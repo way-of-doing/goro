@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Goro/Goro.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Goro.Tests/Goro.Tests.csproj" />
+  </Folder>
+</Solution>
