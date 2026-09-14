@@ -20,7 +20,7 @@ Discover files matching pathspec(s) and output information for each.
 
 Selects the output format. Format names are case-insensitive. Valid options for `<format>` are:
 
-- `plain`
+- `plain` (the default if -o is not specified)
 
   This format produces output of the form
 
