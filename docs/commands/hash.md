@@ -12,6 +12,10 @@ goro hash [-a <algo>] [-o <output>] [--] [<pathspec>...]
 
 Read the audio-relevant part of each input file, calculate its hash, and output that information.
 
+# Pathspecs
+
+This command accepts one or more pathspecs. See [Pathspecs](../concepts/pathspecs.md) for resolution and deduplication rules.
+
 # Options
 
 ```

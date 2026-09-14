@@ -121,4 +121,54 @@ public class FileDiscoveryServiceTests
 
         Assert.That(results, Is.EquivalentTo(new[] { Path.GetFullPath(mp3InSub), Path.GetFullPath(mp3Nested) }));
     }
+
+    [Test]
+    public async Task DiscoverAsync_SameDirectoryGivenTwice_YieldsEachFileOnce()
+    {
+        var mp3A = Path.Combine(_tempDir.FullName, "a.mp3");
+        File.WriteAllText(mp3A, "a");
+
+        var results = await _service.DiscoverAsync(
+            [_tempDir.FullName, _tempDir.FullName], CancellationToken.None).ToListAsync();
+
+        Assert.That(results, Is.EqualTo(new[] { Path.GetFullPath(mp3A) }));
+    }
+
+    [Test]
+    public async Task DiscoverAsync_SameLiteralFileGivenTwice_YieldsItOnce()
+    {
+        var file = Path.Combine(_tempDir.FullName, "track.mp3");
+        File.WriteAllText(file, "audio");
+
+        var results = await _service.DiscoverAsync([file, file], CancellationToken.None).ToListAsync();
+
+        Assert.That(results, Is.EqualTo(new[] { Path.GetFullPath(file) }));
+    }
+
+    [Test]
+    public async Task DiscoverAsync_OverlappingDirectories_YieldsFilesInSubdirectoryOnce()
+    {
+        var subDir = Directory.CreateDirectory(Path.Combine(_tempDir.FullName, "album"));
+        var mp3A = Path.Combine(_tempDir.FullName, "a.mp3");
+        var mp3B = Path.Combine(subDir.FullName, "b.mp3");
+        File.WriteAllText(mp3A, "a");
+        File.WriteAllText(mp3B, "b");
+
+        var results = await _service.DiscoverAsync(
+            [_tempDir.FullName, subDir.FullName], CancellationToken.None).ToListAsync();
+
+        Assert.That(results, Is.EquivalentTo(new[] { Path.GetFullPath(mp3A), Path.GetFullPath(mp3B) }));
+    }
+
+    [Test]
+    public async Task DiscoverAsync_GlobAndLiteralMatchingSameFile_YieldsItOnce()
+    {
+        var mp3A = Path.Combine(_tempDir.FullName, "a.mp3");
+        File.WriteAllText(mp3A, "a");
+
+        var pattern = Path.Combine(_tempDir.FullName, "*.mp3");
+        var results = await _service.DiscoverAsync([pattern, mp3A], CancellationToken.None).ToListAsync();
+
+        Assert.That(results, Is.EqualTo(new[] { Path.GetFullPath(mp3A) }));
+    }
 }

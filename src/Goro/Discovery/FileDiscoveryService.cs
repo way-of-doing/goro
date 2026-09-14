@@ -13,6 +13,12 @@ public sealed class FileDiscoveryService : IFileDiscoveryService
     {
         await Task.Yield();
 
+        // Each pathspec is resolved independently, but the combined result across all
+        // pathspecs is a set: a file matched by more than one pathspec (duplicate
+        // pathspecs, overlapping directories, a glob that also matches a literal path,
+        // etc.) is yielded only once. See docs/concepts/pathspecs.md.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
         foreach (var pathSpec in pathSpecs)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -22,7 +28,10 @@ public sealed class FileDiscoveryService : IFileDiscoveryService
                 foreach (var file in ResolveGlob(pathSpec))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    yield return file;
+                    if (seen.Add(file))
+                    {
+                        yield return file;
+                    }
                 }
             }
             else if (Directory.Exists(pathSpec))
@@ -32,7 +41,11 @@ public sealed class FileDiscoveryService : IFileDiscoveryService
                     cancellationToken.ThrowIfCancellationRequested();
                     if (IsRecognized(file))
                     {
-                        yield return Path.GetFullPath(file);
+                        var fullPath = Path.GetFullPath(file);
+                        if (seen.Add(fullPath))
+                        {
+                            yield return fullPath;
+                        }
                     }
                 }
             }
@@ -40,7 +53,11 @@ public sealed class FileDiscoveryService : IFileDiscoveryService
             {
                 if (IsRecognized(pathSpec))
                 {
-                    yield return Path.GetFullPath(pathSpec);
+                    var fullPath = Path.GetFullPath(pathSpec);
+                    if (seen.Add(fullPath))
+                    {
+                        yield return fullPath;
+                    }
                 }
             }
             else
