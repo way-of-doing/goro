@@ -11,6 +11,7 @@ This project is intended to produce a practically useful tool, but also to showc
 goro/
 ├── docs/                   # Important vision and design instructions   
 │   └── commands/           # Unix man-style description of each command Goro understands
+│   └── concepts/           # Docs that describe cross-cutting concerns etc; linked to by other docs
 │   └── features/           # Explanatory text around Goro features 
 │   └── sessions/           # Archive of past coding agent sessions; check recents for context on what was just decided
 ├── src/
@@ -20,11 +21,13 @@ goro/
 ```
 
 ## Build & test
+
 - Build: `dotnet build`
 - Test: `dotnet test`
 - Run: `dotnet run --project src/Goro --` followed by relevant arguments
 
 # Workflow
+
 - Read the relevant docs under docs/ before proposing any change.
 - Propose a plan — what changes in `src/` and `tests/` — before writing code. Wait for approval.
 - Every new feature gets tests in tests/YourApp.Tests. Stubs or failing tests are fine for behavior that isn't fully specified yet.
@@ -32,6 +35,7 @@ goro/
 - Stop after implementing and let the change be reviewed before committing.
 
 ## Conventions
+
 - Code formatting is not very important when generating code; that should be handled by a dedicated autoformatting tool
 - Every new feature gets unit tests in tests/YourApp.Tests before it's considered done
 - Don't add NuGet packages without asking first
