@@ -12,8 +12,10 @@ goro/
 ├── docs/                   # Important vision and design instructions   
 │   └── commands/           # Unix man-style description of each command Goro understands
 │   └── concepts/           # Docs that describe cross-cutting concerns etc; linked to by other docs
+│   └── design/             # Design rationale, plus deferred features and open questions
 │   └── features/           # Explanatory text around Goro features 
 │   └── sessions/           # Archive of past coding agent sessions; check recents for context on what was just decided
+│   └── testing.md          # Classes of test that matter, why, and the scenarios for each
 ├── src/
 │   └── Goro/               # Project code
 ├── tests/
@@ -40,3 +42,7 @@ goro/
 - Every new feature gets unit tests in tests/YourApp.Tests before it's considered done
 - Don't add NuGet packages without asking first
 - If a doc is ambiguous or conflicts with existing code, stop and ask rather than guessing
+
+## Before stopping
+
+Write a proposed commit message, as you would have done if instructed to go ahead and commit the session's changes so far, to `.claude/commit-msg.txt`.

@@ -26,6 +26,8 @@ goro [COMMAND] [OPTIONS...]
 
 Each command that Goro supports is described in more detail in a document under `docs/commands/`, for example `goro hash` is a command described in `docs/commands/hash.md`.
 
+Every command accepts the global option `--strict-exit-code`, which makes outcomes that would otherwise all be reported as success distinguishable by exit code. See [Exit codes](concepts/exit-codes.md).
+
 # Constraints & preferences
 
 Target: .NET 10, console app, cross-platform

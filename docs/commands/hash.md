@@ -5,7 +5,7 @@
 # Synopsis
 
 ```
-goro hash [-a <algo>] [-o <output>] [--] [<pathspec>...]
+goro hash [-a <algo>] [-o <output>] [--strict-exit-code] [--] [<pathspec>...]
 ```
 
 # Description
@@ -25,7 +25,7 @@ This command accepts one or more pathspecs. See [Pathspecs](../concepts/pathspec
 Selects the hash function to be used. Hash function names are case-insensitive. Valid options for `<algorithm>` are:
 
 - `md5`: use MD5 (the default if -a is not specified)
-- `sha1`: use SHA-1 
+- `sha1`: use SHA-1
 
 ```
 -o <format>, --output=<format>
@@ -33,7 +33,7 @@ Selects the hash function to be used. Hash function names are case-insensitive. 
 
 Selects the output format. Format names are case-insensitive. Valid options for `<format>` are:
 
-- `plain` (the default if -o is not unspecified)
+- `plain` (the default if -o is not specified)
 
   This format produces output of the form
 
@@ -61,3 +61,7 @@ Selects the output format. Format names are case-insensitive. Valid options for 
   - `file`: the full absolute file path name
   - `algo`: the name of the function used to compute the hash
   - `hash`: the computed audio hash
+
+# Exit code
+
+This command accepts the global option `--strict-exit-code`. See [Exit codes](../concepts/exit-codes.md) for the codes it returns and what the option changes.
