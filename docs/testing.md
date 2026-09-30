@@ -282,3 +282,104 @@ rejected on the same terms as the malformed ones.
 | A literal pattern using each of the four unsupported construct families | Each must be a static error, reported before any file is opened, on the same terms as a malformed pattern |
 | A pattern written as a quoted string and as the equivalent raw string, for an escape both levels understand | `"\x41"` and `r"\x41"` must both match the same subject, by the string processing the escape in one case and the pattern engine in the other |
 
+## Unreadable files and pathspecs
+
+### Why this earns its own class of tests
+
+Every other class here is about getting a computation right. This one is about what happens when
+the environment refuses, and it earns attention for two reasons that have nothing to do with the
+rules being subtle.
+
+The first is that these paths are **expensive to provoke and therefore tend to go untested**.
+Asserting that a permission error warns rather than aborting needs a file whose permissions were
+deliberately broken. Asserting what happens when a file disappears mid-run needs it removed
+between discovery and processing. Asserting what a damaged file does needs bytes written by hand
+that no tagger would ever produce. Each is a small piece of fixture work that is easy to skip, and
+the result of skipping all of them is that the least-exercised code in the program is the code
+that runs when a collection turns out to be in exactly the state Goro was built for.
+
+The second is that the guarantee under test is the central one. A run over a hundred thousand
+files must not abort because one of them is damaged, and it must not quietly return an incomplete
+answer as though it were a complete one. Either failure is worse than the condition that provoked
+it.
+
+### What the tests must establish
+
+**A file that cannot be read never stops the run.** Whatever the cause, processing continues with
+the next file and the run reports completion.
+
+**It warns exactly once.** Not once per predicate sub-expression that would have touched the file,
+and not once per attempt to read it: one file that cannot be read is one warning.
+
+**Each command's output says so in the way its own question implies.** This is the assertion most
+worth writing, because the tempting implementation -- leaving the file out -- is correct for
+`list` and wrong for `hash`, and no test of the happy path would reveal the difference.
+
+**A file the run never had to open cannot fail to be read.** Which files are exposed to this
+depends on what the command needs from each one, so the absence of a warning is as much a property
+under test as its presence.
+
+**The exit code distinguishes an incomplete answer from a merely remarkable one.** The precedence
+rules matter more than the individual codes, since they are what a script branches on and what no
+single-condition test exercises.
+
+### Scenarios to cover
+
+| Scenario | What it is there to catch |
+|---|---|
+| A file whose permissions deny reading | Must warn and continue, and the run must complete rather than abort |
+| A file removed between discovery and processing | The same treatment; the window is real on a large collection, so this must not be a distinct failure mode |
+| A file that is not audio at all, and one whose audio is truncated | Must warn and continue, not propagate an exception from the tag library |
+| A predicate mentioning only `file::size`, against a file whose tags cannot be read | Must **not** warn: nothing needed the tags, so nothing failed |
+| The same file under a predicate mentioning a tag identifier | Must warn, and the file must not be listed |
+| `goro list` with no filter, over a file that cannot be opened | Must list it and must not warn, the command having needed nothing but the path |
+| `goro hash` over an unreadable file, in both output formats | The row must appear, with `-` in plain and `null` in JSON. Omitting the row is precisely the failure this scenario exists to catch |
+| `goro list --filter` over an unreadable file | The file must not be listed |
+| One unreadable file among many readable ones, with `--strict-exit-code` | Code `11` |
+| An unreadable file together with a tag that could not be interpreted | Code `11`, not `10`: within a group the higher-numbered code wins |
+| An unreadable file in a run where nothing matched | Code `11`, not `20`, an unreadable file not counting as examined |
+| A data warning and an empty result, with no unreadable file | Code `10`, not `20`: the `1`x group takes precedence over the `2`x group |
+| All of the above without `--strict-exit-code` | Code `0` in every case; the option must be the only thing that surfaces any of this |
+| A pathspec naming a file that does not exist | An error before anything is processed, code `2`, and no output at all |
+| A pathspec naming a directory that cannot be listed at all | The same, since it is equally knowable before the run starts |
+| A glob matching nothing | Not an error: it contributes no files, and with nothing else matching the run returns `21` |
+| A subdirectory that cannot be listed, inside a directory pathspec | Must warn and continue, and every sibling entry must still be processed |
+
+## Warning suppression
+
+### Why this earns its own class of tests
+
+`--no-warn` makes a promise about the *absence* of evidence: a suppressed warning was not
+produced, and nothing anywhere distinguishes a condition that was suppressed from one that never
+occurred. A promise of that shape cannot be checked by confirming that some output is missing,
+because almost any defect also makes output missing. It has to be checked by running two things
+that should be indistinguishable and asserting that they are, across every channel at once.
+
+The second reason is that suppression reaches the exit code, which is the part a script depends on
+and the part that no amount of testing standard error would touch.
+
+### What the tests must establish
+
+**Indistinguishability.** A run over data that warns, with that category suppressed, must agree
+with a run over clean data in everything observable: standard output, standard error, and exit
+code. That is the assertion, and it is a good deal stronger than "standard error was empty".
+
+**Suppression reaches the exit code.** A suppressed category cannot produce its code, which is
+what makes the `2`x codes reachable at all on a collection that warns routinely.
+
+**The categories are independent.** Suppressing one must leave the other entirely alone, in both
+channels.
+
+### Scenarios to cover
+
+| Scenario | What it is there to catch |
+|---|---|
+| A run over data that warns under `--no-warn=data`, against the same run over clean data | Standard output, standard error and exit code must all agree. A test checking only standard error would pass an implementation that still returned `10` |
+| `--no-warn=data` where a data warning would have fired and nothing matched | Code `20`, which is the outcome the option exists to make reachable |
+| `--no-warn=data` where a file also could not be read | Code `11` regardless: the other category is untouched |
+| `--no-warn=file` where a file could not be read and a data warning fired | Code `10`, with the file warning absent from standard error |
+| `--no-warn` bare, `--no-warn=all`, and `--no-warn=data,file` | All three identical in every channel |
+| `--no-warn=data` on a run with no unusable data at all | Identical to the same run without the option: suppressing something that did not happen must change nothing |
+| An unrecognised category name | Rejected as a command line error with code `2`, before anything is processed |
+| A category name in a different case | Accepted: category names are case-insensitive, as the other option values Goro takes already are |
+

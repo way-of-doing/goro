@@ -386,7 +386,9 @@ Only conditions that genuinely depend on the contents of a file are left to be d
 
 ### Warnings
 
-A warning is emitted when an unusable occurrence is consumed while evaluating a predicate, and likewise when a regular expression arriving from tag data fails to compile. Evaluation always continues after a warning: a warning never interrupts processing, and it never changes the result of the predicate.
+This section covers the warnings a predicate produces. For what a warning is, what else can produce one, where they go, and how they relate to the exit code, see [Warnings](warnings.md).
+
+A predicate emits a warning when an unusable occurrence is consumed while it is being evaluated, and likewise when a regular expression arriving from tag data fails to compile. Evaluation always continues after a warning: it never interrupts processing, and it never changes the result of the predicate.
 
 #### What counts as consuming an unusable occurrence
 
@@ -428,9 +430,9 @@ Deduplication resets for every file. A predicate such as `id3v2::track == 1` app
 
 A sub-expression that is never evaluated never warns. In particular, the short-circuiting of `AND` and `OR` can be used deliberately to avoid a warning; refer to [State tests](#state-test-operator) for the guard idiom that relies on this. Within a single operator there is no such escape, since iteration over a multivalue operand is exhaustive: if an operand holds an unusable occurrence and the operator is evaluated at all, the warning is emitted, whether or not some other occurrence already settled the result.
 
-#### Where warnings go
+#### What a warning quotes
 
-Warnings are written to standard error and never to standard output, so that they cannot interfere with the machine-readable output of commands such as `goro list -o json`. They do not by themselves make a command fail: a run that warned is still a run that completed, and reporting that fact through the exit code is opt-in (see [Exit codes](exit-codes.md)). Each warning names the file being processed and quotes the sub-expression responsible, exactly as it was written in the predicate. Where the same source occurs in more than one place, the quoted text is that of the occurrence which actually produced the value. Because deduplication means only one of several equally responsible occurrences is reported, a warning deliberately does not name a position within the predicate.
+Each warning quotes the sub-expression responsible, exactly as it was written in the predicate. Where the same source occurs in more than one place, the quoted text is that of the occurrence which actually produced the value. Because deduplication means only one of several equally responsible occurrences is reported, a warning deliberately does not name a position within the predicate.
 
 ### Modifiers
 

@@ -5,7 +5,7 @@
 # Synopsis
 
 ```
-goro list [--filter=<predicate>] [--strict-exit-code] [--] [<pathspec>...]
+goro list [--filter=<predicate>] [--strict-exit-code] [--no-warn[=<category>,...]] [--] [<pathspec>...]
 ```
 
 # Description
@@ -19,6 +19,8 @@ This command accepts one or more pathspecs. See [Pathspecs](../concepts/pathspec
 # Filtering
 
 By default, every file discovered from the pathspecs is listed. When `--filter` is given, a file is listed only if it additionally satisfies the predicate: the pathspecs decide which files are considered, and the predicate decides which of those are kept. See [Predicates](../concepts/predicates.md) for the expression syntax.
+
+A file that the predicate needs to read and that cannot be read is not listed, a predicate that could not be evaluated not having been satisfied. One warning is emitted for that file and the run continues; see [Warnings](../concepts/warnings.md).
 
 # Options
 
@@ -67,6 +69,6 @@ Selects the output format. Format names are case-insensitive. Valid options for 
   That is: an array of objects, where each object has the following properties:
   - `file`: the full absolute file path name
 
-# Exit code
+# Exit code and warnings
 
-This command accepts the global option `--strict-exit-code`. See [Exit codes](../concepts/exit-codes.md) for the codes it returns and what the option changes.
+This command accepts the global options `--strict-exit-code` and `--no-warn`. See [Exit codes](../concepts/exit-codes.md) for the codes it returns and what `--strict-exit-code` changes, and [Warnings](../concepts/warnings.md) for the warning categories and what `--no-warn` suppresses.

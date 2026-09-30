@@ -31,6 +31,15 @@ The first is memory. Linear time does not mean cheap: the engine's state is boun
 
 The second is the constructs the engine does not support -- lookaround, backreferences, atomic groups, conditionals and balancing groups -- which are rejected rather than matched by some slower route. Supporting them would mean keeping a backtracking engine alongside for the patterns that need it, and a timeout with it, which gives back the nondeterminism for the subset of patterns using those constructs. That may eventually be the right trade, but it is worth making only for a concrete want, and the first candidate that comes to mind, negative lookahead for "does not begin with", is already better said as `NOT (x ~= "^...")`.
 
+**Finer-grained warning suppression**
+`--no-warn` selects by category and by nothing finer. Silencing warnings for one identifier, one tag format or one file would need warnings to carry stable identities to name, and they carry none: a data warning is identified today by the file and the sub-expression that produced it, both facts about a single run rather than names. Choosing what those names are is the work, not the option, and it is far better done against a body of warnings from real collections than in the abstract.
+
+**A summary instead of warnings**
+Collapsing repeats into one line at the end of a run -- "500 files had uninterpretable tag data" -- would keep the signal while losing the volume, which is often what somebody actually wants when they reach for suppression. It would not replace `--no-warn`, since a summary still reports the condition and therefore still belongs in the exit code; the two compose. It waits with everything else that is really about output capabilities. There is a great deal to do there and none of it is why anybody would want this tool: the audio hashing and the query language are what have to be good first.
+
+**Reading options from somewhere other than the command line**
+A scheduled run that wants a standing `--no-warn=data` would rather say so once. An environment variable is the cheap version and needs no file format at all; a configuration file is its own feature, with discovery, precedence and syntax to settle. Neither is worth building before somebody is using Goro often enough to be inconvenienced by its absence.
+
 **Set inclusion operator (`x IN (a, b)`)**:
 Interesting but not must-have; in case array types appear in our grammar, there are potential interops to consider. Note that it cannot be implemented as syntactic sugar around OR, tempting as that looks: an operator is a single quantifier scope, so while `x IN (a, b)` and `x == a OR x == b` agree under the default existential quantifier, they part company under `ALL()`, where the first asks that every occurrence match one of the two and the second asks that every occurrence match `a` or that every occurrence match `b`.
 
