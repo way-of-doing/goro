@@ -15,6 +15,7 @@ goro/
 │   └── design/             # Design rationale, plus deferred features and open questions
 │   └── features/           # Explanatory text around Goro features 
 │   └── sessions/           # Archive of past coding agent sessions; check recents for context on what was just decided
+│   └── implementation.md   # Build-level concerns and open questions that need running code to settle
 │   └── testing.md          # Classes of test that matter, why, and the scenarios for each
 ├── src/
 │   └── Goro/               # Project code

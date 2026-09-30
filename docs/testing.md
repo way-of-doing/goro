@@ -180,6 +180,13 @@ where ordinary set semantics would make it true.
 documentation is small enough to assert in full, and should be, because its entries are what
 establish that no one of the three tests can be derived from the others.
 
+**The regex operator normalizes its subject and not its pattern.** Every other operator
+normalizes both of its operands, so an implementation that reuses the ordinary path for `~=` will
+normalize the pattern too, and the symptom is a pattern that matches slightly different files
+rather than any kind of failure. The asymmetry therefore needs asserting from both sides: that a
+diacritic in the pattern matches nothing, and that the same pattern under `LITERALLY()` matches
+the subject that still has one.
+
 **Warning identity is structural.** The interning rules hold: differences of whitespace, letter
 case, explicit namespace qualification and modifier wrapping do not produce distinct sources,
 while a difference anywhere below the top level does. The set of sources a predicate can produce
@@ -205,3 +212,73 @@ is as much about when the error arrives as about whether it arrives at all.
 | A value that is absent, and one that is a single unusable occurrence, passed to `COUNT()` | Must be 0 and 1 respectively, and neither may warn |
 | Each row of the warning deduplication table | Source identity must be structural and independent of position |
 | Each bullet of the static error list | Every one reported with nothing processed, and with the exit code that says the run never started |
+| A `~=` whose pattern holds a diacritic, against a subject that holds the same one | Must not match: the subject is normalized and the pattern is not |
+| The same pair under `LITERALLY()` | Must match: an unnormalized subject keeps its diacritics |
+| A `~=` whose pattern differs from the subject only in case | Must match by default, and must not under `LITERALLY()`, since the modifier makes the match case-sensitive |
+| A pattern that would change meaning if it were decomposed, such as `e` followed by a combining acute and `?` | Must be matched as written; an implementation that normalizes the pattern turns it into a different pattern rather than a differently-spelled one |
+| A pattern arriving from tag data that is invalid, or that uses an unsupported construct | Must warn and evaluate to false, and must not stop the run |
+
+## Predicate reading
+
+### Why this earns its own class of tests
+
+The classes above are about what a predicate means once it has been read. This one is about the
+step before that, and it earns separate attention because its failure mode is the sharpest in the
+document: the same predicate text yielding a *different value*, with no error raised anywhere. A
+literal read wrongly does not misbehave visibly. It silently selects a different set of files,
+and the predicate on the command line still looks exactly like what the user meant.
+
+Two things concentrate the risk.
+
+**A string literal has two forms and escaping happens at two levels.** A quoted string processes
+escapes and a raw string does not, and where the value is a regular expression the pattern engine
+then processes escapes of its own. Most of the ways to get this wrong produce a valid string that
+is not the intended one: dropping a backslash before a character that is not an escape, reading
+more or fewer digits than `\x` and `\u` take, or mishandling the doubled quote that terminates a
+raw string.
+
+**Tokenisation rests on a rule the productions cannot state.** A token is always as long as it
+can be, and several literals are only unambiguous because of it. Most mistakes here surface as
+parse errors, which are visible and therefore cheap, but not all: the doubled-quote rule inside a
+raw string decides a value rather than whether the text parses.
+
+### What the tests must establish
+
+**Every escape produces exactly its character, and nothing else is an escape.** The list in the
+predicate documentation is closed, so the tests are the list plus the negative case: a backslash
+followed by anything not on it is an error. That negative case matters more than it looks, because
+the tempting implementation -- pass the unknown character through and drop the backslash -- is what
+several languages do, and it would turn a mistyped pattern into a quietly different one.
+
+**A raw string is what was written.** Byte for byte, backslashes included, with a doubled quote
+standing for one quote and the string ending only at a quote that stands alone.
+
+**The two forms are indistinguishable once read.** A quoted string and a raw string denoting the
+same characters are one value, compare equal, and count as one warning source.
+
+**The longest token wins.** Asserted on the literals where it decides something, rather than as a
+property of the lexer in the abstract.
+
+Static rejection of a bad pattern belongs to the error-reporting guarantee asserted in the class
+above, and is not restated here; what this class adds is that the *unsupported* constructs are
+rejected on the same terms as the malformed ones.
+
+### Scenarios to cover
+
+| Scenario | What it is there to catch |
+|---|---|
+| Each of the seven escapes, in a quoted string | Each must produce exactly its character |
+| `"\x41B"` and the four-digit `\u` equivalent | Both escapes take a fixed number of digits, so this is `A` followed by `B` and not a three-digit read |
+| A backslash followed by a character that is not an escape, including `\N` and `\U` | Must be an error, not a dropped backslash and not a literal one |
+| Two `\u` escapes forming a surrogate pair | Must produce the single character outside the Basic Multilingual Plane |
+| `r"\d{4}"` used as a pattern | The backslash must reach the pattern engine unprocessed |
+| `r"a""b"` | Must be the three characters `a"b` |
+| A raw string of four consecutive quotes | Must be a string holding one quote |
+| `r "x"`, with a space between prefix and quote | Must not be a raw string, the prefix having to abut the quote |
+| An identifier named `r` followed by whitespace, by an operator, and by `::` | Must remain an identifier in each case; the raw-string prefix must not capture it |
+| A quoted string and a raw string denoting the same characters, compared with each other and used twice in one predicate | Must be one value and one warning source |
+| `5mb` against `5m`, and `1h10m` against `10 kb` and `1h 10m` | The longest token must win, and whitespace must not appear inside a literal |
+| `1..100`, `1.5..2`, and `1.` | The range operator must survive the lexer, and a trailing period must be rejected |
+| A literal pattern using each of the four unsupported construct families | Each must be a static error, reported before any file is opened, on the same terms as a malformed pattern |
+| A pattern written as a quoted string and as the equivalent raw string, for an escape both levels understand | `"\x41"` and `r"\x41"` must both match the same subject, by the string processing the escape in one case and the pattern engine in the other |
+

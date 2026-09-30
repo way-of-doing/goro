@@ -24,8 +24,12 @@ A global identifier such as `artist` resolves on a best-effort basis across seve
 **Addressing a single `TXXX`, `COMM` or `WXXX` frame by its description**
 These frames are distinguished from one another by a description rather than by their identifier, so Goro currently surfaces them as a multivalue of strings that carry the description inside them. Selecting one by description needs a name made of two parts, the frame and the description, where the rest of the language only ever names one thing. A further `::` part would be the obvious spelling, but it would mean an identifier whose parts are not all namespaces, which wants thinking about before it is committed to.
 
-**What is the scope of the regex timeout -- single match?**
-Potentially just fold this into a timeout for evaluating the whole predicate per-file? Also make it configurable?
+**Resource bounds on regular expression matching**
+Matching uses the non-backtracking engine, so a match is linear in the length of the subject and there is no timeout to scope, to configure, or to make a result depend on machine speed and load. Two questions are parked here rather than answered.
+
+The first is memory. Linear time does not mean cheap: the engine's state is bounded but not small, and a pathological pattern arriving from tag data could in principle make a run expensive without making it non-terminating. If that ever proves real, the shape of the fix is a budget for the whole run rather than a limit on one match, since a per-match limit is exactly what reintroduces the nondeterminism the engine was chosen to remove. Nothing should be built for this before somebody has a collection that exhibits it.
+
+The second is the constructs the engine does not support -- lookaround, backreferences, atomic groups, conditionals and balancing groups -- which are rejected rather than matched by some slower route. Supporting them would mean keeping a backtracking engine alongside for the patterns that need it, and a timeout with it, which gives back the nondeterminism for the subset of patterns using those constructs. That may eventually be the right trade, but it is worth making only for a concrete want, and the first candidate that comes to mind, negative lookahead for "does not begin with", is already better said as `NOT (x ~= "^...")`.
 
 **Set inclusion operator (`x IN (a, b)`)**:
 Interesting but not must-have; in case array types appear in our grammar, there are potential interops to consider. Note that it cannot be implemented as syntactic sugar around OR, tempting as that looks: an operator is a single quantifier scope, so while `x IN (a, b)` and `x == a OR x == b` agree under the default existential quantifier, they part company under `ALL()`, where the first asks that every occurrence match one of the two and the second asks that every occurrence match `a` or that every occurrence match `b`.

@@ -18,15 +18,19 @@ A predicate is supplied to a command as a single command line argument. Because 
 
 The rest of this section describes the syntax for predicates, and the various operators and other constructs that can appear inside them.
 
-### Whitespace
+### Tokens and whitespace
 
-The amount and type of whitespace characters between tokens is ignored when reading predicates. However, whitespace is still required to separate tokens which are grammatically distinct, and of course whitespace is entirely preserved within string values (so the values `"foo"` and `"foo "` are not equal).
+A predicate is read as a sequence of _tokens_: literals, identifiers, operators and punctuation. Two rules govern how the text is divided into them, and both come up often enough to belong here rather than in the grammar.
+
+**A token is always as long as it can be.** Where a stretch of text could be read as one longer token or as two shorter ones, the longer reading wins. This is what makes `5mb` a bytecount rather than a five-minute duration followed by a stray `b`, `1h10m` a single duration rather than three tokens, `r"x"` a raw string rather than an identifier followed by a string, and `NOTx` an identifier rather than the `NOT` operator applied to something called `x`.
+
+**Whitespace separates tokens and is insignificant everywhere else.** The amount and kind of whitespace between two tokens is ignored, but whitespace may never appear *inside* one: `10 kb` and `1h 10m` are not literals, and `r "x"` is not a raw string. Whitespace is therefore required wherever two tokens would otherwise run together into one, which is the whole of why `NOT x` needs its space. Inside a string value whitespace is preserved exactly, so `"foo"` and `"foo "` are not equal.
 
 ### Case sensitivity
 
 Predicate syntax is case-insensitive throughout, using invariant culture rules. The keyword operators (`AND`, `OR`, `NOT`, `BETWEEN`, `IS`), the state names (`USABLE`, `UNUSABLE`, `ABSENT`), the reserved words `NULL`, `TRUE` and `FALSE`, function names, identifiers, namespaces, and the unit suffixes of bytecount and duration literals are all matched without regard to case. `artist`, `Artist` and `ARTIST` are the same identifier, and similarly `id3v2::tit2` and `ID3V2::TIT2` are the same identifier.
 
-The only case-sensitive text in a predicate is the contents of a string value -- and even those are converted to lowercase before being compared, unless `LITERALLY()` is used to prevent it. A quoted part of an identifier is not a string value in this sense and is matched without regard to case like any other part of an identifier, so `ape::"album artist"` and `ape::"Album Artist"` are the same identifier.
+The only case-sensitive text in a predicate is the contents of a string value -- and even those are converted to lowercase before being compared, unless `LITERALLY()` is used to prevent it. The letters of a string escape are a second and smaller exception: the escapes are the ones listed under [Values](#values) and no others, so `\n` is a line feed while `\N` is not an escape at all and is therefore an error. The hexadecimal digits of `\x` and `\u` may be written in either case, and the `r` prefixing a raw string may be either `r` or `R`, both being notation around a string rather than part of its contents. A quoted part of an identifier is not a string value in this sense and is matched without regard to case like any other part of an identifier, so `ape::"album artist"` and `ape::"Album Artist"` are the same identifier.
 
 ### Identifiers and namespaces
 
@@ -86,7 +90,27 @@ The types that Goro recognizes are:
 : represents a binary logical state (true or false). Boolean is the one type with no dynamic aspect: a boolean is always a single usable occurrence, never absent and never unusable, because the operators that produce booleans produce false rather than nothing when handed an operand that is absent or unusable. There is no way to write boolean literals in expressions; boolean values are produced by the various comparison, state test and logical operators described later in this document. Boolean values may only appear as operands of the logical operators `AND`, `OR`, and `NOT`, and as the result of a predicate as a whole. It is an error to use a boolean value anywhere else, in particular as an operand of a comparison, range, or regex operator, or as an argument to any function.
 
 **string**
-: arbitrary alphanumeric sequences within double quotes, such as `"metallica"`. Strings can also contain double quotes, which need to be escaped within the string by preceding them with a backslash character. For example, `"qu\"ote"` is a string that represents the value `qu"ote`, with the double quote in the middle appearing escaped as `\"` within the literal. Strings can also contain backslashes, which need to be escaped in the same manner.
+: a sequence of characters, written in either of two forms.
+
+A **quoted string** is delimited by double quotes and processes escape sequences, as in `"metallica"`. Within one, a backslash introduces an escape, and these are all of them:
+
+| Escape    | Denotes                                        |
+|-----------|------------------------------------------------|
+| `\"`      | a double quote |
+| `\\`      | a backslash |
+| `\n`      | line feed, U+000A |
+| `\r`      | carriage return, U+000D |
+| `\t`      | tab, U+0009 |
+| `\xNN`    | the code unit given by two hexadecimal digits |
+| `\uNNNN`  | the code unit given by four hexadecimal digits |
+
+A backslash followed by anything else is an error rather than a literal backslash, so text written with single backslashes is rejected instead of being silently misread. Both `\x` and `\u` take a fixed number of digits, which is what makes `"\x41B"` unambiguously `A` followed by `B`. The escapes denote UTF-16 code units, so a character outside the Basic Multilingual Plane is written as a surrogate pair.
+
+A **raw string** carries the prefix `r` and processes nothing whatsoever: every character between the quotes is part of the value, and a backslash is simply a backslash. This is the form to reach for when writing a regular expression, where a quoted string would need each of its backslashes doubled -- `r"\d{4}"` and `"\\d{4}"` denote the same pattern, and the first is the one worth reading. A double quote inside a raw string is written by doubling it, so `r"say ""hi"""` is the value `say "hi"`.
+
+Where a pattern is concerned the two forms often agree, because a .NET pattern understands the same five character escapes: `"\x41"` hands the pattern a literal `A` while `r"\x41"` hands it the escape, and both match `A`. They part company over everything else a pattern needs -- `\d`, `\s`, `\b`, `\p{...}`, and a literal backslash -- which is meaningful only to the pattern and therefore wants a raw string.
+
+The two forms differ in nothing but how the text between the quotes is read. A raw string has string type like any other, may appear anywhere a quoted string may, including as a quoted part of an identifier, and two literals denoting the same characters are indistinguishable regardless of which form wrote them.
 
 **number**
 : real dimensionless numbers, such as `2000`, `-1`, and `-.55`. Number literals are optionally preceded by one + or - sign character, followed by either an integer or a floating point number where the integer part is separated from the fractional part by a period. If the number has a fractional part, the integer part is optional and considered to be zero when it does not appear. The period must always be followed by at least one digit, so `1`, `1.5` and `.5` are all valid number literals while `1.` is not.
@@ -141,7 +165,7 @@ There are some **fundamental rules which apply globally** to any operator sub-ex
 2. **An unusable occurrence makes false every combination of operand values that includes it**, and consuming it emits a warning. Under the default existential quantifier an unusable occurrence therefore simply fails to contribute a match, whereas under `ALL()` a single one is enough to make the operator false. See [Multivalues](#multivalues) for what a combination is, and [Warnings](#warnings) for what counts as consuming one.
 3. If an operator has multiple operands, it is an error for the operands to have different types. For example, `file::duration > "01:00"` is an error because `file::duration` has duration type and `"01:00"` is a literal of type string. Instead, `file::duration > 01:00` is correct because `01:00` without quotes is a valid duration literal as described earlier.
 4. There is a very important exception to the previous rule: _numeric literals (but not non-literal numeric values!) are polymorphic and can be compared with any type_. In particular, they are automatically converted to the correct type (that of the other operand): for duration type, the converted value is a duration of the given number of seconds, which may have a fractional part even though durations obtained from files never do, and the comparison is then exact -- `file::duration >= 1.5` is false for a file of one second duration and true for a file of two; for bytecount type it represents the given number of bytes; and for string, the converted value is the decimal string representation of the number. This is also true for range literals; `file::size BETWEEN 60..120` compares `file::size` (a bytecount) with `60..120` (a range of numbers, not bytecounts), but the number range literal is automatically interpreted as a bytecount range literal of 60 to 120 bytes.
-5. When working with string values, all operators _normalize_ the values before checking for a match by default. Normalization entails a) **removal of all diacritics**: the value is decomposed into Unicode NFD form and all diacritic mark characters are discarded; and b) **case insensitivity**, which for all operators except `~=` is achieved by converting the value to lowercase using invariant culture rules. The regex matching operator `~=` is the exception: case-folding a regular expression would silently rewrite it, so `~=` leaves the case of both operands alone and performs the match itself case-insensitively instead (see below). For example, `artist == "motorhead"` would match when the artist is recorded as "Motörhead", despite the difference in casing and diacritics. This normalization can be disabled on a per-case basis by using the `LITERALLY()` modifier (see below).
+5. When comparing string values, an operator _normalizes_ them by default. Normalization entails a) **removal of diacritics**: the value is decomposed into Unicode NFD form and all combining marks are discarded; and b) **case insensitivity**, achieved by converting the value to lowercase using invariant culture rules. For example, `artist == "motorhead"` matches when the artist is recorded as "Motörhead", despite the difference in both casing and diacritics. Normalization is a **mode of the operator** rather than a property of either value, so it is switched off for the whole comparison by a `LITERALLY()` modifier on either operand; see [Comparison modes](#comparison-modes). The regex matching operator `~=` is normalized differently, since only one of its operands is a value being compared at all; see [Regular expression match operator](#regular-expression-match-operator).
 
 #### Comparison operators
 
@@ -160,23 +184,48 @@ Examples:
 
 #### Regular expression match operator
 
-String values can be tested to see if they match a regular expression with the regex matching operator `~=`. The left operand is the value being tested and the right operand is the regular expression. Both operands must be of type string, and it is an error if either is not; the polymorphic numeric literal rule (general operator rule 4) does not apply to this operator. Regular expressions are [.NET-flavored](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expressions).
+String values can be tested to see if they match a regular expression with the regex matching operator `~=`. The left operand is the **subject**, the value being tested; the right operand is the **pattern**. Both must be of type string, and it is an error if either is not; the polymorphic numeric literal rule (general operator rule 4) does not apply to this operator. Regular expressions are [.NET-flavored](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expressions), with the restriction described under [Supported constructs](#supported-constructs) below.
 
-The regex matching operator will match if any substring of the tested value matches the regular expression, so if more exact matching is intended the anchors `^` and/or `$` have to be specified.
+The regex matching operator will match if any substring of the subject matches the pattern, so if more exact matching is intended the anchors `^` and/or `$` have to be specified.
 
-Both operands are normalized by default, but this operator handles the case-insensitivity half of normalization differently from every other operator: rather than converting the operands to lowercase, which would silently rewrite the pattern, only diacritic removal is applied to the operands and the match itself is performed case-insensitively using invariant culture rules. As a consequence, unless `LITERALLY()` is used to suppress normalization, a pattern cannot express a case-sensitive condition and cannot match a diacritic.
+**Only the subject is normalized, and the pattern is never touched.** Diacritics are removed from the subject exactly as for any other operator, and case insensitivity is obtained from the match itself rather than by lowercasing anything. A pattern is what the user wrote, character for character.
 
-If the pattern operand is a string literal, it is validated when the predicate is read, and an invalid pattern is reported as an error before any file is processed. If the pattern operand is not a literal — for example, it comes from a tag — it cannot be validated in advance; if it turns out not to be a valid regular expression when it is evaluated, the operator evaluates to false and a warning is emitted, following the same policy as warnings for unusable values (see [Value conversions](#value-conversions)).
-
-Regular expression matching is always subject to an implementation-defined timeout, applied to each individual match attempt. If no result is available within the (generous) allowed time limit, the operator evaluates to false and a warning is emitted, exactly as for an invalid pattern. Note that this makes the result of a predicate containing `~=` potentially dependent on the machine it runs on and on system load; the warning is what surfaces that this has happened.
+The consequence to remember is that **a pattern cannot match a diacritic**, because the subject no longer has any by the time the match runs: `artist ~= "motö"` finds nothing at all, while `artist ~= "mot"` matches "Motörhead". Applying `LITERALLY()` to either operand switches the whole comparison to unnormalized, which leaves the subject's diacritics intact and makes the match case-sensitive, and is the way to write a pattern that means to match one. See the [rationale](../design/rationale.md) for why the pattern is exempt from normalization.
 
 If either operand is a multivalue, matching follows the ordinary quantifier and nested iteration rules described under [Multivalues](#multivalues); each individual pattern of a multivalue pattern operand is validated independently.
 
 There is no negated version of this operator; to determine if a value does not match a regular expression, apply `NOT` to the result of matching it.
 
-**IMPORTANT** Note that an invalid pattern making the operator evaluate to false has the same consequence under negation as an absent or unusable operand does: `NOT (artist ~= sometag)` evaluates to true when `sometag` is not a valid regular expression, so a file can be selected on the strength of a failed match. The warning is what surfaces this; see the discussion of `!=` versus `NOT ==` above for the same underlying phenomenon.
+Examples:
 
-Example: `artist ~= "s$"` matches any artist whose name ends in "s" or "S"
+- `artist ~= "s$"` matches any artist whose name ends in "s" or "S"
+- `artist ~= r"^\d+ "` matches any artist whose name begins with a number followed by a space. Written as a quoted string the same pattern is `"^\\d+ "`, which is why a raw string is the better habit for patterns
+
+##### Supported constructs
+
+Matching uses the **non-backtracking** engine, with **invariant culture** rules and, unless `LITERALLY()` says otherwise, case insensitivity. A match therefore takes time linear in the length of the subject whatever the pattern, and is never abandoned part way through: there is no matching timeout, and no result depends on the machine a run executes on or on what else that machine was doing at the time.
+
+That engine does not support four families of construct, and a pattern using any of them is rejected rather than matched:
+
+| Construct | Examples |
+|---|---|
+| lookaround, positive and negative | `(?=...)`, `(?!...)`, `(?<=...)`, `(?<!...)` |
+| backreferences, numbered and named | `\1`, `\k<name>` |
+| atomic groups | `(?>...)` |
+| conditionals and balancing groups | `(?(1)a\|b)`, `(?<-x>...)` |
+
+Everything else a .NET pattern may contain is available, including captures and named captures, alternation, greedy and lazy quantifiers, character classes, Unicode categories such as `\p{Lu}`, word boundaries, and inline options.
+
+See the [rationale](../design/rationale.md) for why this engine was chosen and what the restriction costs.
+
+##### Invalid patterns
+
+A pattern that is not a valid supported regular expression is rejected. Where this happens depends on whether the pattern is known in advance:
+
+- **A literal pattern is validated when the predicate is read**, and a bad one is an error reported before any file is processed, like every other error this document describes.
+- **A pattern arriving from tag data cannot be validated in advance.** If it turns out not to be valid when it is evaluated, the operator evaluates to false and a warning is emitted, following the same policy as warnings for unusable occurrences (see [Value conversions](#value-conversions)).
+
+**IMPORTANT** An invalid pattern making the operator evaluate to false has the same consequence under negation as an absent or unusable operand does: `NOT (artist ~= sometag)` evaluates to true when `sometag` is not a valid regular expression, so a file can be selected on the strength of a match that never ran. The warning is what surfaces this; see the discussion of `!=` versus `NOT ==` above for the same underlying phenomenon.
 
 #### State test operator
 
@@ -331,13 +380,13 @@ The errors reported when a predicate is read include:
 - an argument of the wrong type to a function, and a modifier applied to an operand it cannot affect, such as `LITERALLY()` applied to something other than a string, or to the operand of a state test;
 - a modifier applied anywhere other than to an operand of a comparison, range, regex, or state test operator, or to another such modifier;
 - a range whose endpoints are not literals of the same type, or whose `min` is greater than its `max`;
-- a regular expression literal that is not a valid regular expression.
+- a regular expression literal that is not a valid regular expression, or that uses a construct the matching engine does not support.
 
-Only conditions that genuinely depend on the contents of a file are left to be discovered during evaluation, and none of them ever stops a run: a value that is absent, an occurrence that cannot be interpreted, a regular expression arriving from tag data that turns out not to be valid, and a match that exceeds the matching timeout. These are reported as warnings instead, as described below.
+Only conditions that genuinely depend on the contents of a file are left to be discovered during evaluation, and neither of them ever stops a run: a value that is absent or an occurrence that cannot be interpreted, and a regular expression arriving from tag data that turns out not to be valid. These are reported as warnings instead, as described below.
 
 ### Warnings
 
-A warning is emitted when an unusable occurrence is consumed while evaluating a predicate, and likewise when a regular expression fails to compile or a match exceeds the matching timeout. Evaluation always continues after a warning: a warning never interrupts processing, and it never changes the result of the predicate.
+A warning is emitted when an unusable occurrence is consumed while evaluating a predicate, and likewise when a regular expression arriving from tag data fails to compile. Evaluation always continues after a warning: a warning never interrupts processing, and it never changes the result of the predicate.
 
 #### What counts as consuming an unusable occurrence
 
@@ -360,7 +409,7 @@ An unusable occurrence is born once, at the identifier or the conversion that fa
 
 Warnings are deduplicated per file and per source. Evaluating a predicate against one file emits at most one warning for each distinct sub-expression that produced an unusable occurrence; the second and subsequent times the same source is reached while evaluating that same file, nothing further is emitted.
 
-Two sub-expressions are the same source when they apply the same functions, in the same shape, to the same identifiers and literals. How they are written does not matter -- whitespace, letter case, and whether a namespace is given explicitly are all irrelevant -- and neither does where in the predicate they appear. The modifiers `ALL()`, `ANY()` and `LITERALLY()` are transparent for this purpose: they never make two otherwise identical sub-expressions into different sources.
+Two sub-expressions are the same source when they apply the same functions, in the same shape, to the same identifiers and literals. How they are written does not matter -- whitespace, letter case, whether a namespace is given explicitly, and which of the two string forms wrote a literal are all irrelevant -- and neither does where in the predicate they appear. The modifiers `ALL()`, `ANY()` and `LITERALLY()` are transparent for this purpose: they never make two otherwise identical sub-expressions into different sources.
 
 In the following examples, `x` and `y` are identifiers that resolve to an unusable occurrence for the file being evaluated, `m` is a multivalue that includes at least one unusable occurrence, and `s` and `t` are identifiers holding strings that are not valid numbers.
 
@@ -385,15 +434,22 @@ Warnings are written to standard error and never to standard output, so that the
 
 ### Modifiers
 
-Three constructs -- `ALL`, `ANY`, and `LITERALLY` -- are _modifiers_ rather than functions. A modifier does not compute a new value from its argument; it changes how the operator that consumes the value will treat it. `ALL` and `ANY` select the quantifier applied to a multivalue, and `LITERALLY` suppresses the normalization of string values. The default behavior of every value is that of `ANY` and of normalized comparison, so a modifier is only ever needed to depart from that.
+Three constructs -- `ALL`, `ANY`, and `LITERALLY` -- are _modifiers_ rather than functions. A modifier does not compute a new value from its argument; it changes how the operator that consumes the value will treat it. The defaults are existential quantification and normalized comparison, so a modifier is only ever needed to depart from them.
+
+The three are not quite the same kind of thing, and the difference is worth stating because it decides what writing one on one side of an operator does to the other side.
+
+- `ALL` and `ANY` choose a **quantifier**, which belongs to the operand it is written on. Each operand of an operator carries its own, and they are independent: one side may be universal while the other is existential.
+- `LITERALLY` chooses a **comparison mode**, which belongs to the operator. An operator either normalizes the strings it compares or it does not, and a `LITERALLY` on either operand settles that for the comparison as a whole.
 
 Because a modifier's effect is realized by an operator rather than by the modifier itself, **a modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
 
 The restriction applies in one direction only. A modifier may be applied to any operand, including one that is itself a function call, so `LITERALLY(FALLBACK(genre, "pop")) == "Pop"` is valid: modifiers go on the outside, functions on the inside.
 
-Modifiers may be stacked as deeply as desired and in any order, since each one sets an independent property of the operand. `LITERALLY(ALL(genre))` and `ALL(LITERALLY(genre))` mean the same thing, and where the same property is set twice the outermost modifier wins, so `ALL(ANY(genre))` is universally quantified.
+Modifiers may be stacked as deeply as desired and in any order, a quantifier and a comparison mode being independent choices. `LITERALLY(ALL(genre))` and `ALL(LITERALLY(genre))` mean the same thing, and where the same choice is made twice the outermost wins, so `ALL(ANY(genre))` is universally quantified.
 
-The modifiers are:
+#### Quantifiers
+
+A quantifier decides what it means for an operand that holds several occurrences to satisfy an operator. It is a property of the operand it is written on, so each operand of an operator carries its own; see [Multivalues](#multivalues) for how the two are combined when they differ. Applying a quantifier to an operand that holds a single occurrence has no effect, and the operand is treated exactly as it would have been without it.
 
 **ALL(expr)**
 : causes the operand to be evaluated with a _universal_ quantifier when it is a multivalue, instead of the default _existential_ quantifier: an operator using this operand only matches if _all_ of the multiple values present match, rather than _any one_ value as is the default behavior. See [Multivalues](#multivalues) for the full evaluation rules, including how two multivalue operands are combined when their quantifiers differ.
@@ -408,16 +464,18 @@ In case the operand that `ALL()` is applied to is not a multivalue, the modifier
 **ANY(expr)**
 : causes the operand to be evaluated with an _existential_ quantifier when it is a multivalue: an operator using this operand matches when _any one_ of the multiple values matches. This is the default behavior for every multivalue operand, so this modifier is never strictly necessary, but it is included as an explicit counterpart to `ALL()`, both to allow more expressiveness if desired (`ANY(genre) == "rock"` reads very naturally) and to make a quantifier choice explicit where it might otherwise be unclear at a glance -- for example, when comparing two multivalues where only one side is wrapped in `ALL()`.
 
-In case the operand that `ANY()` is applied to is not a multivalue, the modifier has no effect and the operand is treated exactly as it would have been without it.
+#### Comparison modes
+
+A comparison mode decides how an operator compares the strings it is given. There is one such mode, normalization, and one modifier to turn it off. Unlike a quantifier, a mode belongs to the operator rather than to an operand: an operator either normalizes or it does not, and there is no way for one side of a comparison to be normalized while the other is not. Writing the modifier on an operand is how that choice is expressed, and which operand it is written on makes no difference.
 
 **LITERALLY(expr)**
-: prevents any operator that compares strings from normalizing its inputs before testing. Use this modifier to achieve case-sensitive matching, matching on diacritics, and other specialized scenarios. It also works with regular expression matching.
+: switches the operator that consumes this operand out of normalized comparison. Use it for case-sensitive matching, for matching on diacritics, and for other cases where the value is to be taken exactly as recorded.
 
-Note that it is enough for _just one_ of the operands to a string operator to be a `LITERALLY()` value to disable normalization -- `LITERALLY(x) == y`, `x == LITERALLY(y)`, and `LITERALLY(x) == LITERALLY(y)` all do exactly the same thing.
+Because the mode belongs to the operator, it is enough for _just one_ operand to carry the modifier -- `LITERALLY(x) == y`, `x == LITERALLY(y)`, and `LITERALLY(x) == LITERALLY(y)` all do exactly the same thing. There is no such thing as a `LITERALLY` value that could be passed around and compared against a normalized one; the modifier is a note to the operator, and the operator obeys it once.
 
-When applied to either operand of `~=`, this modifier additionally makes the match case-sensitive, since for that operator case insensitivity is part of normalization rather than of the match itself.
+Applied to either operand of `~=`, the modifier additionally makes the match case-sensitive, since for that operator case insensitivity comes from the match rather than from rewriting a value. It also leaves the subject's diacritics in place, which is what allows a pattern to match one.
 
-If the operand is a multivalue, the effect applies individually to each of its occurrences. It is an error to apply `LITERALLY()` to an operand of any type other than string, and likewise to the operand of a state test, where there is no comparison for normalization to affect. An absent value and a string multivalue are of course still permitted.
+Where an operand holds several occurrences, the mode applies to the comparison of every one of them, there being only one comparison mode in play. It is an error to apply `LITERALLY()` to an operand of any type other than string, and likewise to the operand of a state test, where there is no comparison for a mode to affect. An absent value and a string multivalue are of course still permitted.
 
 Examples:
 
@@ -425,8 +483,10 @@ Examples:
 - `artist == LITERALLY("metallica")` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the equality operator from normalizing its inputs before comparing them.
 - `artist BETWEEN "m".."n"` matches "Metallica" because, after normalization by default, "Metallica" sorts between "m" and "n".
 - `LITERALLY(artist) BETWEEN "m".."n"` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the range operator from normalizing its inputs, and upper case "M" does not sort between lower case "m" and "n".
-- `artist ~= "^met"` matches "Metallica" because diacritics are removed from both operands and the match is performed case-insensitively.
-- `artist ~= LITERALLY("^met")` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the regex matching operator from normalizing its inputs.
+- `artist ~= "^met"` matches "Metallica" because the match is performed case-insensitively.
+- `artist ~= LITERALLY("^met")` does _not_ match "Metallica", because `LITERALLY()` makes the match case-sensitive and "Metallica" begins with a capital "M".
+- `artist ~= "motö"` matches nothing, because diacritics are removed from the subject and the pattern is left as written, so the `ö` in it has nothing to match.
+- `LITERALLY(artist) ~= "otö"` matches "Motörhead", because an unnormalized subject keeps its diacritics.
 
 ### Functions
 
@@ -533,9 +593,18 @@ digit           = "0" .. "9" ;
 literal         = string | number | bytecount | duration ;
 range           = literal ".." literal ;
 
-string          = '"' { string_char | escape } '"' ;
+string          = quoted_string | raw_string ;
+
+quoted_string   = '"' { string_char | escape } '"' ;
 string_char     = <any character other than '"' and "\"> ;
-escape          = "\" ( '"' | "\" ) ;
+escape          = "\" ( '"' | "\" | "n" | "r" | "t" )
+                | "\x" hex hex
+                | "\u" hex hex hex hex ;
+
+raw_string      = ( "r" | "R" ) '"' { raw_char | '""' } '"' ;
+raw_char        = <any character other than '"'> ;
+
+hex             = digit | "a" .. "f" | "A" .. "F" ;
 
 number          = [ "+" | "-" ] unsigned_number ;
 unsigned_number = digits [ "." digits ]
@@ -553,9 +622,15 @@ duration_clock  = [ digits ":" ] two_digits ":" two_digits ;
 two_digits      = digit digit ;
 ```
 
-### Whitespace
+### Tokens
 
-Whitespace may appear freely between tokens and is insignificant there, but it may not appear **inside** a token. This matters for `bytecount` and `duration`, whose productions above are single tokens: `10kb` and `1h10m` are literals, whereas `10 kb` and `1h 10m` are not.
+The rules for dividing predicate text into tokens are given under [Tokens and whitespace](#tokens-and-whitespace) and are not restated here. Three consequences bear on the productions above.
+
+The `bytecount`, `duration` and `raw_string` productions are each a single token, so no whitespace may appear anywhere within them, including between a `raw_string`'s `r` and its opening quote.
+
+Inside a `raw_string`, a pair of quotes is taken as the escaped quote whenever two appear together, so the string ends only at a quote standing alone. `r"a""b"` is therefore the three characters `a"b`, and a raw string holding a single quote is written with four in a row.
+
+Because an `identifier` is never followed by a `string` in any production, reading `r"` as the start of a raw string takes nothing away: no predicate that parsed before can change meaning, and an identifier that happens to be named `r` is unaffected wherever whitespace, an operator or a `::` follows it.
 
 ### Constraints not expressed by the grammar
 
