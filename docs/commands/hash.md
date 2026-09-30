@@ -40,7 +40,11 @@ Selects the hash function to be used. Hash function names are case-insensitive. 
 -o <format>, --output=<format>
 ```
 
-Selects the output format. Format names are case-insensitive. Valid options for `<format>` are:
+Selects the output format. Format names are case-insensitive.
+
+The order in which files appear is **unspecified**, whichever format is chosen. Discovery and processing are concurrent, and imposing an order would mean holding results back in order to sort them. If you need a repeatable order -- to diff one run against a later one, which is much of the point of the command -- ask for one: `sort` does it for the plain format, and `jq 'sort_by(.file)'` for the JSON one.
+
+Valid options for `<format>` are:
 
 - `plain` (the default if -o is not specified)
 

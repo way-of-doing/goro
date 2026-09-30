@@ -42,7 +42,11 @@ Errors in the predicate, such as a misspelled identifier or a comparison between
 -o <format>, --output=<format>
 ```
 
-Selects the output format. Format names are case-insensitive. Valid options for `<format>` are:
+Selects the output format. Format names are case-insensitive.
+
+The order in which files appear is **unspecified**, whichever format is chosen. Discovery and processing are concurrent, and imposing an order would mean holding results back in order to sort them. If you want a particular order, ask for one: `goro list ... | sort` gives a repeatable listing, and `-o json` piped into `jq` gives anything else.
+
+Valid options for `<format>` are:
 
 - `plain` (the default if -o is not specified)
 

@@ -34,6 +34,13 @@ The second is the constructs the engine does not support -- lookaround, backrefe
 **Finer-grained warning suppression**
 `--no-warn` selects by category and by nothing finer. Silencing warnings for one identifier, one tag format or one file would need warnings to carry stable identities to name, and they carry none: a data warning is identified today by the file and the sub-expression that produced it, both facts about a single run rather than names. Choosing what those names are is the work, not the option, and it is far better done against a body of warnings from real collections than in the abstract.
 
+**Machine-readable warnings**
+Warnings are prose on standard error, so a caller who wants to act on them across a large collection has to parse English. A structured form is the obvious want, and two decisions about it are already made.
+
+It will not be attached to `-o`. That option selects the format of the answer, and warnings are not part of the answer; coupling them would delete the two combinations people actually want -- JSON records with prose warnings, for a pipeline watched from a terminal, and plain records with structured warnings -- and would put a global effect on a per-command option. A separate global switch, `--warn-format` or similar, keeps the two axes independent. There is good precedent for structured diagnostics on standard error kept behind their own flag, `rustc --error-format=json` being the closest.
+
+And warnings will not be folded into the output stream on standard output either. Standard output carries the answer and standard error carries remarks about it, and mixing them would make every consumer filter record types for a feature most do not want, would fill a saved `goro hash` run with remarks that vary between runs and are not about content, and would stop `wc -l` counting files. The interleaving that a single stream would preserve is worth nothing here in any case, since the order of the output is unspecified.
+
 **A summary instead of warnings**
 Collapsing repeats into one line at the end of a run -- "500 files had uninterpretable tag data" -- would keep the signal while losing the volume, which is often what somebody actually wants when they reach for suppression. It would not replace `--no-warn`, since a summary still reports the condition and therefore still belongs in the exit code; the two compose. It waits with everything else that is really about output capabilities. There is a great deal to do there and none of it is why anybody would want this tool: the audio hashing and the query language are what have to be good first.
 

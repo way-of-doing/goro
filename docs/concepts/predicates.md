@@ -115,6 +115,10 @@ The two forms differ in nothing but how the text between the quotes is read. A r
 **number**
 : real dimensionless numbers, such as `2000`, `-1`, and `-.55`. Number literals are optionally preceded by one + or - sign character, followed by either an integer or a floating point number where the integer part is separated from the fractional part by a period. If the number has a fractional part, the integer part is optional and considered to be zero when it does not appear. The period must always be followed by at least one digit, so `1`, `1.5` and `.5` are all valid number literals while `1.` is not.
 
+A number is a [`System.Decimal`](https://learn.microsoft.com/en-us/dotnet/api/system.decimal): a base-ten value carrying 28 to 29 significant digits. Base ten is the point of the choice, because it makes the claims this document makes elsewhere true rather than nearly true. `1.4kib` is exactly 1433.6 bytes, and a decimal fraction written in a predicate is the value it appears to be rather than the closest approximation a binary fraction can manage.
+
+It is laughable even to wonder whether the range will accommodate a music collection. The largest value this type holds is some hundreds of thousands of times greater than the total quantity of data in existence, counted in bytes, and Goro performs no arithmetic on numbers beyond conversion and comparison, so there is nowhere for precision to drift to.
+
 **bytecount**
 : a numeric value that also has a unit and represents a count of bytes. A bytecount literal is an unsigned number followed immediately by a unit suffix, with no whitespace between them. The available suffixes are, in SI (powers of 10) and IEC (powers of 2) form respectively:
 
@@ -534,7 +538,9 @@ If the argument is a multivalue, this function returns a multivalue of the same 
 **STRING(expr)**
 : converts its argument to a string.
 
-If `expr` is absent, or is already a string, this function returns the same value. If `expr` is a bytecount, it returns the decimal string representation of the count of bytes as a plain number without a unit. If `expr` is a duration, it returns the decimal string representation of the total duration in seconds as a plain number without a unit. If `expr` is a number, it returns its decimal string representation. Every value of every type has a string form, so this function never produces an unusable occurrence of its own; an unusable input yields an unusable result, propagated in silence.
+If `expr` is absent, or is already a string, this function returns the same value. If `expr` is a bytecount, it returns the count of bytes as a plain number without a unit. If `expr` is a duration, it returns the total duration in seconds as a plain number without a unit. If `expr` is a number, it returns that number.
+
+In every case the text is written the way a number literal is: invariant culture, no thousands separator, no exponent, and no trailing zeros in the fractional part, so that the result depends only on the value and not on how it happened to be written -- `STRING(1.50)` and `STRING(1.5)` are both `"1.5"` -- and so that it always reads back through `NUMBER()` as the value it came from. Every value of every type has a string form, so this function never produces an unusable occurrence of its own; an unusable input yields an unusable result, propagated in silence.
 
 If the argument is a multivalue, this function returns a multivalue of the same cardinality, with `STRING()` applied to each occurrence of the input in turn.
 

@@ -54,6 +54,10 @@ that way, and it differs between platforms; consult the platform's own documenta
 expect. Goro does not fabricate a code of its own here, since on some platforms doing so would
 discard the very information that tells a caller the process was killed rather than finished.
 
+An interrupted run also leaves whatever output it had produced by that point, which for `-o json`
+is an array that was never closed and therefore not a valid JSON document. See
+[Implementation notes](../implementation.md) for why the output is streamed rather than held back.
+
 ### Ranges
 
 The codes divide by how many digits they have, which is the quickest way to remember them:
