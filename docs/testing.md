@@ -33,9 +33,10 @@ identical must produce an identical value whether it was stored as Id3v2.2, v2.3
 is the property that the documentation promises, so it is the property that must be tested
 directly rather than inferred from the parts.
 
-**Fidelity of the raw namespaces.** An identifier in a `::raw` namespace must yield the text as
-recorded in the file. Where that is not achievable, the test must pin the exact discrepancy so
-that it is a known and documented deviation rather than a surprise.
+**Faithfulness of the raw namespaces.** An identifier in a `::raw` namespace must yield the datum
+as recorded, uninterpreted, in the type that datum natively has. Where that is not achievable, the
+test must pin the exact discrepancy so that it is a known and documented deviation rather than a
+surprise.
 
 ### Known deviations are recorded as skipped tests, not as prose
 
@@ -89,16 +90,118 @@ interpreted and the raw namespace.
 | A genre reference with an escaped parenthesis, `(17)((weird)` | The doubled parenthesis must be unescaped, on every version |
 | `(RX)` and a bare `RX`, and the same for `CR` | Indistinguishable on v2.3, distinguishable on v2.4; both must map to the same result |
 | A track number written `3/12` | Must yield the track and not be mistaken for two values |
-| A date in each accepted timestamp form, and one in no accepted form | The latter must produce a tainted null, not a wrong date |
-| A field that is present but empty, and one that is present but only whitespace | Must yield an untainted null rather than a tainted one |
+| A date in each accepted timestamp form, and one in no accepted form | The latter must produce an unusable occurrence, not a wrong date |
+| A date-shaped field holding `0000` | Must be unusable; there is no year zero, and resolving it to the number zero would match a great many files silently |
+| A string-typed field that is present but empty, and one present but only whitespace | Id3v2 frames are optional, so a blank one was written deliberately: both must yield a usable empty string, not an absent value |
+| A number-typed field, such as the one behind `id3v2::year`, present but empty or only whitespace | Must yield an unusable occurrence: the frame was written and holds no year |
 | The same frame repeated, with and without distinguishing descriptions | Must yield a multivalue of the expected cardinality |
-| A single v2.4 text frame holding several null-separated values | The only spec-sanctioned source of multiple values in one frame |
+| A single v2.4 text frame holding several NUL-separated values | The only spec-sanctioned source of multiple values in one frame |
 | A frame the library has no class for, holding text | Must be readable through the raw namespace |
+| An `APIC` frame holding a picture | Must be an unusable occurrence and not an absent one, so that a predicate can tell a file that has cover art from one that does not |
 | A v2.2 frame whose identifier the dependency maps to the wrong v2.4 name | Canary: Goro corrects the mapping internally, so the test asserts the underlying defect is still there |
 | A `TCON` frame on v2.3 whose genres are separated by a forward slash, and one holding `(RX)` | Skipped: the recorded text is reported with a semicolon in place of the slash, and without the parentheses. Affects the raw namespace only |
 
+### Global namespace resolution
+
+An identifier in the global namespace is resolved across up to four tag formats in rank order, and
+which format supplies the answer is decided by whether a format produced a *usable* occurrence
+rather than merely a present one. Getting that wrong returns a value from the wrong tag without
+any visible symptom, which is the same failure mode as the rest of this class and earns the same
+treatment. The scenarios are few and they are exhaustive, so they should all be written.
+
+These require a file carrying more than one tag format, so the fixtures differ from those above.
+
+| Scenario | What it is there to catch |
+|---|---|
+| A preferred format absent, a lesser one holding a usable value | The ordinary fall-through: the lesser format's value is returned |
+| A preferred format holding only unreadable data, a lesser one holding a usable value | The lesser format's value must be returned. Stopping at the preferred format because it was merely present is the specific regression this row exists to catch |
+| A preferred format holding one usable and one unreadable occurrence, a lesser one holding a usable value | The preferred format wins and its value is returned entire, so using it warns; usability breaks ties, it does not outrank preference |
+| Only one format holding anything, and it holds only unreadable data | The result must be unusable, not absent |
+| No format holding anything | Absent |
+| Both a preferred and a lesser format holding usable values | The lesser format must not be consulted at all, which needs asserting against the tag reader rather than against the result |
+| A preferred format whose defect was routed around | No warning is emitted, the discarded occurrences not being part of the value returned. This is the documented price of the facade, so it is pinned deliberately rather than left to be discovered |
+
 ### Scenarios deliberately not covered
 
-Genuinely binary frames, such as attached pictures, are out of scope: no identifier is defined
-for them and there is no sensible string for them to resolve to. Should that change, the
-scenario list changes with it.
+Recovering the *content* of a genuinely binary frame is out of scope: no identifier hands back
+bytes, and none is planned. What is in scope, and is listed above, is that such a frame resolves
+to an unusable occurrence rather than to an absent value, since that distinction is what lets a
+predicate ask whether a file carries cover art at all.
+
+## Predicate semantics
+
+### Why this earns its own class of tests
+
+A predicate decides which files a command touches. A defect in how one is evaluated therefore
+does not crash and does not show up in output: it silently operates on the wrong set of files,
+which is the failure mode this document already calls the worst available. That is the same
+argument that earns tag reading a class of its own, and it applies with more force here, because
+these rules are Goro's own and nothing outside the test suite constrains them.
+
+Three areas carry nearly all of the risk.
+
+**Quantifier semantics over multivalues.** Which combinations an operator evaluates, and in what
+nesting, decides the answer whenever a file records the same datum more than once -- which on a
+real collection is most files, for at least one identifier. Every rule here is one a plausible
+implementation can get wrong while still returning a perfectly well-formed boolean.
+
+**The distinction between absent and unusable.** Absence is intercepted before iteration while
+unusability is evaluated inside it, and the two reach the same outcome -- false -- by different
+routes. An implementation that conflates them passes every test that only checks what a
+comparison returned, and fails only in the places that tell the two apart: the state tests, the
+warnings, and universal quantification.
+
+**Warning identity.** Deduplication is by interned source rather than by position, and the set of
+sources a predicate can produce is enumerable before any file is read. That makes the mechanism
+testable without a file at all, which is an opportunity the suite should take.
+
+### What the tests must establish
+
+**Operand order never changes an operator's result.** For every operator and every combination of
+quantifiers, an expression and its mirror image agree: `ALL(a) == b` with `b == ALL(a)`, and
+`a < ALL(b)` with `ALL(b) > a`. This is the property that nesting by quantifier exists to deliver,
+and the reason it was chosen over nesting by written position, so it is the property to assert
+directly rather than to infer from the parts.
+
+**No operator is a rewriting of other operators.** Because an operator is one quantifier scope,
+splitting one into two logical operators changes its meaning. `BETWEEN` must therefore be
+evaluated once per combination rather than decomposed into a pair of comparisons.
+
+**Iteration within an operator is exhaustive.** A settled result does not stop it, so an unusable
+occurrence in an operand warns whether or not some other occurrence had already decided the
+answer. The result is the same either way, which is exactly why this needs asserting on the
+warnings rather than on the boolean: a test that only checks what an operator returned cannot
+tell an exhaustive implementation from a short-circuiting one.
+
+**Universal quantification is non-vacuous.** `ALL(x)` in any operator is false for an absent `x`,
+where ordinary set semantics would make it true.
+
+**The state tests are complete and mutually irreducible.** The truth table in the predicate
+documentation is small enough to assert in full, and should be, because its entries are what
+establish that no one of the three tests can be derived from the others.
+
+**Warning identity is structural.** The interning rules hold: differences of whitespace, letter
+case, explicit namespace qualification and modifier wrapping do not produce distinct sources,
+while a difference anywhere below the top level does. The set of sources a predicate can produce
+is computable from the predicate alone.
+
+**Every static error is reported before a file is opened.** Each bullet of the error list needs a
+test asserting both the rejection and that nothing was processed, since the guarantee under test
+is as much about when the error arrives as about whether it arrives at all.
+
+### Scenarios to cover
+
+| Scenario | What it is there to catch |
+|---|---|
+| Each of the three two-multivalue quantifier combinations, each with its operands written in both orders | Nesting must follow the quantifiers and not the written positions |
+| An ordering operator with exactly one operand under `ALL()` | The result is an aggregate comparison; an implementation reading it as "every one of these is less than every one of those" is wrong |
+| `v BETWEEN 1..10` against a multivalue of `0` and `20` | Must be false; an implementation that desugars into two comparisons returns true |
+| `ALL(x) == v` and `ALL(x) IS USABLE` for an absent `x` | Both false; universal quantification must not be vacuous |
+| Every row of the state test truth table, including the absent row | The three tests must be mutually irreducible, which is what the absent row establishes |
+| `x != v` against `NOT x == v`, for an absent `x`, an unusable `x`, and a multivalue holding one of each | The two are not complementary, and each must give the documented answer of the pair |
+| A guard whose right operand would warn, and the same guard with the operands transposed | Short-circuiting must hold, since the observable difference is a warning that is or is not emitted |
+| An operator that finds a match among the usable occurrences of a bag that also holds an unusable one | The warning must be emitted anyway, since iteration within an operator does not short-circuit; a short-circuiting implementation would emit it or not according to the order of an unordered bag |
+| The same bag with its occurrences supplied to the operator in the reverse order | The result, the warnings and the exit code must all be identical, which is the property exhaustive iteration exists to deliver |
+| A value that is absent, and one that is a single unusable occurrence, passed to `COUNT()` | Must be 0 and 1 respectively, and neither may warn |
+| Each row of the warning deduplication table | Source identity must be structural and independent of position |
+| Each bullet of the static error list | Every one reported with nothing processed, and with the exit code that says the run never started |

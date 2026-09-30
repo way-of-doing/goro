@@ -6,25 +6,42 @@ Goro predicate expressions can refer to a number of built-in identifiers. This d
 
 Identifiers are shown below in their conventional casing, but predicate syntax is case-insensitive and they may be written in any case.
 
-An identifier resolves to null when the tag data it refers to is not present in a file. If the data is present but cannot be interpreted as the type given in the tables below — for example a year field holding something that is not a year — the identifier resolves to a _tainted null_ instead, which behaves the same way but raises a warning. See [Predicates](../../concepts/predicates.md) for what that means in an expression.
+An identifier is **absent** when the file records nothing for it. When the data is there but cannot be interpreted as the type given in the tables below — for example a year field holding something that is not a year — the identifier resolves to an **unusable** occurrence instead, which behaves the same way in every respect but raises a warning when it is used. See [Predicates](../../concepts/predicates.md) for what absence and unusability mean in an expression, and [Absent, usable, and unusable data](#absent-usable-and-unusable-data) below for the rules that decide which of them a given piece of tag data produces.
 
 ### Definitions
 
 #### Open, closed, and raw namespaces
 
-Some namespaces such as `id3v1` are _closed_: the full set of valid identifiers in that namespace is statically known, and therefore any identifier can be accepted or rejected as invalid without any file-specific context. Other namespaces such as `vorbis` are _open_: there is an unbounded set of identifiers in them that can resolve to a non-null value depending on the specific file, and the members of that set cannot be determined before looking at the file. Open namespaces typically include some standard documented identifiers, and also a set of identifiers that directly resolve to tag data and derive their names from that.
+Some namespaces such as `id3v1` are _closed_: the full set of valid identifiers in that namespace is statically known, and therefore any identifier can be accepted or rejected as invalid without any file-specific context. Other namespaces such as `vorbis` are _open_: there is an unbounded set of identifiers in them that can resolve to a value depending on the specific file, and the members of that set cannot be determined before looking at the file. Open namespaces typically include some standard documented identifiers, and also a set of identifiers that directly resolve to tag data and derive their names from that.
 
-Goro will reject a predicate that refers to an unknown identifier in a closed namespace after parsing the predicate and before touching any files. On the other hand, an identifier within an open namespace will never be rejected as invalid; if the data it is intended to resolve to does not exist, the identifier simply resolves to null.
+Goro will reject a predicate that refers to an unknown identifier in a closed namespace after parsing the predicate and before touching any files. On the other hand, an identifier within an open namespace will never be rejected as invalid; if the data it is intended to resolve to does not exist, the identifier is simply an absent value.
 
 An identifier in an open namespace derives the field name it looks for from its own name, and several tag formats permit field names that the rules for an identifier cannot spell -- most commonly names containing spaces, such as the APE item key `Album Artist`. Such a field is reached by writing that part of the identifier as a quoted string, as in `ape::"album artist"`; see [Predicates](../../concepts/predicates.md) for the syntax. Every field name these formats permit can be written this way.
 
-Orthogonally to this, some namespaces are "raw". This is not a technical property of namespaces, but rather a design convention. Namespaces with a nested `::raw` part are intended to provide unfettered access to tag data without the possibility of resolving to a tainted null value; therefore, such namespaces (whether open or closed) will define identifiers **of string type only**. Naturally, these identifiers can, depending on context, still resolve to untainted null and to multivalues.
+Orthogonally to this, some namespaces are "raw". This is not a technical property of namespaces, but rather a design convention. Namespaces with a nested `::raw` part are intended to provide unfettered access to tag data without interpreting it, and their typing follows from that: **a raw identifier has the type the recorded datum natively has**, so that reading it requires no interpretation and can never fail. Tag fields hold text, so in practice every raw identifier is of string type, with two exceptions -- the genre and the track of an Id3v1 tag, which are single numeric bytes rather than text and are accordingly typed as numbers. Nothing in a raw namespace is ever unusable on account of tag data failing to parse as something else. Naturally, these identifiers can, depending on context, still be absent and still resolve to multivalues; and where the underlying data is neither text nor a scalar of any kind, they are always unusable occurrences, which is the one remaining way a raw identifier can be.
+
+#### Absent, usable, and unusable data
+
+[Predicates](../../concepts/predicates.md) describes every value as being either absent or a bag of occurrences, each of which is usable or unusable. Which of the three a given identifier produces for a given file is decided by the rules here, together with whatever each namespace's own section adds to them.
+
+The general rule is that **data which is there but cannot be interpreted as the identifier's type is an unusable occurrence**, while **data which is not there at all is absent**. An identifier reading date-shaped data out of a field holding `last tuesday` is unusable; the same identifier reading a file that has no such field is absent. Everything below is about deciding which of those two a particular piece of tag data amounts to.
+
+**A blank field.** A field that is empty, or that holds nothing but whitespace, is read in one of two ways depending on how its format lays fields out.
+
+- Where a format makes fields **optional** -- Vorbis comments, APE items, Id3v2 frames -- a field exists because a tagger wrote it, so a blank one is data that was recorded and holds nothing useful. For a string-typed identifier it resolves to a usable empty string, an empty string being a perfectly good string; for an identifier of any other type it resolves to an unusable occurrence.
+- Where a format lays its fields out as a **fixed structure** -- Id3v1 alone, among the formats Goro reads -- every field is present whether or not anything was ever written into it, so the presence of a field records nothing. A field padded entirely with NUL bytes or with spaces is therefore absent, whatever the identifier's type.
+
+This distinction matters more than it looks. The four bytes of the Id3v1 year field exist in every Id3v1 tag ever written, so treating a blank one as recorded-but-unusable would warn about a substantial fraction of any real collection while telling its owner nothing they could act on.
+
+**Data that is not text.** Some tag data is neither text nor a scalar of any kind, and so has no recorded form a value could hold: an APE item flagged as binary, and an Id3v2 attached picture. Such data resolves to an unusable occurrence, which is a different thing from being absent and can be told apart from it with a state test, so a predicate can ask whether a file has cover art.
+
+This is also the one way an identifier in a **raw** namespace can be unusable. A raw namespace never interprets the text it finds, so nothing in one is ever unusable because content failed to parse; but where there is no text to hand back in the first place, there is no usable occurrence either.
 
 #### Parsing dates
 
 A common feature of several namespaces is an identifier named `year`. In many cases, this identifier is of type number while the underlying tag data can be any arbitrary string. The rules for extracting a value out of such _date-shaped_ data are as follows:
 
-1. The tag data is first trimmed of any leading and trailing whitespace. If nothing remains, the identifier resolves to an untainted null, exactly as if no tag data had been present at all.
+1. The tag data is first trimmed of any leading and trailing whitespace. If nothing remains, the identifier resolves according to the rule for [a blank field](#absent-usable-and-unusable-data) above: absent when the data came from an Id3v1 tag, and an unusable occurrence when it came from a format whose fields are optional.
 2. All data extraction from what is logically (bar potential low data precision) an instant in time first conceptually resolves _a full Gregorian calendar date_ in all cases, and then extracts only the relevant parts from that resolved date. For example, the identifier `id3v1::year` will ultimately only resolve to a simple integer year value, but conceptually, it will first resolve to a full date with the month and day parts defaulted, and then the year part only will be extracted from that date to produce `year`.
 3. A number of potential date formats will be attempted to find a match, in fixed predetermined order of preference. Once the tag data is confirmed to match one of these formats, no further matching will be attempted; if the matched format does not include a month or day value, that value is defaulted to `1`.
 4. Unless otherwise specified, an identifier that is documented to read date-shaped data will attempt to match the following formats, in order of highest preference on top:
@@ -40,18 +57,20 @@ A common feature of several namespaces is an identifier named `year`. In many ca
 
 Every field other than the year must be written as exactly two digits, and the `T` separating the date from the time is a literal character. These are the timestamp formats that Id3v2 defines as its subset of ISO 8601, and they are accepted everywhere date-shaped data is read, not only in Id3v2 tags. The order in which they are listed does not affect the outcome, since no string can match more than one of them. The ISO 8601 constructs that Id3v2 mentions but does not include in that subset, notably durations written with a slash, are simply not among the formats listed above.
 
-If tag data exists for a date-shaped identifier and the data is neither pure whitespace nor matches any of the above formats, the identifier will resolve to a tainted null value.
+If tag data exists for a date-shaped identifier and the data is neither pure whitespace nor matches any of the above formats, the identifier resolves to an unusable occurrence.
+
+A matched format must also denote a real date. The Gregorian calendar has no year zero, so a year of `0000` does not resolve to the number zero but to an unusable occurrence. This case earns its own sentence because it is common rather than exotic: `0000` is what a great many taggers write into an Id3v1 year field they have nothing to put in, and it is written data rather than padding, so the blank-field rule above does not reach it. Resolving it to zero would make `id3v1::year == 0` true across a large part of a collection and `year BETWEEN 1900..2030` quietly false for the same files, with no warning and nothing at all to notice.
 
 #### Parsing track numbers
 
 A common feature of several namespaces is an identifier named `track` that is of type number while the underlying tag data can be any arbitrary string. The rules for extracting a value out of such data are as follows. In every case the tag data is first trimmed of any leading and trailing whitespace; whitespace within the data is not affected.
 
-- If the tag data does not exist, or nothing remains after trimming, `track` will resolve to an untainted null
-- Otherwise, if the tag data is the ASCII representation of an unsigned integer, `track` will resolve to that integer (as numeric value)
-- Otherwise, if the tag data is of the form "X/Y" (ASCII representations of two unsigned integers X and Y separated by a forward slash, with no whitespace inbetween), `track` will resolve to X (as a numeric value)
-- Otherwise, `track` will resolve to a tainted null
+- If the tag data does not exist, `track` is absent; if the data exists but nothing remains after trimming, it resolves according to the rule for [a blank field](#absent-usable-and-unusable-data) above
+- Otherwise, if the tag data is the ASCII decimal notation of an unsigned integer, `track` will resolve to that integer (as numeric value)
+- Otherwise, if the tag data is of the form "X/Y" (ASCII decimal notation of two unsigned integers X and Y separated by a forward slash, with no whitespace inbetween), `track` will resolve to X (as a numeric value)
+- Otherwise, `track` resolves to an unusable occurrence
 
-Note that this only applies when `track` is typed as a number; raw namespaces do not define any identifiers of type number, so identifiers such as `vorbis::raw::tracknumber` which are of type string do not follow these parsing rules and can never resolve to a tainted null.
+Note that these rules are about extracting a number out of text, so they apply only where a number-typed identifier reads a text field. An identifier such as `vorbis::raw::tracknumber`, being of string type, hands the text back unparsed and is never unusable on that account. Nor do the rules apply to `id3v1::track` and `id3v1::raw::track`, which are number-typed but read a single byte and therefore have nothing to parse.
 
 ### Global namespace
 
@@ -65,15 +84,29 @@ Includes high-convenience accessors for structured metadata, such as `artist` to
 | `title`     | string     | A best-effort attempt on the track title (see below)
 | `year`      | number     | A best-effort attempt on the track release year (see below)
 
-Depending on the tag data present in each file, and on which tag formats are consulted, any of these identifiers can resolve to a multivalue: a global identifier has whatever cardinality the format that resolved it produced. `artist` may therefore be a single value in one file and a multivalue in the next.
+Depending on the tag data present in each file, and on which tag formats are consulted, any of these identifiers can resolve to a multivalue: a global identifier has whatever cardinality was produced by the format that resolved it, meaning the one the rules below select. `artist` may therefore be a single value in one file and a multivalue in the next.
 
 The meaning of "best-effort" is:
   - tag formats are ranked by order of preference, strongest to weakest: vorbis > ape > id3v2 > id3v1
-  - for each tag, try to resolve it from the strongest format; if it resolves to null, try the next ranked format
-  - less preferred formats will not be evaluated at all if a more preferred one produces a non-null value (a kind of short-circuiting)
-  - if _any_ attempted format resolved to a tainted null and the final value of an identifier is also null, then that null value will also be tainted
+  - the result is the value of the highest-ranked format that produced **at least one usable occurrence**, and that value is taken entire, unusable occurrences included
+  - failing that, it is the value of the highest-ranked format that produced any non-absent result, which is necessarily (due to the previous rule) a value all of whose occurrences are unusable
+  - failing that, every format was absent, and so is the result
 
-All of this exists to serve one goal, which might be framed as "the obvious naive attempt should succeed". Somebody who wants the files by Metallica should be able to write `artist == "metallica"` and get them, without first having to learn which tag formats their collection happens to use, which of them this particular file carries, how each one spells things, or that in some tracks Metallica are not the only artists performing. Every rule above -- the ranking, the fall-through, the short-circuiting, the propagation of taint -- is machinery in service of that one sentence working.
+Usability is what decides the fall-through, not mere presence: a format holding data that cannot be read does not stop the search, because the whole point of consulting several formats is to come back with something usable. A format that holds a usable year loses to none but a better-ranked format that also holds one.
+
+Evaluation stops as soon as a format yields a usable occurrence, since nothing a less preferred format could produce would change the answer; until then every format in rank order is consulted. Worked through:
+
+| vorbis                    | ape          | result |
+|---------------------------|--------------|--------|
+| absent                    | usable       | ape's value; the ordinary fall-through
+| unusable                  | usable       | ape's value; a preferred format holding junk does not win over a usable one
+| usable and unusable       | usable       | vorbis's value entire, the unusable occurrence included, since the preferred format did produce something usable
+| unusable                  | absent       | vorbis's value, all of it unusable; a defect is reported rather than passed off as absence
+| absent                    | absent       | absent
+
+One consequence is worth stating plainly, because it is the price of the convenience. Where a preferred format holds unreadable data and a lesser one holds a usable value, the defect is discarded silently: the occurrences that could not be read are not part of the value returned, so nothing warns about them. This is deliberate -- a facade that reported every defect it routed around would warn constantly on precisely the collections it exists to make bearable -- and it is why the format-specific namespaces are the supported way to be precise. A predicate such as `ANY(vorbis::year) IS UNUSABLE` finds exactly the files whose defect the facade papered over.
+
+All of this exists to serve one goal, which might be framed as "the obvious naive attempt should succeed". Somebody who wants the files by Metallica should be able to write `artist == "metallica"` and get them, without first having to learn which tag formats their collection happens to use, which of them this particular file carries, how each one spells things, or that in some tracks Metallica are not the only artists performing. Every rule above -- the ranking, the fall-through, the short-circuiting, the preference for a usable occurrence over a merely present one -- is machinery in service of that one sentence working.
 
 On the other hand, convenience is only convenient while it is helping, and a facade that guesses well for most files will occasionally guess against what you actually want. When that happens, do not fight it. Disregard the global namespace entirely and address the tag you mean, through the format-specific namespaces or, if you want the bytes as they were recorded and nothing else, through their `raw` counterparts. Nothing in this section is applicable to the latter: they resolve exactly one thing from exactly one place, and they are the supported way to be precise.
 
@@ -93,11 +126,11 @@ Unlike other tag formats, APE prescribes no fixed set of item keys and no naming
 | `ape::track`    | number     | Value(s) of the `Track` item; this value comes from [tracknumber-shaped](#parsing-track-numbers) data
 | `ape::year`     | number     | Value(s) of the `Year` item; this value comes from [date-shaped](#parsing-dates) data, since an APE `Year` item commonly records a full date rather than only a year
 
-Because this namespace is open, any identifier not listed above resolves to the value(s) of the item of the same name, as a string, or to an untainted null if the file carries no such item. An item key that the rules for an identifier cannot spell -- `Album Artist`, for instance, and a great many APE keys contain spaces -- is named by writing that part of the identifier as a quoted string, as in `ape::"album artist"`.
+Because this namespace is open, any identifier not listed above resolves to the value(s) of the item of the same name, as a string, or to an absent value if the file carries no such item. An item key that the rules for an identifier cannot spell -- `Album Artist`, for instance, and a great many APE keys contain spaces -- is named by writing that part of the identifier as a quoted string, as in `ape::"album artist"`.
 
 Of the identifiers above, only `ape::track` and `ape::year` are interpreted at all; every other one resolves to the item's values as recorded, exactly as any identifier in this namespace does. In particular no genre conventions are applied. APE carries none of the historical baggage that Id3v2's genre frame accumulated: it expresses several values directly rather than by delimiter, so there is nothing to second-guess, and the references to the Id3v1 genre table are a convention of Id3v2 alone -- a value of `17` in a `Genre` item is the genre named "17". A consequence is that for every identifier other than `track` and `year`, the `ape::raw` counterpart resolves to exactly the same thing.
 
-An APE item need not hold text. An item flagged as an external locator resolves to that locator as a string, since a locator is text. An item flagged as binary -- a `Cover Art (Front)` item, typically -- has no string form and resolves to an untainted null.
+An APE item need not hold text. An item flagged as an external locator resolves to that locator as a string, since a locator is text. An item flagged as binary -- a `Cover Art (Front)` item, typically -- has no string form and resolves to an unusable occurrence, which is how a predicate can tell such an item apart from one that is not in the file at all.
 
 Two quirks are worth knowing. APE forbids a tag from carrying two keys that differ only in case, but files that do so exist, and Goro sees only the last of them. And the earlier revision of the format specified its values as ISO-8859-1 rather than UTF-8; such files are uncommon, but a value in one that uses any character outside ASCII will not read correctly.
 
@@ -125,9 +158,36 @@ Includes identifiers to access Id3v1 tag information. This namespace is **closed
 | `id3v1::artist`  | string     | Track artist name
 | `id3v1::album`   | string     | Album name
 | `id3v1::comment` | string     | Comments
-| `id3v1::genre`   | string     | Musical genre
+| `id3v1::genre`   | string     | Musical genre; see [Genre](#genre) below
 | `id3v1::title`   | string     | Track title
-| `id3v1::year`    | number     | Year
+| `id3v1::track`   | number     | Track number, recorded as a single byte; Id3v1.1 only, see [A fixed structure](#a-fixed-structure) below
+| `id3v1::year`    | number     | Year; this value comes from [date-shaped](#parsing-dates) data
+
+#### A fixed structure
+
+Id3v1 differs from every other format Goro reads in a way that shows through in what its identifiers resolve to. An Id3v1 tag is a block of 128 bytes with a fixed layout, not a collection of fields a tagger chooses to write. Every field is therefore present in every tag, conventionally padded with NUL bytes or spaces where nothing was put into it, and the presence of a field says nothing whatever about whether anything was recorded in it. A field padded that way is consequently **absent** rather than unusable, by the rule for [a blank field](#absent-usable-and-unusable-data); this is the one format where that reading applies.
+
+Two further consequences of the fixed layout are worth knowing.
+
+The track number is not part of Id3v1 as originally specified. Id3v1.1 takes the last two bytes of the comment field and uses them for a NUL byte followed by a single track byte, which is also how a reader tells the two revisions apart. So `id3v1::comment` reads 30 bytes on a tag with no track number and 28 bytes on one that has it, and `id3v1::track` is absent on a tag of the original revision. A track byte of zero is the convention for "not recorded" and is absent as well, zero not being a track number that exists.
+
+Every text field has a fixed width of 30 bytes, and a tagger writing a longer value has no option but to truncate it. `id3v1::artist` can therefore fail to compare equal to an artist name that the same file records in full elsewhere, which is one more reason to prefer the global namespace unless an Id3v1 tag is specifically what is wanted.
+
+#### Genre
+
+The Id3v1 genre is a single byte holding an index into the genre table -- the same 148-entry table, original entries together with the widely adopted extensions, that the Id3v2 genre conventions refer to. It resolves as follows:
+
+- the value 255 is the convention for "no genre recorded", and is absent
+- a value that indexes an entry the table defines resolves to the name of that genre, as a string
+- a value that indexes no defined entry is an unusable occurrence: the byte is there and it names no genre
+
+The byte itself is available as `id3v1::raw::genre`, which is number-typed and reports the index whether or not the table defines an entry for it.
+
+One quirk deserves stating plainly, because it is not Goro's to fix and it affects a great many files. Index 0 is a genuine entry, and its genre is "Blues". A tagger that fills a tag with zero bytes rather than leaving the genre byte at 255 therefore produces a file that claims to be Blues, indistinguishable by its genre byte alone from a file whose owner meant it. Nothing in the byte can tell the two apart, so Goro does not try: `id3v1::genre` resolves to "Blues" for both. What does distinguish them is that the rest of such a tag is blank as well, which a predicate can say directly -- `id3v1::genre == "blues" AND id3v1::artist IS ABSENT AND id3v1::title IS ABSENT` finds the zero-filled tags without catching the deliberate ones.
+
+#### Encoding
+
+Id3v1 specifies its text as ISO-8859-1, and Goro reads it as such. Taggers in the wild frequently wrote whatever their local codepage happened to be instead, so a value holding any character outside ASCII may not read correctly, in the same way and for the same reason as the older revision of an APE tag. Such a value is still text, so it is a usable occurrence rather than an unusable one; there is no state for data that decoded without complaint and came out wrong, and inventing one would not help, since Goro has no way to know.
 
 ### Namespace `id3v1::raw`
 
@@ -138,9 +198,16 @@ Provides the same Id3v1 tag information as the `id3v1` namespace, but without in
 | `id3v1::raw::artist`  | string     | Track artist name
 | `id3v1::raw::album`   | string     | Album name
 | `id3v1::raw::comment` | string     | Comments
-| `id3v1::raw::genre`   | string     | Musical genre
+| `id3v1::raw::genre`   | number     | Genre table index as recorded, such as `17`; see below
 | `id3v1::raw::title`   | string     | Track title
-| `id3v1::raw::year`    | string     | Year; the type of this identifier is the only difference with the `id3v1` namespace
+| `id3v1::raw::track`   | number     | Track number as recorded; see below
+| `id3v1::raw::year`    | string     | Year as recorded, such as `"1991"` or `"0000"`
+
+`id3v1::raw::year` hands back the recorded text rather than a number, so a year field holding `0000` yields the string `"0000"` here while `id3v1::year` is unusable, and the raw identifier is never unusable on account of failing to parse.
+
+The genre and the track of an Id3v1 tag are not text but single numeric bytes, and the type each one has here is the type it has on disk. `id3v1::raw::genre` is the byte itself: `17` where `id3v1::genre` is "Rock", `200` where `id3v1::genre` is unusable because the table defines no such entry, and absent at 255. `id3v1::raw::track` is likewise the track byte, absent at zero, and resolves to exactly what `id3v1::track` does -- there being nothing to interpret, the interpreted and raw readings coincide, as they already do for most of the `ape` namespace.
+
+Typing these two as numbers rather than as text is arbitrary only in the sense that the format is: a raw identifier reports the datum as recorded, and what is recorded here is a number. It needs no further rule and it earns two things. A junk index can be named exactly, so `id3v1::raw::genre BETWEEN 148..254` finds the files using an index the table never defined and `id3v1::raw::genre == 0` finds those whose genre byte was never set away from the first table entry. And a predicate that asks this namespace for a genre *name* -- `id3v1::raw::genre == "rock"` -- is a type mismatch, so it is rejected before a single file is opened, instead of warning once per file across an entire collection.
 
 ### Namespace `id3v2`
 
@@ -156,13 +223,13 @@ Includes identifiers to access Id3v2 tag information. This namespace is **open**
 | `id3v2::track`   | number     | Value(s) of the `TRCK` frame; this value comes from [tracknumber-shaped](#parsing-track-numbers) data
 | `id3v2::year`    | number     | Value(s) of the `TDRC` frame; this value comes from [date-shaped](#parsing-dates) data
 
-Because this namespace is open, any identifier not listed above is taken to be a frame identifier and resolves to the content of the frames of that name. `id3v2::TIT3` reads the `TIT3` frames, and an identifier naming a frame the file does not carry resolves to an untainted null.
+Because this namespace is open, any identifier not listed above is taken to be a frame identifier and resolves to the content of the frames of that name. `id3v2::TIT3` reads the `TIT3` frames, and an identifier naming a frame the file does not carry is absent.
 
 #### Frame names and tag versions
 
 Id3v2 exists in three revisions that differ in how frames are named: v2.2 uses three-character identifiers, while v2.3 and v2.4 use four. **Goro presents a single unified view in which every frame is named by its v2.4 identifier, whatever the file actually contains.** A v2.2 `TT2` frame and a v2.3 `TIT2` frame are both read as `id3v2::TIT2`, and there is no need to know or ask which revision a file uses. The few v2.2 frames that have no v2.4 counterpart keep their original three-character name, so `id3v2::CRM` reads a v2.2 `CRM` frame.
 
-One consequence is worth remembering: a frame must be referred to by its v2.4 name even when the file stores it under an older one. The year of a v2.3 file lives in a `TYER` frame on disk but is read as `id3v2::TDRC`; because the namespace is open, writing `id3v2::TYER` is not an error and simply resolves to null. Of course, this is only relevant if you care about specific frames; otherwise, `id3v2::year` completely sidesteps these issues.
+One consequence is worth remembering: a frame must be referred to by its v2.4 name even when the file stores it under an older one. The year of a v2.3 file lives in a `TYER` frame on disk but is read as `id3v2::TDRC`; because the namespace is open, writing `id3v2::TYER` is not an error and is simply absent. Of course, this is only relevant if you care about specific frames; otherwise, `id3v2::year` completely sidesteps these issues.
 
 #### Common behaviour
 
@@ -221,13 +288,13 @@ Well-known identifiers in this namespace are listed below. All of these are defi
 | `vorbis::track`       | number     | Value(s) from the field "TRACKNUMBER"; this value comes from [tracknumber-shaped](#parsing-track-numbers) data
 | `vorbis::year`        | number     | Value(s) from the field "DATE"; this value comes from [date-shaped](#parsing-dates) data
 
-Because this namespace is open, _any_ identifier within it not explicitly defined above can still resolve to a string value read from tags, or null if the tag holds no field whose name matches that of the identifier. For example, the identifier `vorbis::custom` would look for Vorbis comment fields with the name `"custom"` (matched case-insensitively) and would resolve to: an untainted null, if no such field exists in the tag; a string value, if exactly one such field exists in the tag; or a multivalue of strings, if more than one fields exist.
+Because this namespace is open, _any_ identifier within it not explicitly defined above can still resolve to a string value read from tags, or be absent if the tag holds no field whose name matches that of the identifier. For example, the identifier `vorbis::custom` would look for Vorbis comment fields with the name `"custom"` (matched case-insensitively) and would resolve to: an absent value, if no such field exists in the tag; a string value, if exactly one such field exists in the tag; or a multivalue of strings, if more than one field exists.
 
 ### Namespace `vorbis::raw`
 
 Provides the same Vorbis comment data as the `vorbis` namespace, but without interpreting it. This namespace is **open** and raw. As with `vorbis`, any identifier in it can potentially resolve to a multivalue, since Vorbis fields may appear any number of times.
 
-This namespace defines no well-known identifiers of its own. Every identifier in it resolves to the value(s) of the Vorbis comment field of the same name, matched case-insensitively, as a string. `vorbis::raw::artist` reads the field "ARTIST", `vorbis::raw::custom` reads the field "CUSTOM", and neither can ever resolve to a tainted null.
+This namespace defines no well-known identifiers of its own. Every identifier in it resolves to the value(s) of the Vorbis comment field of the same name, matched case-insensitively, as a string. `vorbis::raw::artist` reads the field "ARTIST", `vorbis::raw::custom` reads the field "CUSTOM", and neither is ever unusable, Vorbis comment values being text by definition.
 
 Because there are no well-known names here, an identifier in this namespace does not always have the same name as its interpreted counterpart in `vorbis`. Where the two differ it is because the interpreted identifier is named for what it means rather than for the field it reads:
 
@@ -241,4 +308,4 @@ Because there are no well-known names here, an identifier in this namespace does
 | `vorbis::track`        | `vorbis::raw::tracknumber`  | "TRACKNUMBER"
 | `vorbis::year`         | `vorbis::raw::date`         | "DATE"
 
-So `vorbis::raw::track` is not the uninterpreted form of `vorbis::track`; it reads a field literally named "TRACK", which is not a standard Vorbis field and will usually resolve to null.
+So `vorbis::raw::track` is not the uninterpreted form of `vorbis::track`; it reads a field literally named "TRACK", which is not a standard Vorbis field and will usually be absent.
