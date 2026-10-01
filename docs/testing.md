@@ -82,7 +82,7 @@ interpreted and the raw namespace.
 | Scenario | What it is there to catch |
 |---|---|
 | A value containing a forward slash, such as an artist named `AC/DC` | The library splits some v2.3 frames on `/`; a single value must not become two |
-| A value containing a semicolon, such as `Rock; Metal` | Goro's own split applies to genres only, and every resulting value must be trimmed |
+| A value containing a semicolon, such as `Rock; Metal` | Goro's own split applies to genres only, and every resulting value must be trimmed -- `Metal` and not `" Metal"`, the space after a separator being the commonest convention there is |
 | A genre written as a bare number, `17` | Must expand to the named genre on every version |
 | A genre written as a reference, `(17)` | The parenthesised form is legal in v2.2 and v2.3 and out of spec in v2.4, but occurs there after a version migration |
 | A genre reference with a refinement, `(17)Post-Rock` | Must yield both the referenced name and the refinement, on every version |
@@ -92,7 +92,10 @@ interpreted and the raw namespace.
 | A track number written `3/12` | Must yield the track and not be mistaken for two values |
 | A date in each accepted timestamp form, and one in no accepted form | The latter must produce an unusable occurrence, not a wrong date |
 | A date-shaped field holding `0000` | Must be unusable; there is no year zero, and resolving it to the number zero would match a great many files silently |
-| A string-typed field that is present but empty, and one present but only whitespace | Id3v2 frames are optional, so a blank one was written deliberately: both must yield a usable empty string, not an absent value |
+| A string-typed field that is present but empty, and one present but only whitespace | Both must be **absent** through the interpreted identifier, a file whose frame holds three spaces having no artist by any reading a person would recognise |
+| The same two fields through the raw namespace | A usable empty string and a usable three-space string respectively: raw trims nothing, and this is where the information the interpreted namespace set aside is still visible |
+| A value with whitespace at one end, through both namespaces | Trimmed through the interpreted identifier and untouched through the raw one |
+| A value with whitespace *inside* it, such as `" AC / DC "` | Must yield `AC / DC`: trimming takes the ends and never the middle |
 | A number-typed field, such as the one behind `id3v2::year`, present but empty or only whitespace | Must yield an unusable occurrence: the frame was written and holds no year |
 | The same frame repeated, with and without distinguishing descriptions | Must yield a multivalue of the expected cardinality |
 | A single v2.4 text frame holding several NUL-separated values | The only spec-sanctioned source of multiple values in one frame |

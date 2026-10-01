@@ -140,8 +140,10 @@ For example, `1.4mb`, `100b` and `10KiB` are all valid bytecount literals.
 : a numeric value that also has a unit and represents a duration in time, measured in **whole seconds**. Duration values never carry a sub-second component: a duration obtained from a file, such as `file::duration`, is truncated towards zero to a whole number of seconds when it is produced, so a file playing for 4 minutes and 5.7 seconds has a `file::duration` of exactly `4m5s`. Truncation rather than rounding is used, matching the way playing times are conventionally displayed. Because the precision of a duration value is the same as the precision the literal syntax can express, durations can be meaningfully compared for equality.
 
 Valid duration literals can take two forms:
-- `[#h][#m][#s]`, where hash signs `#` represent some nonnegative integer and the letters `h`, `m` and `s` are case-insensitive literals representing hours, minutes, and seconds respectively. At least one of the unit specifiers must be present, and those that do appear must appear in the order given above. For example, `1h10m`, `1h1s`, and `0s` are all valid duration literals.
-- `[#:]##:##`, where the single hash sign `#` represents a nonnegative integer and the double hash signs `##` represent a nonnegative integer in the range 0 to 59, inclusive. Numbers represented by double hash signs must always be written as two digits, so if less than 10 must be prefixed by a zero. For example, `250:00:00`, `01:59`, and `00:00` are all valid duration literals.
+- `[#h][#m][#s]`, where hash signs `#` represent some nonnegative integer and the letters `h`, `m` and `s` are case-insensitive literals representing hours, minutes, and seconds respectively. At least one of the unit specifiers must be present, and those that do appear must appear in the order given above. The fields are unbounded and additive, so `90m` is ninety minutes and `1h100m` is two hours and forty minutes. For example, `1h10m`, `1h1s`, `90m` and `0s` are all valid duration literals.
+- `#:##` for minutes and seconds, or `#:##:##` for hours, minutes and seconds. The double hash signs `##` stand for a two-digit number from 00 to 59, written with a leading zero where it is below ten. The leading field is written as any number of digits and is **not** bounded at 59, so the conventional way of writing a long playing time works: `90:00` is ninety minutes and `250:00:00` is two hundred and fifty hours. `1:59`, `01:59`, `0:00` and `3:30` are all valid.
+
+A leading field so large that the duration could not be represented is rejected when the predicate is read, as any other literal that cannot be represented would be.
 
 Whitespace may not appear inside a duration literal: `1h10m` is a valid literal and `1h 10m` is not.
 
@@ -150,7 +152,9 @@ There are also two concepts closely related to value types, which are however no
 **ranges**
 : ranges are always specified as literals, and represent a range of values that can be used in comparisons. Ranges have a type like any other value, so there are numeric ranges, string ranges, duration ranges, etc. Valid range literals take the form `min..max` where `min` and `max` must be literals of the same type. For example, `1..100` is a numeric range from 1 to 100 (inclusive) and `10kb..10mb` is a bytecount range.
 
-Attempting to create a range such that `min > max` is an error.
+A range whose endpoints are not of the same type is rejected rather than guessed at. `60..120kb` is an error, and the diagnostic says what the trouble is: it is unclear whether `60` means sixty bytes or sixty kilobytes, and the unit has to be given.
+
+Attempting to create a range such that `min > max` is an error. The two endpoints are compared the way the operator will compare them, which for strings means that a `LITERALLY` on the operator's other operand decides whether they are compared normalized -- `LITERALLY(artist) BETWEEN "B".."a"` is a valid range while `artist BETWEEN "B".."a"` is not.
 
 **multivalues**
 : a _multivalue_ is the name this document gives to a bag of cardinality greater than one: the simultaneous existence of several occurrences where a single value might otherwise be expected. Multivalues cannot be specified as literals, but they arise whenever the same kind of data is recorded more than once within tags. For example, the identifier `artist` might be absent (if there is no artist tag of any kind), a simple string value (if there is exactly one artist tag), or a multivalue (e.g. if there are multiple Vorbis comments with the `Artist` key).
@@ -168,8 +172,10 @@ There are some **fundamental rules which apply globally** to any operator sub-ex
 1. **An absent operand makes a comparison, range, or regex operator false**, regardless of what its other operands might be, and iteration over any multivalue operand does not run at all. For example, if there is no Id3v2 tag, the predicates `id3v2::track == 5` and `id3v2::track != 5` will _both_ evaluate to false, because `id3v2::track` is absent in both cases. This rule does not concern the logical operators `AND`, `OR`, and `NOT`, whose operands are always boolean and therefore never absent; nor does it concern the state test operator `IS`, whose purpose includes observing absence.
 2. **An unusable occurrence makes false every combination of operand values that includes it**, and consuming it emits a warning. Under the default existential quantifier an unusable occurrence therefore simply fails to contribute a match, whereas under `ALL()` a single one is enough to make the operator false. See [Multivalues](#multivalues) for what a combination is, and [Warnings](#warnings) for what counts as consuming one.
 3. If an operator has multiple operands, it is an error for the operands to have different types. For example, `file::duration > "01:00"` is an error because `file::duration` has duration type and `"01:00"` is a literal of type string. Instead, `file::duration > 01:00` is correct because `01:00` without quotes is a valid duration literal as described earlier.
-4. There is a very important exception to the previous rule: _numeric literals (but not non-literal numeric values!) are polymorphic and can be compared with any type_. In particular, they are automatically converted to the correct type (that of the other operand): for duration type, the converted value is a duration of the given number of seconds, which may have a fractional part even though durations obtained from files never do, and the comparison is then exact -- `file::duration >= 1.5` is false for a file of one second duration and true for a file of two; for bytecount type it represents the given number of bytes; and for string, the converted value is the decimal string representation of the number. This is also true for range literals; `file::size BETWEEN 60..120` compares `file::size` (a bytecount) with `60..120` (a range of numbers, not bytecounts), but the number range literal is automatically interpreted as a bytecount range literal of 60 to 120 bytes.
-5. When comparing string values, an operator _normalizes_ them by default. Normalization entails a) **removal of diacritics**: the value is decomposed into Unicode NFD form and all combining marks are discarded; and b) **case insensitivity**, achieved by converting the value to lowercase using invariant culture rules. For example, `artist == "motorhead"` matches when the artist is recorded as "Motörhead", despite the difference in both casing and diacritics. Normalization is a **mode of the operator** rather than a property of either value, so it is switched off for the whole comparison by a `LITERALLY()` modifier on either operand; see [Comparison modes](#comparison-modes). The regex matching operator `~=` is normalized differently, since only one of its operands is a value being compared at all; see [Regular expression match operator](#regular-expression-match-operator).
+4. There is a very important exception to the previous rule: _a numeric literal, though not a non-literal numeric value, may stand for a bytecount or a duration_, and is converted to whichever of the two the other operand is. For duration the converted value is that number of seconds, which may have a fractional part even though durations obtained from files never do, and the comparison is then exact -- `file::duration >= 1.5` is false for a file of one second duration and true for a file of two. For bytecount it is that number of bytes, so `file::size > 1000` selects the files larger than a thousand bytes rather than a thousand kilobytes, and `file::size > 1kb` is how to say the latter. The same holds for range literals: `file::size BETWEEN 60..120` compares `file::size` with a range of 60 to 120 bytes. A numeric literal that would convert to a bytecount or a duration may not be negative, neither of those having negative values.
+
+   A numeric literal does **not** stand for a string. `id3v2::raw::TRCK > 9` is an error rather than a comparison against `"9"`, and a string has to be written as one. This keeps the two directions alike, since `year == "2000"` was always an error: a language that rejected the quoted number while silently accepting the bare one would surprise in the direction that matters, every identifier in a raw namespace being string-typed and an ordering comparison over decimal text being almost never what anyone means.
+5. When comparing string values, an operator _normalizes_ them by default. Normalization entails a) **removal of diacritics**: the value is decomposed into Unicode NFD form and all combining marks are discarded; and b) **case insensitivity**, achieved by converting the value to lowercase using invariant culture rules. For example, `artist == "motorhead"` matches when the artist is recorded as "Motörhead", despite the difference in both casing and diacritics. What is removed is precisely the combining marks that decomposition exposes, which is a narrower set than the word "diacritics" suggests: a letter with no canonical decomposition keeps whatever distinguishes it, so `ø`, `ß`, `ı`, `þ`, `æ` and `œ` are unaffected and `artist == "orsted"` does not match "Ørsted". Normalization is a **mode of the operator** rather than a property of either value, so it is switched off for the whole comparison by a `LITERALLY()` modifier on either operand; see [Comparison modes](#comparison-modes). The regex matching operator `~=` is normalized differently, since only one of its operands is a value being compared at all; see [Regular expression match operator](#regular-expression-match-operator).
 
 #### Comparison operators
 
@@ -188,7 +194,7 @@ Examples:
 
 #### Regular expression match operator
 
-String values can be tested to see if they match a regular expression with the regex matching operator `~=`. The left operand is the **subject**, the value being tested; the right operand is the **pattern**. Both must be of type string, and it is an error if either is not; the polymorphic numeric literal rule (general operator rule 4) does not apply to this operator. Regular expressions are [.NET-flavored](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expressions), with the restriction described under [Supported constructs](#supported-constructs) below.
+String values can be tested to see if they match a regular expression with the regex matching operator `~=`. The left operand is the **subject**, the value being tested; the right operand is the **pattern**. Both must be of type string, and it is an error if either is not. Regular expressions are [.NET-flavored](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expressions), with the restriction described under [Supported constructs](#supported-constructs) below.
 
 The regex matching operator will match if any substring of the subject matches the pattern, so if more exact matching is intended the anchors `^` and/or `$` have to be specified.
 
@@ -272,6 +278,8 @@ Two expressions can be combined with the `AND` and `OR` logical operators. For e
 
 The `AND` and `OR` operators are _short-circuiting_: their operands will always be evaluated in the (left-to-right) order of appearance in the expression, and the second operand will only be evaluated if the result of the operator cannot be determined after having evaluated the first operand. For example, in the expression `genre == "metal" and year between 1970..1980`, if `genre == "metal"` evaluates to false then the sub-expression `year between 1970..1980` will not be evaluated at all because we already know the operator's result will be false.
 
+Because the operands are evaluated in the order they were written and are never reordered, that order also decides what a predicate costs to evaluate. An identifier in the `file` namespace needs no more than the file's metadata, a tag identifier needs its tag read, and a global identifier may consult several formats before it answers. So `file::size > 10mb AND artist == "metallica"` reads tags only for the files that pass the first test, while the same two conditions in the other order read tags for every file discovered. Where the choice is free, put the cheap condition first.
+
 This short-circuiting behavior is intended to allow a [state test](#state-test-operator) to be used for checking that a value is fit to use before an operator uses it and emits a warning. A comparison cannot perform that check itself, since it evaluates to false whether the value was absent, was unusable, or was simply not a match; refer to the state tests above for the guard idiom.
 
 The operands of `AND`, `OR`, and `NOT` must be of type boolean, and it is an error to apply them to a value of any other type. Since booleans are only ever produced by the comparison, range, and regex operators and by the logical operators themselves, in practice this means their operands must be comparisons or other logical expressions, optionally parenthesized.
@@ -312,7 +320,7 @@ When one or more operands are multivalue, the operator's result is calculated by
 
 This is the one place where Goro deliberately declines to short-circuit. The `AND` and `OR` operators do short-circuit, and are relied on to; see [Boolean operators](#boolean-operators) and [State tests](#state-test-operator) for the guard idiom that depends on it. The difference is that the operands of `AND` and `OR` appear in a written order the reader chose, whereas the occurrences within a bag do not.
 
-The loops are nested **by quantifier, not by position**: a universally-quantified operand always forms a loop outside any existentially-quantified one. Where two operands carry the same quantifier the nesting between them is immaterial to the result, so the order in which the operands were written never affects the result of an operator. Should an operator ever take more than two value operands, the same rule applies: universals outermost, existentials innermost, with the written order breaking ties among operands of the same quantifier.
+The loops are nested **by quantifier, not by position**: a universally-quantified operand always forms a loop outside any existentially-quantified one. Where two operands carry the same quantifier the nesting between them is immaterial, so which side of an operator an operand is written on never changes the nesting and therefore never changes the result. That is a claim about the quantifiers and not about the operators themselves: `a < b` and `b < a` remain different propositions, as always, and the two operands of `~=` have fixed roles. Should an operator ever take more than two value operands, the same rule applies: universals outermost, existentials innermost, with the written order breaking ties among operands of the same quantifier.
 
 An unusable occurrence participates in this iteration like any other, with general operator rule 2 applying to it: every combination that includes it makes the operator false for that combination. Under the default existential quantifier an unusable occurrence therefore simply fails to contribute a match, whereas under `ALL()` a single one is enough to make the operator false overall. For example, if `vorbis::year` has two occurrences, one holding `1991` and one holding data that is not a date at all, then `vorbis::year == 1991` is true while `ALL(vorbis::year) == 1991` is false.
 
@@ -356,6 +364,8 @@ For example, suppose `a` is a multivalue of `1` and `2`, and `b` is a multivalue
 - `ALL(b) == a` is false: `3` has no match in `a`
 
 For the equality operator this reads naturally as a containment test: `ALL(a) == b` is true precisely when every value of `a` also occurs in `b`.
+
+For an ordering operator the same rule reads as a comparison of aggregates, which is worth seeing once. Taking `a` of `1` and `2` and `b` of `2` and `3` again, `ALL(a) < b` is true, because every value of `a` is below *some* value of `b` -- which is to say because the largest value of `a` is below the largest value of `b`. It does not say that every value of `a` is below every value of `b`; that is what `ALL(a) < ALL(b)` says, and it is false here.
 
 ### Value conversions
 
@@ -447,7 +457,7 @@ The three are not quite the same kind of thing, and the difference is worth stat
 - `ALL` and `ANY` choose a **quantifier**, which belongs to the operand it is written on. Each operand of an operator carries its own, and they are independent: one side may be universal while the other is existential.
 - `LITERALLY` chooses a **comparison mode**, which belongs to the operator. An operator either normalizes the strings it compares or it does not, and a `LITERALLY` on either operand settles that for the comparison as a whole.
 
-Because a modifier's effect is realized by an operator rather than by the modifier itself, **a modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
+Because a modifier's effect is realized by an operator rather than by the modifier itself, **a modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. For `BETWEEN` that means its left operand alone, the range on its right being built out of literals rather than out of operands. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
 
 The restriction applies in one direction only. A modifier may be applied to any operand, including one that is itself a function call, so `LITERALLY(FALLBACK(genre, "pop")) == "Pop"` is valid: modifiers go on the outside, functions on the inside.
 
@@ -517,6 +527,8 @@ This function reads cardinality and nothing else. It never interprets an occurre
 
 Note that `COUNT()` answers a question about cardinality rather than about fitness for use. `COUNT(expr) == 0` is exactly `expr IS ABSENT`, and says nothing at all about whether the occurrences of a value that is not absent can be read; a [state test](#state-test-operator) is how to ask that.
 
+Note also that it counts the occurrences an identifier resolved to, which is not always the number of tags they came from. A single Id3v2 `TCON` frame holding `(17)Post-Rock` resolves to two genres, so `COUNT(id3v2::genre)` is 2 for such a file. If the count of tags is what is wanted, count the raw namespace, which resolves one occurrence per tag.
+
 Example:
 
 - `COUNT(genre) > 1` is true if and only if `genre` is a multivalue
@@ -582,7 +594,7 @@ function_call   = name "(" [ expression { "," expression } ] ")" ;
 
 The four levels of `or_expr`, `and_expr`, `not_expr` and `comparison_expr` are what give the operators the precedence listed under [Grouping, precedence, and associativity](#grouping-precedence-and-associativity). `comparison_tail` appears at most once and never recurses, which is what makes the comparison, range, regex and state test operators non-associative.
 
-Because a modifier can only occur within an `operand`, and `operand` occurs only as an operand of a comparison, range, regex or state test operator, the placement restriction described under [Modifiers](#modifiers) is imposed by the grammar rather than by a rule laid on top of it. The recursion in `operand` is what allows modifiers to be stacked without limit. Note that `primary` admits a parenthesized `expression` but `operand` does not, so a modifier may not be wrapped in redundant grouping parentheses: `(ALL(genre)) == "x"` does not parse.
+Because a modifier can only occur within an `operand`, and `operand` occurs only as an operand of a comparison, range, regex or state test operator, the grammar admits a modifier in every position the restriction described under [Modifiers](#modifiers) allows. It does not by itself forbid the others: `COUNT(ALL(genre))` satisfies `function_call`, whose `name` simply is not a function, so static analysis completes the restriction. This is what the modifier names are reserved for, since recognizing one is what allows a misplaced modifier to be reported as such. The recursion in `operand` is what allows modifiers to be stacked without limit. Note that `primary` admits a parenthesized `expression` but `operand` does not, so a modifier may not be wrapped in redundant grouping parentheses: `(ALL(genre)) == "x"` does not parse.
 
 ### Identifiers and names
 
@@ -626,7 +638,7 @@ byte_unit       = "b"
 
 duration        = duration_units | duration_clock ;
 duration_units  = [ digits "h" ] [ digits "m" ] [ digits "s" ] ;
-duration_clock  = [ digits ":" ] two_digits ":" two_digits ;
+duration_clock  = digits ":" two_digits [ ":" two_digits ] ;
 two_digits      = digit digit ;
 ```
 
@@ -652,6 +664,7 @@ Not every rule in this document is grammatical, and a construct that this gramma
 - a `name_part` written as a `string` names the same thing as the equivalent bare `name` when the name is one a bare `name` could have spelled, so the two forms are one identifier and not two;
 - a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a literal;
 - the `operand` a `LITERALLY` modifier is applied to must be of type string, and must not be the operand of a state test;
-- the two endpoints of a `range` must be literals of the same type, and `min` must not be greater than `max`;
+- the two endpoints of a `range` must be literals of the same type, and `min` must not be greater than `max`, compared the way the operator will compare them, so that a `LITERALLY` on the operator's other operand decides whether string endpoints are compared normalized;
+- a `number` that stands for a `bytecount` or a `duration` must not be negative, neither of those having negative values;
 - at least one of the three unit groups of a `duration_units` must be present, so the empty string does not satisfy that production;
-- each `two_digits` of a `duration_clock` must denote a value between 0 and 59 inclusive.
+- each `two_digits` of a `duration_clock` must denote a value between 0 and 59 inclusive, while its leading `digits` is unbounded and must only be small enough for the duration to be represented.
