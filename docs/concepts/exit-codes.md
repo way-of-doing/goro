@@ -102,9 +102,9 @@ emit file warnings, and match nothing, all three. Two rules decide which is retu
 
 - **A code in the `1`x group takes precedence over one in the `2`x group.** Something wrong with
   the data the run read is worth reporting ahead of what the query found, because it may well be
-  the reason the query found what it did: a value that cannot be interpreted makes every
-  comparison using it false, so an empty result reported on its own would hide the more useful of
-  the two facts.
+  the reason the query found what it did: a value that cannot be interpreted leaves every
+  comparison using it without an answer, `goro list` does not list a file whose predicate has none, and
+  so an empty result reported on its own would hide the more useful of the two facts.
 - **Within a group, the higher-numbered code wins.** So `11` takes precedence over `10`: a data
   warning means the output is complete and some data in it was disregarded, whereas a file warning
   means the output is **incomplete**, so anything concluded from it may be wrong for a reason the
@@ -115,7 +115,8 @@ emit file warnings, and match nothing, all three. Two rules decide which is retu
 So the order today is `11`, then `10`, then `20` or `21`. Codes `20` and `21` cannot both apply,
 since either files were examined or none were found, and a file that could not be read does not
 count as examined for the purposes of `20`: a run whose only discovered file was unreadable
-returns `11` rather than `20`.
+returns `11` rather than `20`. A file whose predicate could not be answered, by contrast, was read
+and examined, and counts towards `20` like any other file that was not listed.
 
 ### Suppressed warnings and the exit code
 

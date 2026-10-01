@@ -29,11 +29,17 @@ Every warning belongs to exactly one of two categories. They are named here beca
 selects by them, and because the exit code reports them separately.
 
 **Data that cannot be interpreted -- the `data` category.** A tag field holding something that cannot be read as the kind
-of value it should hold yields an unusable occurrence, and using one warns. On a real collection
-this is much the most common warning, and it is the reason the whole mechanism exists. The rules
-for exactly when it fires -- which constructs consume an unusable occurrence and which pass it
-along, how a warning is attributed, and how warnings are deduplicated within a file -- belong to
-predicates and are described under [Warnings](predicates.md#warnings) there.
+of value it should hold yields an unusable occurrence, and using one warns. So does a regular
+expression arriving from tag data that is not a valid pattern. On a real collection this is much
+the most common warning, and it is the reason the whole mechanism exists. The rules for exactly
+when it fires -- which constructs consume an unusable occurrence and which pass it along, how a
+warning is attributed, and how warnings are deduplicated within a file -- belong to predicates and
+are described under [Warnings](predicates.md#warnings) there.
+
+Unusable data can leave a predicate without an answer for a file, where the answer depended on
+the data that could not be read. What a command does with such a file is the command's to say,
+and each command that accepts a predicate documents it; `goro list` does not list the file. The
+warning is emitted where the data was used, whether or not the answer turned out to depend on it.
 
 **A file that cannot be read -- the `file` category.** Where Goro must read a file to do what was asked and cannot -- the
 file has gone since it was discovered, permission is refused, or its contents are damaged or not

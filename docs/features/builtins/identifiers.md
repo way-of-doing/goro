@@ -6,7 +6,7 @@ Goro predicate expressions can refer to a number of built-in identifiers. This d
 
 Identifiers are shown below in their conventional casing, but predicate syntax is case-insensitive and they may be written in any case.
 
-An identifier is **absent** when the file records nothing for it. When the data is there but cannot be interpreted as the type given in the tables below — for example a year field holding something that is not a year — the identifier resolves to an **unusable** occurrence instead, which behaves the same way in every respect but raises a warning when it is used. See [Predicates](../../concepts/predicates.md) for what absence and unusability mean in an expression, and [Absent, usable, and unusable data](#absent-usable-and-unusable-data) below for the rules that decide which of them a given piece of tag data produces.
+An identifier is **absent** when the file records nothing for it. When the data is there but cannot be interpreted as the type given in the tables below — for example a year field holding something that is not a year — the identifier resolves to an **unusable** occurrence instead, which leaves any comparison that depends on it without an answer and raises a warning when it is used. See [Predicates](../../concepts/predicates.md) for what absence and unusability mean in an expression, and [Absent, usable, and unusable data](#absent-usable-and-unusable-data) below for the rules that decide which of them a given piece of tag data produces.
 
 ### Definitions
 

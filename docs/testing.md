@@ -148,11 +148,13 @@ nesting, decides the answer whenever a file records the same datum more than onc
 real collection is most files, for at least one identifier. Every rule here is one a plausible
 implementation can get wrong while still returning a perfectly well-formed boolean.
 
-**The distinction between absent and unusable.** Absence is intercepted before iteration while
-unusability is evaluated inside it, and the two reach the same outcome -- false -- by different
-routes. An implementation that conflates them passes every test that only checks what a
-comparison returned, and fails only in the places that tell the two apart: the state tests, the
-warnings, and universal quantification.
+**The distinction between absent and unusable.** Absence is intercepted before iteration and
+makes an operator false, while unusability is evaluated inside it and makes the combinations it
+touches unusable. For a predicate without `NOT` the two select exactly the same files, so an
+implementation that conflates them -- most tempting of all, one that reads unusable as false --
+passes every test that only checks which files a positive predicate selected. It fails only in
+the places that tell the two apart: negation, the state tests, the warnings, universal
+quantification, and what the command does with a file whose predicate could not be answered.
 
 **Warning identity.** Deduplication is by interned source rather than by position, and the set of
 sources a predicate can produce is enumerable before any file is read. That makes the mechanism
@@ -178,6 +180,22 @@ tell an exhaustive implementation from a short-circuiting one.
 
 **Universal quantification is non-vacuous.** `ALL(x)` in any operator is false for an absent `x`,
 where ordinary set semantics would make it true.
+
+**Unusable data never selects a file.** A predicate that evaluates to true must be true whatever
+the data that could not be read had held. Two properties together establish it, and both are
+suited to generated predicates rather than hand-picked ones: a predicate without `NOT` selects
+exactly the same files whether unusable results are kept or read as false, and a predicate with
+`NOT` never selects a file that the same predicate would reject for some usable replacement of its
+unusable occurrences.
+
+**The logical operators follow their table, and short-circuit only on a settling operand.** Every
+row of the table in the predicate documentation should be asserted, for both operand orders. The
+short-circuit is observable through warnings, so it needs asserting there: an unusable first
+operand of `AND` or `OR` must lead to the second operand being evaluated, and a false first operand
+of `AND`, or a true one of `OR`, must not.
+
+**An unusable boolean is never reported twice.** Comparing, testing, substituting for or combining
+an unusable boolean emits nothing beyond what the operator that produced it emitted.
 
 **The state tests are complete and mutually irreducible.** The truth table in the predicate
 documentation is small enough to assert in full, and should be, because its entries are what
@@ -208,7 +226,15 @@ is as much about when the error arrives as about whether it arrives at all.
 | `v BETWEEN 1..10` against a multivalue of `0` and `20` | Must be false; an implementation that desugars into two comparisons returns true |
 | `ALL(x) == v` and `ALL(x) IS USABLE` for an absent `x` | Both false; universal quantification must not be vacuous |
 | Every row of the state test truth table, including the absent row | The three tests must be mutually irreducible, which is what the absent row establishes |
-| `x != v` against `NOT x == v`, for an absent `x`, an unusable `x`, and a multivalue holding one of each | The two are not complementary, and each must give the documented answer of the pair |
+| `x != v` against `NOT x == v`, for an absent `x`, an unusable `x`, and a multivalue holding one of each | For the absent and multivalue cases the two are not complementary and each must give the documented answer; for the unusable case both must be unusable |
+| `x < v` against `NOT x >= v`, for a single unusable `x` | Both unusable: negation must not turn a comparison that could not be answered into a true one |
+| `x == v` and `ALL(x) == v` and `ALL(x) == w`, for `x` holding one occurrence equal to `v` and one unusable | True, unusable and false respectively: an answered combination settles a quantifier whenever it can, and only otherwise does the unusable one decide |
+| `x > 1 AND y > 1`, with `x` unusable and `y` unusable | Two warnings: an unusable first operand must not settle `AND` |
+| `FALSE AND y > 1` and `TRUE OR y > 1`, with `y` unusable | No warning: a settling first operand must short-circuit |
+| `FALLBACK(x > 1, FALSE)` against `FALLBACK(x, 0) > 1`, with `x` unusable | One warning and none respectively: substituting for a comparison's result does not undo the comparison's warning |
+| `(x > 1) == (x > 1)` and `(x > 1) IS UNUSABLE`, with `x` unusable | One warning in total for the first and none beyond the comparison's for the second; the second is true |
+| A boolean as an operand of `<`, `BETWEEN` or `~=`, or as an argument to `NUMBER()` or `STRING()` | A static error: booleans are unordered and not convertible |
+| `(a == b) == (c == d)` and `a == b == c` | The first is valid and compares two booleans; the second is still a syntax error |
 | A guard whose right operand would warn, and the same guard with the operands transposed | Short-circuiting must hold, since the observable difference is a warning that is or is not emitted |
 | An operator that finds a match among the usable occurrences of a bag that also holds an unusable one | The warning must be emitted anyway, since iteration within an operator does not short-circuit; a short-circuiting implementation would emit it or not according to the order of an unordered bag |
 | The same bag with its occurrences supplied to the operator in the reverse order | The result, the warnings and the exit code must all be identical, which is the property exhaustive iteration exists to deliver |
@@ -219,7 +245,8 @@ is as much about when the error arrives as about whether it arrives at all.
 | The same pair under `LITERALLY()` | Must match: an unnormalized subject keeps its diacritics |
 | A `~=` whose pattern differs from the subject only in case | Must match by default, and must not under `LITERALLY()`, since the modifier makes the match case-sensitive |
 | A pattern that would change meaning if it were decomposed, such as `e` followed by a combining acute and `?` | Must be matched as written; an implementation that normalizes the pattern turns it into a different pattern rather than a differently-spelled one |
-| A pattern arriving from tag data that is invalid, or that uses an unsupported construct | Must warn and evaluate to false, and must not stop the run |
+| A pattern arriving from tag data that is invalid, or that uses an unsupported construct | Must warn and evaluate to unusable, and must not stop the run |
+| `NOT (s ~= p)`, with `p` from tag data and not a valid pattern | Unusable, not true: no file may be selected on the strength of a match that never ran |
 
 ## Predicate reading
 
@@ -282,6 +309,7 @@ rejected on the same terms as the malformed ones.
 | A quoted string and a raw string denoting the same characters, compared with each other and used twice in one predicate | Must be one value and one warning source |
 | `5mb` against `5m`, and `1h10m` against `10 kb` and `1h 10m` | The longest token must win, and whitespace must not appear inside a literal |
 | `1..100`, `1.5..2`, and `1.` | The range operator must survive the lexer, and a trailing period must be rejected |
+| `TRUE`, `true` and `False` as literals, `::true` as an identifier, and `year == NULL` | The boolean literals are case-insensitive keywords and qualifying one makes it an identifier; `NULL` names nothing and must be rejected with a diagnostic saying what to write instead |
 | A literal pattern using each of the four unsupported construct families | Each must be a static error, reported before any file is opened, on the same terms as a malformed pattern |
 | A pattern written as a quoted string and as the equivalent raw string, for an escape both levels understand | `"\x41"` and `r"\x41"` must both match the same subject, by the string processing the escape in one case and the pattern engine in the other |
 
@@ -338,6 +366,8 @@ single-condition test exercises.
 | `goro list` with no filter, over a file that cannot be opened | Must list it and must not warn, the command having needed nothing but the path |
 | `goro hash` over an unreadable file, in both output formats | The row must appear, with `-` in plain and `null` in JSON. Omitting the row is precisely the failure this scenario exists to catch |
 | `goro list --filter` over an unreadable file | The file must not be listed |
+| `goro list --filter` over a file whose predicate evaluates to unusable | The file must not be listed, and the data warnings that made it unusable must be on standard error |
+| The same file under the same predicate wrapped as `FALLBACK(..., TRUE)` | The file must be listed: the predicate, not the command, decides here |
 | One unreadable file among many readable ones, with `--strict-exit-code` | Code `11` |
 | An unreadable file together with a tag that could not be interpreted | Code `11`, not `10`: within a group the higher-numbered code wins |
 | An unreadable file in a run where nothing matched | Code `11`, not `20`, an unreadable file not counting as examined |
@@ -379,6 +409,7 @@ channels.
 |---|---|
 | A run over data that warns under `--no-warn=data`, against the same run over clean data | Standard output, standard error and exit code must all agree. A test checking only standard error would pass an implementation that still returned `10` |
 | `--no-warn=data` where a data warning would have fired and nothing matched | Code `20`, which is the outcome the option exists to make reachable |
+| `--no-warn=data` where the only file's predicate evaluated to unusable | Code `20`: the file was examined and not listed, and nothing reports why, the caller having said uninterpretable data is not a problem |
 | `--no-warn=data` where a file also could not be read | Code `11` regardless: the other category is untouched |
 | `--no-warn=file` where a file could not be read and a data warning fired | Code `10`, with the file warning absent from standard error |
 | `--no-warn` bare, `--no-warn=all`, and `--no-warn=data,file` | All three identical in every channel |

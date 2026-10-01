@@ -12,7 +12,7 @@ predicate - filtering expression accepted by commands as argument
 
 ### Overview
 
-Some Goro commands have optional arguments that can be used to configure the scope of the command. This is achieved by writing _predicates_: conditions that determine if a file is in scope for processing based on its properties, tags, and other associated data. For example, `artist == "metallica"` is a predicate satisfied by files where the artist tag matches "metallica". In this predicate, `artist` and `"metallica"` are _values_ being compared by the _operator_ `==`, which determines if they are equal. A predicate as a whole must be an expression of type boolean: a file is in scope for processing when the predicate evaluates to true for it, and out of scope otherwise. A bare value such as `artist` is therefore not a valid predicate.
+Some Goro commands have optional arguments that can be used to configure the scope of the command. This is achieved by writing _predicates_: conditions that determine if a file is in scope for processing based on its properties, tags, and other associated data. For example, `artist == "metallica"` is a predicate satisfied by files where the artist tag matches "metallica". In this predicate, `artist` and `"metallica"` are _values_ being compared by the _operator_ `==`, which determines if they are equal. A predicate as a whole must be a [definite](#definite-expressions) expression of type boolean: a file is in scope for processing when the predicate evaluates to true for it, and out of scope when it evaluates to false. A predicate can also evaluate to an unusable boolean, when the data it needed for a file could not be interpreted; what a command does with such a file is for the command to say, and each command that accepts a predicate documents it. A bare value such as `artist` is not a valid predicate.
 
 A predicate is supplied to a command as a single command line argument. Because predicate syntax uses double quotes to delimit string values, that argument normally has to be wrapped in single quotes so that the shell passes it through intact; see [goro list](../commands/list.md) for a worked example.
 
@@ -58,7 +58,7 @@ The keyword operators `AND`, `OR`, `NOT`, `BETWEEN`, and `IS` (case-insensitive)
 
 The state names `USABLE`, `UNUSABLE`, and `ABSENT` (case-insensitive) are reserved on the same terms, since they are what the right-hand side of the `IS` operator is written with.
 
-The keywords `NULL`, `TRUE`, and `FALSE` (case-insensitive) are also reserved and cannot be used as a bare identifier in the global namespace. None of the three names anything that exists: Goro has no null value, and it has no boolean literals. They are reserved so that a predicate written in the expectation that they do exist -- `year == NULL` being the obvious one -- can be told what to write instead of being reported as a reference to an undefined identifier.
+The keywords `TRUE` and `FALSE` (case-insensitive) are the two boolean literals, and are reserved on the same terms. The keyword `NULL` (case-insensitive) is reserved as well, although it names nothing that exists: Goro has no null value.
 
 This restriction applies only to bare, unqualified identifiers. If an identifier happens to coincide with a keyword, it can still be referenced by explicitly qualifying it, e.g. `::and`.
 
@@ -72,22 +72,24 @@ Although the grammar does not require it, no built-in identifier in the global n
 
 Values in predicates come from _identifiers_ (preagreed names to refer to various types of data specific to each file) and _literals_ (values specified directly when writing a predicate). For example, in the predicate `year == 2000`, `year` is an identifier and `2000` is a literal value.
 
-Every value has three aspects, and only the first of them is decided by the text of the predicate.
+Every value has three aspects. The first is always decided by the text of the predicate; the other two are decided by the file, except that the text of some expressions guarantees their cardinality (see [Definite expressions](#definite-expressions) below).
 
-**Type** : A value's type dictates what operations may be performed on it and how their results are calculated. The types are `string`, `number`, `bytecount`, `duration` and `boolean`, and they are described below. A value's type never depends on the file being examined: identifiers have a declared type, each function has a fixed result type, and literals are typed by their syntax. This is what allows every type error in a predicate to be reported before any file is opened.
+**Type** : A value's type dictates what operations may be performed on it and how their results are calculated. The types are `string`, `number`, `bytecount`, `duration` and `boolean`, and they are described below. A value's type never depends on the file being examined: identifiers have a declared type, each function and operator has a fixed result type, and literals are typed by their syntax.
 
 **Cardinality** : A value is either **absent**, meaning that the file records nothing for it, or a bag of one or more _occurrences_. A bag is unordered and its occurrences are not deduplicated, so the same datum recorded twice in the underlying tags occurs twice in the bag. A bag of exactly one occurrence is indistinguishable from a simple value: no construct in the language can tell the two apart, and everything this document says about simple values holds unchanged for a bag of cardinality one. Absent is the value of cardinality zero, and it is the only one -- there is no empty bag distinct from absence.
 
-**State** : Each occurrence in a bag is either **usable**, meaning that its data can be interpreted as the value's type, or **unusable**, meaning that the data is there but cannot be so interpreted. A tag field holding `nineteen ninety one` where a year is expected is one unusable occurrence. An unusable occurrence takes part in every operation exactly as a usable one does, with a single difference: using it emits a warning, because it marks a defect in the file that somebody will want to go and fix. Absent data, by contrast, is ordinary, and never warns on its own account.
+**State** : Each occurrence in a bag is either **usable**, meaning that its data can be interpreted as the value's type, or **unusable**, meaning that the data is there but cannot be so interpreted. A tag field holding `nineteen ninety one` where a year is expected is one unusable occurrence. An unusable occurrence takes part in every operation as a usable one does -- it is counted, carried through functions and iterated over like any other -- but it cannot supply an answer, and it marks a defect in the file. An operator that needs its content emits a warning, and has no answer for any combination that includes it, so that the operator's result is also unusable unless some other occurrence seen during the operation settles it. Absent data, by contrast, is ordinary, and never warns on its own account.
 
 Absence is a property of a whole value, while unusability is a property of a single occurrence. From this it follows that **a bag never contains an absence**: an occurrence that is not there is not an occurrence. Where a resolution rule discards an occurrence entirely, it lowers the value's cardinality, and a value all of whose occurrences are discarded is absent.
 
-These three aspects are the whole of the model. There is no fourth state, there is no null, and none of the three can be written as a literal: a file decides cardinality and state, and nothing in a predicate can state them directly. What a predicate can do is _ask_, with the [state test](#state-test-operator) operator.
-
-The types that Goro recognizes are:
+#### Types
 
 **boolean**
-: represents a binary logical state (true or false). Boolean is the one type with no dynamic aspect: a boolean is always a single usable occurrence, never absent and never unusable, because the operators that produce booleans produce false rather than nothing when handed an operand that is absent or unusable. There is no way to write boolean literals in expressions; boolean values are produced by the various comparison, state test and logical operators described later in this document. Boolean values may only appear as operands of the logical operators `AND`, `OR`, and `NOT`, and as the result of a predicate as a whole. It is an error to use a boolean value anywhere else, in particular as an operand of a comparison, range, or regex operator, or as an argument to any function.
+: a truth value, true or false. The boolean literals are `TRUE` and `FALSE`, and boolean values are otherwise produced by the comparison, range, regex, state test and logical operators described later in this document.
+
+Operators and the boolean literals always produce exactly one boolean, never an absent one, which makes them [definite](#definite-expressions). A boolean can be unusable: a comparison, range or regex operator whose answer depended on an occurrence it could not interpret has no answer to give, and its result is an unusable boolean (see [General operator rules](#general-operator-rules)).
+
+Booleans are **unordered**. They may be compared with `==` and `!=`, tested with a state test, and passed to `COUNT()` and `FALLBACK()`, but it is an error to use one as an operand of an ordering operator, of `BETWEEN`, or of `~=`, or as an argument to `NUMBER()` or `STRING()`.
 
 **string**
 : a sequence of characters, written in either of two forms.
@@ -147,7 +149,9 @@ A leading field so large that the duration could not be represented is rejected 
 
 Whitespace may not appear inside a duration literal: `1h10m` is a valid literal and `1h 10m` is not.
 
-There are also two concepts closely related to value types, which are however not types themselves:
+#### Ranges and multivalues
+
+Two further concepts are closely related to types, but are not types themselves:
 
 **ranges**
 : ranges are always specified as literals, and represent a range of values that can be used in comparisons. Ranges have a type like any other value, so there are numeric ranges, string ranges, duration ranges, etc. Valid range literals take the form `min..max` where `min` and `max` must be literals of the same type. For example, `1..100` is a numeric range from 1 to 100 (inclusive) and `10kb..10mb` is a bytecount range.
@@ -161,6 +165,22 @@ Attempting to create a range such that `min > max` is an error. The two endpoint
 
 The concept of multivalues is intended to enable clear and precise explanations of how Goro behaves in the presence of multiple tags that provide the same data, and is presented in more detail in its own section below.
 
+#### Definite expressions
+
+Some expressions are guaranteed by their form to produce exactly one occurrence, whatever the file. Such an expression is **definite**. The definite expressions are:
+
+- every literal;
+- the result of every operator: comparison, range, regex, state test, and the logical operators `AND`, `OR` and `NOT`;
+- `COUNT()`, whatever its argument;
+- `FALLBACK()`, `NUMBER()` and `STRING()` applied to a definite argument;
+- a parenthesized definite expression.
+
+An identifier is never definite, whatever its namespace.
+
+Definiteness is a property of an expression, known when the predicate is read, and never a property of a value. An identifier that happens to resolve to a single occurrence for a particular file is not thereby definite, and nothing in the language can tell such a value from the result of a definite expression; the guarantee is about every file, not about this one. A definite expression is never absent, but it can still be unusable: a comparison that met data it could not interpret is definite and unusable.
+
+Definiteness matters in one place. The operands of the logical operators, and a predicate as a whole, must be definite; see [Boolean operators](#boolean-operators).
+
 ### Operators
 
 Values within Goro predicates can be compared with the _comparison operators_ `==` (equality), `!=` (inequality), `<` (less than), `>` (greater than), `<=` (less than or equal), and `>=` (greater than or equal). There are also _boolean_ or _logical operators_ that appear as words instead of symbols: `NOT`, `AND`, and `OR`.
@@ -169,8 +189,8 @@ Values within Goro predicates can be compared with the _comparison operators_ `=
 
 There are some **fundamental rules which apply globally** to any operator sub-expression:
 
-1. **An absent operand makes a comparison, range, or regex operator false**, regardless of what its other operands might be, and iteration over any multivalue operand does not run at all. For example, if there is no Id3v2 tag, the predicates `id3v2::track == 5` and `id3v2::track != 5` will _both_ evaluate to false, because `id3v2::track` is absent in both cases. This rule does not concern the logical operators `AND`, `OR`, and `NOT`, whose operands are always boolean and therefore never absent; nor does it concern the state test operator `IS`, whose purpose includes observing absence.
-2. **An unusable occurrence makes false every combination of operand values that includes it**, and consuming it emits a warning. Under the default existential quantifier an unusable occurrence therefore simply fails to contribute a match, whereas under `ALL()` a single one is enough to make the operator false. See [Multivalues](#multivalues) for what a combination is, and [Warnings](#warnings) for what counts as consuming one.
+1. **An absent operand makes a comparison, range, or regex operator false**, regardless of what its other operands might be, and iteration over any multivalue operand does not run at all. For example, if there is no Id3v2 tag, the predicates `id3v2::track == 5` and `id3v2::track != 5` will _both_ evaluate to false, because `id3v2::track` is absent in both cases. This rule does not concern the logical operators `AND`, `OR`, and `NOT`, whose operands are definite and therefore never absent; nor does it concern the state test operator `IS`, whose purpose includes observing absence.
+2. **An unusable occurrence makes unusable every combination of operand values that includes it**, and consuming it emits a warning. How the combinations are then combined into the operator's result is described under [Multivalues](#multivalues): a combination that was answered can still settle the result, so that `vorbis::year == 1991` is true for a file holding one occurrence of `1991` and one that is not a year at all. See [Warnings](#warnings) for what counts as consuming an occurrence.
 3. If an operator has multiple operands, it is an error for the operands to have different types. For example, `file::duration > "01:00"` is an error because `file::duration` has duration type and `"01:00"` is a literal of type string. Instead, `file::duration > 01:00` is correct because `01:00` without quotes is a valid duration literal as described earlier.
 4. There is a very important exception to the previous rule: _a numeric literal, though not a non-literal numeric value, may stand for a bytecount or a duration_, and is converted to whichever of the two the other operand is. For duration the converted value is that number of seconds, which may have a fractional part even though durations obtained from files never do, and the comparison is then exact -- `file::duration >= 1.5` is false for a file of one second duration and true for a file of two. For bytecount it is that number of bytes, so `file::size > 1000` selects the files larger than a thousand bytes rather than a thousand kilobytes, and `file::size > 1kb` is how to say the latter. The same holds for range literals: `file::size BETWEEN 60..120` compares `file::size` with a range of 60 to 120 bytes. A numeric literal that would convert to a bytecount or a duration may not be negative, neither of those having negative values.
 
@@ -179,7 +199,7 @@ There are some **fundamental rules which apply globally** to any operator sub-ex
 
 #### Comparison operators
 
-The comparison operators `==`, `!=`, `<`, `<=`, `>`, `>=` directly compare their operands. Comparison between values of type number, bytecount, and duration are trivial; comparison between values of type string is by default _an ordinal Unicode comparison_ that is preceded by _normalization_ of the string values as detailed above (unless the `LITERALLY()` modifier is used to avoid this). An absent operand makes a comparison false whichever comparison it is, as does an unusable occurrence in the combination being evaluated; see the general operator rules above.
+The comparison operators `==`, `!=`, `<`, `<=`, `>`, `>=` directly compare their operands. Comparisons between values of type number, bytecount, and duration are trivial; comparison between values of type string is by default _an ordinal Unicode comparison_ that is preceded by _normalization_ of the string values as detailed above (unless the `LITERALLY()` modifier is used to avoid this). Booleans, being unordered, may be compared only with `==` and `!=`, so `(year < 2000) == (genre == "rock")` is true when the two conditions agree. An absent operand makes a comparison false regardless of what comparison it is, while an unusable occurrence makes the combination being evaluated unusable; see the general operator rules above.
 
 #### Range operator
 
@@ -233,13 +253,13 @@ See the [rationale](../design/rationale.md) for why this engine was chosen and w
 A pattern that is not a valid supported regular expression is rejected. Where this happens depends on whether the pattern is known in advance:
 
 - **A literal pattern is validated when the predicate is read**, and a bad one is an error reported before any file is processed, like every other error this document describes.
-- **A pattern arriving from tag data cannot be validated in advance.** If it turns out not to be valid when it is evaluated, the operator evaluates to false and a warning is emitted, following the same policy as warnings for unusable occurrences (see [Value conversions](#value-conversions)).
+- **A pattern arriving from tag data cannot be validated in advance.** An occurrence of the pattern operand that turns out not to be a valid supported pattern is an occurrence the operator cannot interpret as a pattern, and the operator treats it exactly as it treats any other [unusable occurrence](#unusable-occurrences): every combination that includes it is unusable, and consuming it emits a warning whose source is the pattern operand. A run is never stopped by it.
 
-**IMPORTANT** An invalid pattern making the operator evaluate to false has the same consequence under negation as an absent or unusable operand does: `NOT (artist ~= sometag)` evaluates to true when `sometag` is not a valid regular expression, so a file can be selected on the strength of a match that never ran. The warning is what surfaces this; see the discussion of `!=` versus `NOT ==` above for the same underlying phenomenon.
+Because the result is unusable rather than false, negating it does not turn it into a match: `NOT (artist ~= sometag)` is unusable, not true, when `sometag` is not a valid regular expression, so no file is selected on the strength of a match that never ran.
 
 #### State test operator
 
-The state test operator `IS` asks about the cardinality and state of a value rather than about its contents. Its left operand is the value being examined, and its right operand is one of the three state names:
+The state test operator `IS` asks about the cardinality and state of a value rather than about its contents. Its left operand is the value being examined, which may be of any type, and its right operand is one of the three state names:
 
 - `x IS ABSENT` -- true when the file records nothing at all for `x`
 - `x IS USABLE` -- true when an occurrence of `x` can be interpreted as its type
@@ -255,7 +275,9 @@ The state test operator `IS` asks about the cardinality and state of a value rat
 | one usable and one unusable | false       | true        | true          | false              | false
 | two unusable occurrences    | false       | false       | true          | false              | true
 
-A state test is exempt from general operator rule 1, since reporting absence is what it is for. It also never consumes a value and therefore never warns, however unusable the data it examined turns out to be. Those two properties together are what make it a guard.
+A state test is exempt from general operator rule 1, since reporting absence is what it is for. It also never consumes a value and therefore never warns, even for unusable occurrences.
+
+Applied to a boolean, a state test asks whether a condition could be answered: `(NUMBER(x) > 5) IS UNUSABLE` is true for a file where the comparison met data it could not interpret, and never warns on its own account, although the comparison it examines will already have warned.
 
 No state test is derivable from the others, because an absent value makes both quantified forms false and so breaks the duality that would otherwise collapse them. In particular `ALL(x) IS USABLE` is the conservative guard -- it requires both that `x` is present and that every one of its occurrences can be read -- whereas `NOT (x IS USABLE)` is a weaker statement that an absent value also satisfies.
 
@@ -270,19 +292,34 @@ Examples:
 
 #### Boolean operators
 
-An expression inside a predicate can be negated with the `NOT` operator. For example, `year < 2000` and `NOT year >= 2000` are logically and functionally equivalent when `year` is a usable occurrence.
+An expression inside a predicate can be negated with the `NOT` operator. For example, `year < 2000` and `NOT year >= 2000` are logically and functionally equivalent when `year` is a single usable occurrence.
 
-**IMPORTANT** This equivalence does _not_ hold if `year` is absent, or if the occurrence being compared is unusable. Because such an operand makes every comparison operator evaluate to false regardless of which operator it is (see general operator rules above), `year < 2000` evaluates to false, while `NOT year >= 2000` evaluates to `NOT false`, i.e. true. This is the same underlying phenomenon noted below for `!=` and `NOT ==` on multivalues, and it applies to any comparison operator and its logical complement whenever absent or unusable data is involved, not just `!=`/`==`.
+**IMPORTANT** This equivalence does _not_ hold when `year` is absent. An absent operand makes every comparison false (see general operator rules above), so `year < 2000` evaluates to false, while `NOT year >= 2000` evaluates to `NOT false`, i.e. true. Nor does it hold when `year` is a multivalue, for the reason described under [Multivalues](#multivalues). Both are the same phenomenon, and it affects every comparison operator alike: a comparison such as `year < 2000` and its complement `year >= 2000` are complementary only for a value of cardinality one, an absent value making both false and a multivalue possibly making both true.
+
+A single unusable occurrence of `year` does not break the equivalence. `year < 2000` and `year >= 2000` are both unusable, and so is `NOT year >= 2000`, since negating a comparison that could not be answered does not answer it.
 
 Two expressions can be combined with the `AND` and `OR` logical operators. For example, `year < 2000 AND artist == "metallica"`.
 
-The `AND` and `OR` operators are _short-circuiting_: their operands will always be evaluated in the (left-to-right) order of appearance in the expression, and the second operand will only be evaluated if the result of the operator cannot be determined after having evaluated the first operand. For example, in the expression `genre == "metal" and year between 1970..1980`, if `genre == "metal"` evaluates to false then the sub-expression `year between 1970..1980` will not be evaluated at all because we already know the operator's result will be false.
+Each of the three logical operators produces an unusable result exactly when an unusable operand leaves the answer open, and true or false whenever the other operand settles it:
+
+| `a`      | `b`      | `a AND b` | `a OR b` | `NOT a`  |
+|----------|----------|:---------:|:--------:|:--------:|
+| true     | true     | true      | true     | false    |
+| true     | false    | false     | true     | false    |
+| false    | false    | false     | false    | true     |
+| unusable | true     | unusable  | true     | unusable |
+| unusable | false    | false     | unusable | unusable |
+| unusable | unusable | unusable  | unusable | unusable |
+
+The table is symmetrical, so `b AND a` and `b OR a` give the same results as `a AND b` and `a OR b`. A logical operator never consumes its operands and never warns.
+
+The `AND` and `OR` operators are _short-circuiting_: their operands will always be evaluated in the (left-to-right) order of appearance in the expression, and the second operand will only be evaluated if the result of the operator cannot be determined after having evaluated the first operand. For example, in the expression `genre == "metal" and year between 1970..1980`, if `genre == "metal"` evaluates to false then the sub-expression `year between 1970..1980` will not be evaluated at all because we already know the operator's result will be false. An `AND` is therefore settled by a false first operand and an `OR` by a true one; an unusable first operand settles neither, so the second operand is evaluated, and may itself warn.
 
 Because the operands are evaluated in the order they were written and are never reordered, that order also decides what a predicate costs to evaluate. An identifier in the `file` namespace needs no more than the file's metadata, a tag identifier needs its tag read, and a global identifier may consult several formats before it answers. So `file::size > 10mb AND artist == "metallica"` reads tags only for the files that pass the first test, while the same two conditions in the other order read tags for every file discovered. Where the choice is free, put the cheap condition first.
 
-This short-circuiting behavior is intended to allow a [state test](#state-test-operator) to be used for checking that a value is fit to use before an operator uses it and emits a warning. A comparison cannot perform that check itself, since it evaluates to false whether the value was absent, was unusable, or was simply not a match; refer to the state tests above for the guard idiom.
+This short-circuiting behavior is intended to allow a [state test](#state-test-operator) to be used for checking that a value is fit to use before an operator uses it and emits a warning. A comparison cannot perform that check itself, since by the time it can tell that an occurrence is unusable it has already consumed it; refer to the state tests above for the guard idiom. A state test never evaluates to unusable, so a guard always settles an `AND` when it fails.
 
-The operands of `AND`, `OR`, and `NOT` must be of type boolean, and it is an error to apply them to a value of any other type. Since booleans are only ever produced by the comparison, range, and regex operators and by the logical operators themselves, in practice this means their operands must be comparisons or other logical expressions, optionally parenthesized.
+The operands of `AND`, `OR`, and `NOT` must be [definite](#definite-expressions) booleans, and it is an error to apply them to anything else. In practice this means their operands are comparisons, state tests, other logical expressions, the literals `TRUE` and `FALSE`, or a `FALLBACK()` of one of these, optionally parenthesized.
 
 #### Grouping, precedence, and associativity
 
@@ -302,7 +339,7 @@ An operator of higher precedence binds more tightly than one of lower precedence
 
 When a left-associative operator appears more than once in a chain without parentheses, it is evaluated left to right. For example, `a AND b AND c` is evaluated as `(a AND b) AND c`. This does not change the result for `AND` or `OR` chains, but it does determine the order in which operands are evaluated. `NOT` is a unary prefix operator and may be applied repeatedly, so `NOT NOT a` is valid and equivalent to `a`.
 
-The comparison operators, the regex operator `~=`, the range operator `BETWEEN`, and the state test operator `IS` are non-associative and cannot be chained. `a == b == c` is an error rather than being read as `(a == b) == c`, because the result of the first comparison is a boolean and booleans are not valid operands of a comparison. A condition of that kind must be written with an explicit logical operator, as in `a == b AND b == c`.
+The comparison operators, the regex operator `~=`, the range operator `BETWEEN`, and the state test operator `IS` are non-associative and cannot be chained. `a == b == c` is a syntax error rather than being read as `(a == b) == c`. A condition of that kind must be written with an explicit logical operator, as in `a == b AND b == c`. Where comparing the outcome of one comparison with another is really what is meant, the parentheses say so: `(a == b) == (c == d)` is valid, its operands being booleans.
 
 Parentheses should be used whenever the default precedence might not match the reader's expectation, even if they are not strictly required to produce the intended result.
 
@@ -314,6 +351,13 @@ When an operand is multivalue, it is evaluated according to a _quantifier_: exis
 
 When one or more operands are multivalue, the operator's result is calculated by nested iteration over the multivalue operands' occurrences, with the operator's test applied once to every combination of occurrences reached this way. An existentially-quantified operand contributes a true result if any one of its occurrences leads to one; a universally-quantified operand requires every one of its occurrences to lead to a true result.
 
+A combination that includes an unusable occurrence has no answer of its own, so a quantifier gathers three kinds of outcome rather than two, and settles on true or false wherever the outcomes it has allow:
+
+- an existentially-quantified operand is true if any of its occurrences leads to true; otherwise it is unusable if any leads to unusable; otherwise it is false;
+- a universally-quantified operand is false if any of its occurrences leads to false; otherwise it is unusable if any leads to unusable; otherwise it is true.
+
+These are the rules of the logical operators applied across a bag: an existential quantifier is an `OR` over the occurrences, and a universal one an `AND`.
+
 **An operator is a single quantifier scope.** The iteration belongs to the operator, and every one of its value operands is reached within it, which is what makes an operator's test indivisible: a construct that looks like two operators joined by a logical operator has two scopes and is a different proposition, as the `BETWEEN` example above shows. Nothing in the language may therefore be defined by rewriting it into other operators.
 
 **The iteration does not short-circuit.** Every combination is evaluated even after the operator's result is settled. This changes no result -- a quantifier's answer does not depend on how many witnesses were examined -- but it decides which warnings a file produces, and that has to be decided, because a bag is unordered. If iteration stopped at the first witness, then for a value holding one matching occurrence and one unusable one, whether a warning was emitted would depend on which occurrence the iteration happened to reach first, over a collection the specification declares to have no order. A run's warnings, and with them its exit code under `--strict-exit-code`, would vary between implementations, between releases, and potentially between runs, for a predicate whose answer never changed. Exhaustive evaluation costs nothing worth counting, since the bags involved hold a handful of occurrences at most.
@@ -322,7 +366,7 @@ This is the one place where Goro deliberately declines to short-circuit. The `AN
 
 The loops are nested **by quantifier, not by position**: a universally-quantified operand always forms a loop outside any existentially-quantified one. Where two operands carry the same quantifier the nesting between them is immaterial, so which side of an operator an operand is written on never changes the nesting and therefore never changes the result. That is a claim about the quantifiers and not about the operators themselves: `a < b` and `b < a` remain different propositions, as always, and the two operands of `~=` have fixed roles. Should an operator ever take more than two value operands, the same rule applies: universals outermost, existentials innermost, with the written order breaking ties among operands of the same quantifier.
 
-An unusable occurrence participates in this iteration like any other, with general operator rule 2 applying to it: every combination that includes it makes the operator false for that combination. Under the default existential quantifier an unusable occurrence therefore simply fails to contribute a match, whereas under `ALL()` a single one is enough to make the operator false overall. For example, if `vorbis::year` has two occurrences, one holding `1991` and one holding data that is not a date at all, then `vorbis::year == 1991` is true while `ALL(vorbis::year) == 1991` is false.
+An unusable occurrence participates in this iteration like any other, with general operator rule 2 applying to it: every combination that includes it is unusable. Under the default existential quantifier an unusable occurrence therefore cannot prevent a match that another occurrence supplies, and under `ALL()` it cannot prevent a mismatch that another occurrence supplies; what it prevents is an answer that would have depended on it. For example, if `vorbis::year` has two occurrences, one holding `1991` and one holding data that is not a date at all, then `vorbis::year == 1991` is true, because the first occurrence settles it; `ALL(vorbis::year) == 1991` is unusable, because whether every year is 1991 turns on the one that cannot be read; and `ALL(vorbis::year) == 2000` is false, because the first occurrence already shows that not every year is 2000.
 
 Absence, by contrast, does not participate in this iteration at all: an absent operand makes the operator false before any iteration begins, by general operator rule 1. This deserves stating separately, because it is the one place where the identification of absence with the bag of cardinality zero must not be read set-theoretically. Ordinary quantifier semantics would make `ALL(genre) == "rock"` _vacuously true_ for a file with no genre whatsoever, there being no counterexample available to find. Goro makes it false instead: a predicate demanding that every genre be rock is a predicate about genres, and a file that has none does not satisfy it. Universal quantification in Goro is non-vacuous, and it is non-vacuous because absence is intercepted before iteration rather than because the quantifier itself is unusual.
 
@@ -335,7 +379,7 @@ Examples:
 
 The regular expression operator also works transparently with multivalues in the same way: it matches when _any_ of the multiple values match the regular expression, by default.
 
-**IMPORTANT** This behavior means that the example expressions `genre != "metal"` and `NOT genre == "metal"`, which are strictly complementary if `genre` is a simple value, are no longer complementary if it is a multivalue.
+**IMPORTANT** This behavior means that the example expressions `genre != "metal"` and `NOT genre == "metal"`, which are strictly complementary if `genre` is a simple value, are no longer complementary if it is a multivalue. It is the same phenomenon described for an absent value under [Boolean operators](#boolean-operators), seen from the other side.
 
 Examples:
 
@@ -369,57 +413,68 @@ For an ordering operator the same rule reads as a comparison of aggregates, whic
 
 ### Value conversions
 
-With the exception of numeric literals, operators that have multiple operands require the operands to have the same type and produce an error if not. This means that a comparison such as `id3v2::track > vorbis::raw::tracknumber`, which attempts to compare a number with a string, is rejected with an error. To prevent this error a conversion of one of the values to the type of the other is required. Converting `id3v2::track` to a string might result in a comparison such as `"2" > "10"` -- this comparison result is, perhaps surprisingly, true, and it would be correct to instead write `id3v2::track > NUMBER(vorbis::raw::tracknumber)` to avoid this problem and compare numerically. However, `vorbis::raw::tracknumber` might not hold a valid numeric string, and in that case `NUMBER()` yields an unusable occurrence and the comparison always evaluates to false, by general operator rule 2. The warning that consuming an unusable occurrence emits is what keeps this from happening silently, and a [state test](#state-test-operator) is how a predicate can decide for itself what to do about it.
+With the exception of numeric literals, operators that have multiple operands require the operands to have the same type and produce an error if not. This means that a comparison such as `id3v2::track > vorbis::raw::tracknumber`, which attempts to compare a number with a string, is rejected with an error. To prevent this error a conversion of one of the values to the type of the other is required. Converting `id3v2::track` to a string might result in a comparison such as `"2" > "10"` -- this comparison result is, perhaps surprisingly, true, and it would be correct to instead write `id3v2::track > NUMBER(vorbis::raw::tracknumber)` to avoid this problem and compare numerically. However, `vorbis::raw::tracknumber` might not hold a valid numeric string, and in that case `NUMBER()` yields an unusable occurrence and the comparison is unusable rather than true or false, by general operator rule 2. The warning that consuming an unusable occurrence emits is what keeps this from happening silently, and a [state test](#state-test-operator) is how a predicate can decide for itself what to do about it.
 
 #### Unusable occurrences
 
-Unusable occurrences arise in two ways: from an identifier whose underlying tag data is present but cannot be interpreted as the identifier's declared type, and from a type conversion function whose input cannot be converted. In particular, the type conversion function `NUMBER()` produces an unusable occurrence when its input cannot be converted to the appropriate type. An unusable occurrence takes part in every operation exactly as a usable one does, with a single difference: using it causes Goro to emit a warning to alert you, as described under [Warnings](#warnings) below.
+Unusable occurrences arise in three ways:
+
+- from an identifier whose underlying tag data is present but cannot be interpreted as the identifier's declared type;
+- from a type conversion function whose input cannot be converted; in particular, `NUMBER()` produces an unusable number when its input cannot be converted;
+- from a comparison, range or regex operator that could not reach an answer because of an unusable occurrence among its operands, or because a pattern arriving from tag data was not a valid one; its result is an unusable boolean.
+
+The first two are where a defect is found, and consuming the occurrence they produce causes Goro to emit a warning to alert you, as described under [Warnings](#warnings) below. The third is a consequence of the first two rather than a further defect.
 
 Two constructs can examine an unusable occurrence without using it, and therefore without warning. A [state test](#state-test-operator) reports state rather than content, so `ALL(NUMBER(x)) IS USABLE` establishes that every occurrence of `x` converted to a number without reporting the ones that did not. And `FALLBACK(expr, literal_default)` substitutes for an occurrence instead of reading it, so it is silent for an unusable occurrence exactly as it is for an absent value.
 
 Because identifiers can produce unusable occurrences of their own, state tests and `FALLBACK()` are useful applied directly to identifiers and not only to the results of conversions. `FALLBACK(id3v2::track, 0)` substitutes zero both for a track frame that is missing and for one that is present but unusable, and `ANY(id3v2::track) IS USABLE` is the way to require that at least one usable track number exists; if `ANY` were replaced with `ALL`, the test would require that _all_ potentially existing track numbers are usable.
 
+Both apply equally to the result of a comparison, so that `FALLBACK(year < 2000, TRUE)` is true for a file whose year cannot be read. `FALLBACK()` replaces the comparison's result, but cannot undo the warning the comparison emitted while producing it.
+
 ### Errors
 
 Goro reports every error it possibly can when the predicate is read, before any file is processed. This is a deliberate constraint rather than a convenience: a command may be operating on a hundred thousand files, and it is not acceptable for such a run to abort halfway through because of a mistake that could have been pointed out at the start.
 
-Reporting errors this early is possible because the type of every sub-expression in a predicate is known statically, as described under [Values](#values). A file decides only a value's cardinality and the state of each of its occurrences, never its type. Type checking therefore needs no file at all.
+Reporting errors this early is possible because the type of every sub-expression in a predicate is known statically, as described under [Values](#values), and so is whether it is [definite](#definite-expressions). A file decides only a value's cardinality and the state of each of its occurrences, never its type, and never the cardinality of a definite expression. Checking therefore needs no file at all.
 
 The errors reported when a predicate is read include:
 
 - syntax errors of any kind, including a non-ASCII character in an identifier, a chained comparison such as `a == b == c`, a reserved word used as a bare identifier, and a qualified name used as a function call;
 - a reference to an identifier that is not defined, where the namespace it names is a closed one;
 - a type mismatch between the operands of an operator, outside the numeric literal exception;
-- a boolean value used anywhere other than as an operand of `AND`, `OR` or `NOT`, and a predicate whose value as a whole is not boolean;
-- an argument of the wrong type to a function, and a modifier applied to an operand it cannot affect, such as `LITERALLY()` applied to something other than a string, or to the operand of a state test;
+- an operand of `AND`, `OR` or `NOT`, or a predicate as a whole, that is not a definite boolean;
+- a boolean used as an operand of an ordering operator, of `BETWEEN`, or of `~=`, booleans being unordered;
+- an argument of the wrong type to a function, such as a boolean passed to `NUMBER()` or `STRING()`;
+- `LITERALLY()` applied to an operand that is not a string, or to the operand of a state test;
 - a modifier applied anywhere other than to an operand of a comparison, range, regex, or state test operator, or to another such modifier;
 - a range whose endpoints are not literals of the same type, or whose `min` is greater than its `max`;
 - a regular expression literal that is not a valid regular expression, or that uses a construct the matching engine does not support.
 
-Only conditions that genuinely depend on the contents of a file are left to be discovered during evaluation, and neither of them ever stops a run: a value that is absent or an occurrence that cannot be interpreted, and a regular expression arriving from tag data that turns out not to be valid. These are reported as warnings instead, as described below.
+Only conditions that genuinely depend on the contents of a file are left to be discovered during evaluation, and neither of them ever stops a run: a value that is absent, and an occurrence that cannot be interpreted -- including a pattern arriving from tag data that turns out not to be a valid one. The first is ordinary; the second is reported as a warning, as described below.
 
 ### Warnings
 
 This section covers the warnings a predicate produces. For what a warning is, what else can produce one, where they go, and how they relate to the exit code, see [Warnings](warnings.md).
 
-A predicate emits a warning when an unusable occurrence is consumed while it is being evaluated, and likewise when a regular expression arriving from tag data fails to compile. Evaluation always continues after a warning: it never interrupts processing, and it never changes the result of the predicate.
+A predicate emits a warning when an unusable occurrence is consumed while it is being evaluated. Evaluation always continues after a warning: it never interrupts processing, and it never changes the result of the predicate.
 
 #### What counts as consuming an unusable occurrence
 
-**Consuming an unusable occurrence means producing a result derived from its content.** Only consuming emits a warning. Everything else follows from that one rule, and nothing is exempt from it:
+**Consuming an unusable occurrence means asking a question of its content.** Only consuming emits a warning. The comparison, range and regex operators are the constructs that ask such questions -- they are where data is turned into a truth value -- and everything else follows from that one rule:
 
-- The comparison, range and regex operators interpret the content of their operands in order to produce a result. They consume, so an operator handed an unusable occurrence warns.
-- `NUMBER()` and `STRING()` map an unusable occurrence to an unusable occurrence. They derive nothing from its content; they _propagate_ it, keeping the source it was born with, and they are silent.
+- The comparison, range and regex operators need the content of their operands in order to answer. They consume, so an operator handed an unusable occurrence warns, and its result for the combinations that include the occurrence is unusable. A pattern from tag data that is not a valid pattern is consumed in the same way.
+- `NUMBER()` and `STRING()` map an unusable occurrence to an unusable occurrence. They ask nothing of its content; they _propagate_ it, keeping its source, and they are silent.
 - `COUNT()` reads cardinality, which is knowable without interpreting any occurrence. It is silent.
 - `FALLBACK()` substitutes for an occurrence instead of reading it. It is silent.
 - A [state test](#state-test-operator) reads state rather than content. It is silent.
+- An operator's result is unusable only if the operator consumed an unusable occurrence, which has therefore already been reported. Whatever consumes such a result (for example `AND`, `OR` and `NOT`) cannot report anything new.
 - A modifier computes nothing at all, so applying one leaves the operator that follows as the consumer.
 
 This is what allows the guard `ALL(NUMBER(x)) IS USABLE AND NUMBER(x) > 5` to work even when the unusable data originates in `x` itself rather than in the conversion: `NUMBER()` propagates what it was handed, the state test reads the state of the result without consuming it, and `AND` short-circuits before any operator can.
 
 #### Where a warning comes from
 
-An unusable occurrence is born once, at the identifier or the conversion that failed, and it carries that _source_ for the remainder of the evaluation. A function or operator that passes it through changes neither its state nor its source. A warning is therefore emitted at the point where the occurrence is consumed, but reports where it was born: in `STRING(id3v1::year) == "1991"` applied to a file whose Id3v1 year field holds something that is not a year, the unusable occurrence is born at `id3v1::year`, is propagated through `STRING()`, and the warning is triggered by the consuming `==` but names `id3v1::year` as the source, which is where the problem actually is.
+An unusable occurrence has a _source_: the identifier or the conversion at which it arose, or, for a pattern from tag data that is not a valid pattern, the pattern operand of the `~=` that could not use it. A function that passes an occurrence through does not change its source. A warning is emitted at the point where the occurrence is consumed, but names its source: in `STRING(id3v1::year) == "1991"` applied to a file whose Id3v1 year field holds something that is not a year, the unusable occurrence arises at `id3v1::year`, is propagated through `STRING()`, and the warning is triggered by the consuming `==` but names `id3v1::year` as the source, which is where the problem actually is.
 
 #### Deduplication
 
@@ -439,10 +494,13 @@ In the following examples, `x` and `y` are identifiers that resolve to an unusab
 | `NUMBER(s) > NUMBER(s)`            | 1        | structurally identical sub-expressions are one source
 | `NUMBER(s) > NUMBER(t)`            | 2        | the sources differ below the top level
 | `ALL(m) == "a" OR m == "b"`        | 1        | `ALL()` is transparent, so both operands have the same source
+| `x > 1 AND y > 1`                  | 2        | an unusable first operand does not settle `AND`, so the second is evaluated as well
+| `(x > 1) == (x > 1)`               | 1        | the outer `==` uses an unusable boolean, which has already been reported
+| `FALLBACK(x > 1, FALSE)`           | 1        | `FALLBACK()` replaces the comparison's result after the comparison has warned
 
 Deduplication resets for every file. A predicate such as `id3v2::track == 1` applied to a collection in which 500 files have junk where the track number should be will therefore produce 500 warnings, one per affected file. This is deliberate: each warning names a file whose data needs attention, and collapsing the repeats would discard exactly the information that makes the warning actionable.
 
-A sub-expression that is never evaluated never warns. In particular, the short-circuiting of `AND` and `OR` can be used deliberately to avoid a warning; refer to [State tests](#state-test-operator) for the guard idiom that relies on this. Within a single operator there is no such escape, since iteration over a multivalue operand is exhaustive: if an operand holds an unusable occurrence and the operator is evaluated at all, the warning is emitted, whether or not some other occurrence already settled the result.
+A sub-expression that is never evaluated never warns. In particular, the short-circuiting of `AND` and `OR` can be used deliberately to avoid a warning; refer to [State tests](#state-test-operator) for the guard idiom that relies on this. Only a first operand that is true or false can short-circuit, though, so a comparison that is itself unusable does not shield what follows it the way a state test does. Within a single operator there is no such escape, since iteration over a multivalue operand is exhaustive: if an operand holds an unusable occurrence and the operator is evaluated at all, the warning is emitted, whether or not some other occurrence already settled the result.
 
 #### What a warning quotes
 
@@ -540,19 +598,21 @@ Because this function substitutes for an occurrence rather than reading it, it n
 
 If `expr` is a multivalue, this function returns a multivalue of the same cardinality, with `FALLBACK()` applied to each occurrence of the input in turn. Its result is therefore never absent and never contains an unusable occurrence.
 
+`expr` may be of any type, boolean included, and `TRUE` and `FALSE` are literals like any other. Applied to a comparison, `FALLBACK()` decides what a condition that could not be answered should mean; see [Unusable occurrences](#unusable-occurrences), including for why doing so does not silence the comparison.
+
 **NUMBER(expr)**
 : converts its argument to a number.
 
-If `expr` is absent, or is already a number, this function returns the same value. If `expr` is a bytecount, it returns the count as a number of bytes. If `expr` is a duration, it returns total number of seconds. If `expr` is a string that satisfies the rules for a numeric literal, it is converted to a number and returned. If `expr` is a string that does _not_ validate as a numeric literal, the result is an unusable occurrence, which will emit a warning the first time an attempt is made to use it. An unusable input yields an unusable result, propagated in silence.
+If `expr` is absent, or is already a number, this function returns the same value. It is an error to pass it a boolean. If `expr` is a bytecount, it returns the count as a number of bytes. If `expr` is a duration, it returns total number of seconds. If `expr` is a string that satisfies the rules for a numeric literal, it is converted to a number and returned. If `expr` is a string that does _not_ validate as a numeric literal, the result is an unusable occurrence, which will emit a warning the first time an attempt is made to use it. An unusable input yields an unusable result, propagated in silence.
 
 If the argument is a multivalue, this function returns a multivalue of the same cardinality, with `NUMBER()` applied to each occurrence of the input in turn.
 
 **STRING(expr)**
 : converts its argument to a string.
 
-If `expr` is absent, or is already a string, this function returns the same value. If `expr` is a bytecount, it returns the count of bytes as a plain number without a unit. If `expr` is a duration, it returns the total duration in seconds as a plain number without a unit. If `expr` is a number, it returns that number.
+If `expr` is absent, or is already a string, this function returns the same value. It is an error to pass it a boolean. If `expr` is a bytecount, it returns the count of bytes as a plain number without a unit. If `expr` is a duration, it returns the total duration in seconds as a plain number without a unit. If `expr` is a number, it returns that number.
 
-In every case the text is written the way a number literal is: invariant culture, no thousands separator, no exponent, and no trailing zeros in the fractional part, so that the result depends only on the value and not on how it happened to be written -- `STRING(1.50)` and `STRING(1.5)` are both `"1.5"` -- and so that it always reads back through `NUMBER()` as the value it came from. Every value of every type has a string form, so this function never produces an unusable occurrence of its own; an unusable input yields an unusable result, propagated in silence.
+In every case the text is written the way a number literal is: invariant culture, no thousands separator, no exponent, and no trailing zeros in the fractional part, so that the result depends only on the value and not on how it happened to be written -- `STRING(1.50)` and `STRING(1.5)` are both `"1.5"` -- and so that it always reads back through `NUMBER()` as the value it came from. Every value of every type it accepts has a string form, so this function never produces an unusable occurrence of its own; an unusable input yields an unusable result, propagated in silence.
 
 If the argument is a multivalue, this function returns a multivalue of the same cardinality, with `STRING()` applied to each occurrence of the input in turn.
 
@@ -610,8 +670,10 @@ digit           = "0" .. "9" ;
 ### Literals
 
 ```ebnf
-literal         = string | number | bytecount | duration ;
+literal         = string | number | bytecount | duration | boolean ;
 range           = literal ".." literal ;
+
+boolean         = "TRUE" | "FALSE" ;
 
 string          = quoted_string | raw_string ;
 
@@ -656,13 +718,14 @@ Because an `identifier` is never followed by a `string` in any production, readi
 
 Not every rule in this document is grammatical, and a construct that this grammar accepts may still be rejected. The following constraints are enforced by static analysis of a parsed predicate rather than by the grammar, and all of them are reported as [errors](#errors) when the predicate is read:
 
-- a `predicate` must have boolean type, so a bare `primary` such as `artist` parses but is not a valid predicate;
-- the operands of an operator must have the same type, subject to the numeric literal exception, and the operands of `AND`, `OR` and `NOT` must be boolean while the operands of every other operator must not be;
+- a `predicate` must be a definite expression of boolean type, so a bare `primary` such as `artist` parses but is not a valid predicate;
+- the operands of an operator must have the same type, subject to the numeric literal exception, and the operands of `AND`, `OR` and `NOT` must be definite booleans;
+- booleans are unordered, so a boolean may not be an operand of `<`, `<=`, `>`, `>=`, `BETWEEN` or `~=`, nor an endpoint of a `range`;
 - both operands of `~=` must be strings, and its right operand must be a valid regular expression if it is a literal;
-- the `operand` of a state test may be of any type other than boolean, since a state test asks about cardinality and state rather than about content;
+- the `operand` of a state test may be of any type, boolean included, since a state test asks about cardinality and state rather than about content;
 - an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may not be one of the reserved words unless the identifier is qualified;
 - a `name_part` written as a `string` names the same thing as the equivalent bare `name` when the name is one a bare `name` could have spelled, so the two forms are one identifier and not two;
-- a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a literal;
+- a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a literal, and `NUMBER()` and `STRING()` do not accept a boolean;
 - the `operand` a `LITERALLY` modifier is applied to must be of type string, and must not be the operand of a state test;
 - the two endpoints of a `range` must be literals of the same type, and `min` must not be greater than `max`, compared the way the operator will compare them, so that a `LITERALLY` on the operator's other operand decides whether string endpoints are compared normalized;
 - a `number` that stands for a `bytecount` or a `duration` must not be negative, neither of those having negative values;

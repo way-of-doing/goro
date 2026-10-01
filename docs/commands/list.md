@@ -22,13 +22,15 @@ By default, every file discovered from the pathspecs is listed. When `--filter` 
 
 A file that the predicate needs to read and that cannot be read is not listed, a predicate that could not be evaluated not having been satisfied. One warning is emitted for that file and the run continues; see [Warnings](../concepts/warnings.md).
 
+A file whose predicate evaluates to unusable, because the answer depended on tag data that could not be interpreted, is not listed either. The data warnings emitted while evaluating the predicate say what could not be read.
+
 # Options
 
 ```
 --filter=<predicate>
 ```
 
-Restricts the listing to files satisfying `<predicate>`. The predicate is evaluated once for each discovered file, and only files for which it evaluates to true are listed. See [Predicates](../concepts/predicates.md) for the expression syntax.
+Restricts the listing to files satisfying `<predicate>`. The predicate is evaluated once for each discovered file, and only files for which it evaluates to true are listed; a file for which it evaluates to false or to unusable is not. See [Predicates](../concepts/predicates.md) for the expression syntax.
 
 The predicate must be given as a single command line argument. Because predicate syntax uses double quotes to delimit string values, the argument normally has to be wrapped in single quotes so that the shell passes it through unchanged:
 
