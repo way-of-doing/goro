@@ -20,7 +20,7 @@ This command accepts one or more pathspecs. See [Pathspecs](../concepts/pathspec
 
 By default, every file discovered from the pathspecs is listed. When `--filter` is given, a file is listed only if it additionally satisfies the predicate: the pathspecs decide which files are considered, and the predicate decides which of those are kept. See [Predicates](../concepts/predicates.md) for the expression syntax.
 
-A file that the predicate needs to read and that cannot be read is not listed, a predicate that could not be evaluated not having been satisfied. One warning is emitted for that file and the run continues; see [Warnings](../concepts/warnings.md).
+A file that the predicate needs to read and that cannot be read is not listed. One warning is emitted for that file and the run continues; see [Warnings](../concepts/warnings.md). This differs from `goro hash`, which reports such a file rather than leaving it out.
 
 A file whose predicate evaluates to unusable, because the answer depended on tag data that could not be interpreted, is not listed either. The data warnings emitted while evaluating the predicate say what could not be read.
 
@@ -44,9 +44,7 @@ Errors in the predicate, such as a misspelled identifier or a comparison between
 -o <format>, --output=<format>
 ```
 
-Selects the output format. Format names are case-insensitive.
-
-The order in which files appear is **unspecified**, whichever format is chosen. Discovery and processing are concurrent, and imposing an order would mean holding results back in order to sort them. If you want a particular order, ask for one: `goro list ... | sort` gives a repeatable listing, and `-o json` piped into `jq` gives anything else.
+Selects the output format. Format names are case-insensitive. The order in which files appear is **unspecified**, whichever format is chosen; discovery and processing are concurrent.
 
 Valid options for `<format>` are:
 

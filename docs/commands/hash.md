@@ -12,14 +12,9 @@ goro hash [-a <algo>] [-o <output>] [--strict-exit-code] [--no-warn[=<category>,
 
 Read the audio-relevant part of each input file, calculate its hash, and output that information.
 
-A file whose audio cannot be read has no hash, and Goro says so rather than passing over it in
-silence: the file still appears in the output, with its hash reported as absent, and one warning
-is emitted for it. See [Warnings](../concepts/warnings.md).
-
-Omitting such a file would be the more obvious thing to do and would be worse. The comparison this
-command exists to support is between one run's output and a later one's, and a row missing from the
-output is indistinguishable from a file that has been deleted, whereas a row whose hash is absent
-says exactly what happened.
+A file whose audio cannot be read has no hash. It still appears in the output, with its hash
+reported as absent, and one warning is emitted for it; see [Warnings](../concepts/warnings.md).
+This differs from `goro list`, which leaves out a file it cannot read.
 
 # Pathspecs
 
@@ -40,9 +35,7 @@ Selects the hash function to be used. Hash function names are case-insensitive. 
 -o <format>, --output=<format>
 ```
 
-Selects the output format. Format names are case-insensitive.
-
-The order in which files appear is **unspecified**, whichever format is chosen. Discovery and processing are concurrent, and imposing an order would mean holding results back in order to sort them. If you need a repeatable order -- to diff one run against a later one, which is much of the point of the command -- ask for one: `sort` does it for the plain format, and `jq 'sort_by(.file)'` for the JSON one.
+Selects the output format. Format names are case-insensitive. The order in which files appear is **unspecified**, whichever format is chosen; discovery and processing are concurrent.
 
 Valid options for `<format>` are:
 

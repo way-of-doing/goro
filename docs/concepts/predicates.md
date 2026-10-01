@@ -24,7 +24,7 @@ A predicate is read as a sequence of _tokens_: literals, identifiers, operators 
 
 **A token is always as long as it can be.** Where a stretch of text could be read as one longer token or as two shorter ones, the longer reading wins. This is what makes `5mb` a bytecount rather than a five-minute duration followed by a stray `b`, `1h10m` a single duration rather than three tokens, `r"x"` a raw string rather than an identifier followed by a string, and `NOTx` an identifier rather than the `NOT` operator applied to something called `x`.
 
-**Whitespace separates tokens and is insignificant everywhere else.** The amount and kind of whitespace between two tokens is ignored, but whitespace may never appear *inside* one: `10 kb` and `1h 10m` are not literals, and `r "x"` is not a raw string. Whitespace is therefore required wherever two tokens would otherwise run together into one, which is the whole of why `NOT x` needs its space. Inside a string value whitespace is preserved exactly, so `"foo"` and `"foo "` are not equal.
+**Whitespace separates tokens and is insignificant everywhere else.** The amount and kind of whitespace between two tokens is ignored, but whitespace may never appear *inside* one: `10 kb` and `1h 10m` are not literals, and `r "x"` is not a raw string. Whitespace is therefore required wherever two tokens would otherwise run together into one, as in `NOT x`. Inside a string value whitespace is preserved exactly, so `"foo"` and `"foo "` are not equal.
 
 ### Case sensitivity
 
@@ -56,13 +56,13 @@ For a list of predefined namespaces and identifiers within them together with a 
 
 The keyword operators `AND`, `OR`, `NOT`, `BETWEEN`, and `IS` (case-insensitive) are reserved and cannot be used as a bare identifier in the global namespace. For example, `and` alone is always interpreted as the logical `AND` operator, never as an identifier named "and".
 
-The state names `USABLE`, `UNUSABLE`, and `ABSENT` (case-insensitive) are reserved on the same terms, since they are what the right-hand side of the `IS` operator is written with.
+The state names `USABLE`, `UNUSABLE`, and `ABSENT` (case-insensitive) are reserved on the same terms.
 
 The keywords `TRUE` and `FALSE` (case-insensitive) are the two boolean literals, and are reserved on the same terms. The keyword `NULL` (case-insensitive) is reserved as well, although it names nothing that exists: Goro has no null value.
 
 This restriction applies only to bare, unqualified identifiers. If an identifier happens to coincide with a keyword, it can still be referenced by explicitly qualifying it, e.g. `::and`.
 
-The modifiers `ALL`, `ANY`, and `LITERALLY` (case-insensitive) are reserved on the same terms. They are reserved because, unlike a function, a modifier may only appear in one specific position, and recognizing the name is what allows a misplaced modifier to be reported as such instead of as a call to an undefined function.
+The modifiers `ALL`, `ANY`, and `LITERALLY` (case-insensitive) are reserved on the same terms.
 
 Function names (such as `COUNT`, `FALLBACK`, `NUMBER`, and `STRING`) are not reserved words in this sense.
 
@@ -108,18 +108,14 @@ A **quoted string** is delimited by double quotes and processes escape sequences
 
 A backslash followed by anything else is an error rather than a literal backslash, so text written with single backslashes is rejected instead of being silently misread. Both `\x` and `\u` take a fixed number of digits, which is what makes `"\x41B"` unambiguously `A` followed by `B`. The escapes denote UTF-16 code units, so a character outside the Basic Multilingual Plane is written as a surrogate pair.
 
-A **raw string** carries the prefix `r` and processes nothing whatsoever: every character between the quotes is part of the value, and a backslash is simply a backslash. This is the form to reach for when writing a regular expression, where a quoted string would need each of its backslashes doubled -- `r"\d{4}"` and `"\\d{4}"` denote the same pattern, and the first is the one worth reading. A double quote inside a raw string is written by doubling it, so `r"say ""hi"""` is the value `say "hi"`.
-
-Where a pattern is concerned the two forms often agree, because a .NET pattern understands the same five character escapes: `"\x41"` hands the pattern a literal `A` while `r"\x41"` hands it the escape, and both match `A`. They part company over everything else a pattern needs -- `\d`, `\s`, `\b`, `\p{...}`, and a literal backslash -- which is meaningful only to the pattern and therefore wants a raw string.
+A **raw string** carries the prefix `r` and processes nothing whatsoever: every character between the quotes is part of the value, and a backslash is simply a backslash, so `r"\d{4}"` and `"\\d{4}"` denote the same text. A double quote inside a raw string is written by doubling it, so `r"say ""hi"""` is the value `say "hi"`.
 
 The two forms differ in nothing but how the text between the quotes is read. A raw string has string type like any other, may appear anywhere a quoted string may, including as a quoted part of an identifier, and two literals denoting the same characters are indistinguishable regardless of which form wrote them.
 
 **number**
 : real dimensionless numbers, such as `2000`, `-1`, and `-.55`. Number literals are optionally preceded by one + or - sign character, followed by either an integer or a floating point number where the integer part is separated from the fractional part by a period. If the number has a fractional part, the integer part is optional and considered to be zero when it does not appear. The period must always be followed by at least one digit, so `1`, `1.5` and `.5` are all valid number literals while `1.` is not.
 
-A number is a [`System.Decimal`](https://learn.microsoft.com/en-us/dotnet/api/system.decimal): a base-ten value carrying 28 to 29 significant digits. Base ten is the point of the choice, because it makes the claims this document makes elsewhere true rather than nearly true. `1.4kib` is exactly 1433.6 bytes, and a decimal fraction written in a predicate is the value it appears to be rather than the closest approximation a binary fraction can manage.
-
-It is laughable even to wonder whether the range will accommodate a music collection. The largest value this type holds is some hundreds of thousands of times greater than the total quantity of data in existence, counted in bytes, and Goro performs no arithmetic on numbers beyond conversion and comparison, so there is nowhere for precision to drift to.
+A number is a [`System.Decimal`](https://learn.microsoft.com/en-us/dotnet/api/system.decimal): a base-ten value carrying 28 to 29 significant digits. `1.4kib` is exactly 1433.6 bytes, and a decimal fraction written in a predicate is the value it appears to be rather than the closest approximation a binary fraction can manage.
 
 **bytecount**
 : a numeric value that also has a unit and represents a count of bytes. A bytecount literal is an unsigned number followed immediately by a unit suffix, with no whitespace between them. The available suffixes are, in SI (powers of 10) and IEC (powers of 2) form respectively:
@@ -139,7 +135,7 @@ The number may have a fractional part, in which case the literal denotes exactly
 For example, `1.4mb`, `100b` and `10KiB` are all valid bytecount literals.
 
 **duration**
-: a numeric value that also has a unit and represents a duration in time, measured in **whole seconds**. Duration values never carry a sub-second component: a duration obtained from a file, such as `file::duration`, is truncated towards zero to a whole number of seconds when it is produced, so a file playing for 4 minutes and 5.7 seconds has a `file::duration` of exactly `4m5s`. Truncation rather than rounding is used, matching the way playing times are conventionally displayed. Because the precision of a duration value is the same as the precision the literal syntax can express, durations can be meaningfully compared for equality.
+: a numeric value that also has a unit and represents a duration in time, measured in **whole seconds**. Duration values never carry a sub-second component: a duration obtained from a file, such as `file::duration`, is truncated towards zero to a whole number of seconds when it is produced, so a file playing for 4 minutes and 5.7 seconds has a `file::duration` of exactly `4m5s`.
 
 Valid duration literals can take two forms:
 - `[#h][#m][#s]`, where hash signs `#` represent some nonnegative integer and the letters `h`, `m` and `s` are case-insensitive literals representing hours, minutes, and seconds respectively. At least one of the unit specifiers must be present, and those that do appear must appear in the order given above. The fields are unbounded and additive, so `90m` is ninety minutes and `1h100m` is two hours and forty minutes. For example, `1h10m`, `1h1s`, `90m` and `0s` are all valid duration literals.
@@ -190,11 +186,13 @@ Values within Goro predicates can be compared with the _comparison operators_ `=
 There are some **fundamental rules which apply globally** to any operator sub-expression:
 
 1. **An absent operand makes a comparison, range, or regex operator false**, regardless of what its other operands might be, and iteration over any multivalue operand does not run at all. For example, if there is no Id3v2 tag, the predicates `id3v2::track == 5` and `id3v2::track != 5` will _both_ evaluate to false, because `id3v2::track` is absent in both cases. This rule does not concern the logical operators `AND`, `OR`, and `NOT`, whose operands are definite and therefore never absent; nor does it concern the state test operator `IS`, whose purpose includes observing absence.
-2. **An unusable occurrence makes unusable every combination of operand values that includes it**, and consuming it emits a warning. How the combinations are then combined into the operator's result is described under [Multivalues](#multivalues): a combination that was answered can still settle the result, so that `vorbis::year == 1991` is true for a file holding one occurrence of `1991` and one that is not a year at all. See [Warnings](#warnings) for what counts as consuming an occurrence.
-3. If an operator has multiple operands, it is an error for the operands to have different types. For example, `file::duration > "01:00"` is an error because `file::duration` has duration type and `"01:00"` is a literal of type string. Instead, `file::duration > 01:00` is correct because `01:00` without quotes is a valid duration literal as described earlier.
-4. There is a very important exception to the previous rule: _a numeric literal, though not a non-literal numeric value, may stand for a bytecount or a duration_, and is converted to whichever of the two the other operand is. For duration the converted value is that number of seconds, which may have a fractional part even though durations obtained from files never do, and the comparison is then exact -- `file::duration >= 1.5` is false for a file of one second duration and true for a file of two. For bytecount it is that number of bytes, so `file::size > 1000` selects the files larger than a thousand bytes rather than a thousand kilobytes, and `file::size > 1kb` is how to say the latter. The same holds for range literals: `file::size BETWEEN 60..120` compares `file::size` with a range of 60 to 120 bytes. A numeric literal that would convert to a bytecount or a duration may not be negative, neither of those having negative values.
 
-   A numeric literal does **not** stand for a string. `id3v2::raw::TRCK > 9` is an error rather than a comparison against `"9"`, and a string has to be written as one. This keeps the two directions alike, since `year == "2000"` was always an error: a language that rejected the quoted number while silently accepting the bare one would surprise in the direction that matters, every identifier in a raw namespace being string-typed and an ordering comparison over decimal text being almost never what anyone means.
+2. **An unusable occurrence makes unusable every combination of operand values that includes it**, and consuming it emits a warning. How the combinations are then combined into the operator's result is described under [Multivalues](#multivalues): a combination that was answered can still settle the result, so that `vorbis::year == 1991` is true for a file holding one occurrence of `1991` and one that is not a year at all. See [Warnings](#warnings) for what counts as consuming an occurrence.
+
+3. If an operator has multiple operands, it is an error for the operands to have different types. For example, `file::duration > "01:00"` is an error because `file::duration` has duration type and `"01:00"` is a literal of type string. Instead, `file::duration > 01:00` is correct because `01:00` without quotes is a valid duration literal as described earlier.
+
+4. There is a very important exception to the previous rule: _a numeric literal, though not a non-literal numeric value, may stand for a bytecount or a duration_, and is converted to whichever of the two the other operand is. For duration the converted value is that number of seconds, which may have a fractional part even though durations obtained from files never do, and the comparison is then exact -- `file::duration >= 1.5` is false for a file of one second duration and true for a file of two. For bytecount it is that number of bytes, so `file::size > 1000` selects the files larger than a thousand bytes rather than a thousand kilobytes, and `file::size > 1kb` is how to say the latter. The same holds for range literals: `file::size BETWEEN 60..120` compares `file::size` with a range of 60 to 120 bytes. A numeric literal that would convert to a bytecount or a duration may not be negative, neither of those having negative values. A numeric literal does **not** stand for a string, and a string literal does not stand for a number: `id3v2::raw::TRCK > 9` and `year == "2000"` are both errors.
+
 5. When comparing string values, an operator _normalizes_ them by default. Normalization entails a) **removal of diacritics**: the value is decomposed into Unicode NFD form and all combining marks are discarded; and b) **case insensitivity**, achieved by converting the value to lowercase using invariant culture rules. For example, `artist == "motorhead"` matches when the artist is recorded as "Motörhead", despite the difference in both casing and diacritics. What is removed is precisely the combining marks that decomposition exposes, which is a narrower set than the word "diacritics" suggests: a letter with no canonical decomposition keeps whatever distinguishes it, so `ø`, `ß`, `ı`, `þ`, `æ` and `œ` are unaffected and `artist == "orsted"` does not match "Ørsted". Normalization is a **mode of the operator** rather than a property of either value, so it is switched off for the whole comparison by a `LITERALLY()` modifier on either operand; see [Comparison modes](#comparison-modes). The regex matching operator `~=` is normalized differently, since only one of its operands is a value being compared at all; see [Regular expression match operator](#regular-expression-match-operator).
 
 #### Comparison operators
@@ -279,14 +277,14 @@ A state test is exempt from general operator rule 1, since reporting absence is 
 
 Applied to a boolean, a state test asks whether a condition could be answered: `(NUMBER(x) > 5) IS UNUSABLE` is true for a file where the comparison met data it could not interpret, and never warns on its own account, although the comparison it examines will already have warned.
 
-No state test is derivable from the others, because an absent value makes both quantified forms false and so breaks the duality that would otherwise collapse them. In particular `ALL(x) IS USABLE` is the conservative guard -- it requires both that `x` is present and that every one of its occurrences can be read -- whereas `NOT (x IS USABLE)` is a weaker statement that an absent value also satisfies.
+`ALL(x) IS USABLE` is the conservative guard: it requires both that `x` is present and that every one of its occurrences can be read. `NOT (x IS UNUSABLE)` is the same except that an absent value also satisfies it.
 
-There is deliberately no `IS NOT`. Because the quantifiers are explicit and dual, every negated reading is already expressible: `NOT (ALL(x) IS USABLE)` says that not every occurrence is usable, and `NOT (ANY(x) IS USABLE)` says that none of them is. An `IS NOT` would express nothing new while introducing another instance of the `!=` versus `NOT ==` distinction described below.
+There is no `IS NOT`; a negated state test is written with the boolean negation operator. For example, `NOT (ALL(x) IS USABLE)` says that not every occurrence is usable, and `NOT (ANY(x) IS USABLE)` says that none of them is.
 
 Examples:
 
-- `ALL(NUMBER(id3v2::raw::TRCK)) IS USABLE AND NUMBER(id3v2::raw::TRCK) > 5` is the safe way to compare a converted value: the guard admits only files where every occurrence converted, and because `AND` short-circuits the comparison never sees an occurrence that did not
-- `ANY(NUMBER(id3v2::raw::TRCK)) IS USABLE AND NUMBER(id3v2::raw::TRCK) > 5` is the optimistic counterpart, which proceeds when at least one occurrence converted and accepts a warning about the ones that did not
+- `ALL(NUMBER(vorbis::bpm)) IS USABLE AND NUMBER(vorbis::bpm) > 120` is the conservative guard: it admits only files where every `BPM` field converted, so the comparison never meets one that did not and nothing warns. A file holding one good `BPM` field and one piece of junk is passed over, silently.
+- `ANY(NUMBER(vorbis::bpm)) IS USABLE AND NUMBER(vorbis::bpm) > 120` is the optimistic counterpart: it proceeds when at least one field converted, can still find a match among those, and warns about the rest.
 - `year IS ABSENT` selects the files that record no year at all, which no comparison can express, since every comparison against an absent value is false whichever operator it uses
 - `ANY(vorbis::year) IS UNUSABLE` selects the files whose Vorbis date fields need attention, and is the predicate to reach for when a run has reported warnings and the data behind them has to be found
 
@@ -313,9 +311,7 @@ Each of the three logical operators produces an unusable result exactly when an 
 
 The table is symmetrical, so `b AND a` and `b OR a` give the same results as `a AND b` and `a OR b`. A logical operator never consumes its operands and never warns.
 
-The `AND` and `OR` operators are _short-circuiting_: their operands will always be evaluated in the (left-to-right) order of appearance in the expression, and the second operand will only be evaluated if the result of the operator cannot be determined after having evaluated the first operand. For example, in the expression `genre == "metal" and year between 1970..1980`, if `genre == "metal"` evaluates to false then the sub-expression `year between 1970..1980` will not be evaluated at all because we already know the operator's result will be false. An `AND` is therefore settled by a false first operand and an `OR` by a true one; an unusable first operand settles neither, so the second operand is evaluated, and may itself warn.
-
-Because the operands are evaluated in the order they were written and are never reordered, that order also decides what a predicate costs to evaluate. An identifier in the `file` namespace needs no more than the file's metadata, a tag identifier needs its tag read, and a global identifier may consult several formats before it answers. So `file::size > 10mb AND artist == "metallica"` reads tags only for the files that pass the first test, while the same two conditions in the other order read tags for every file discovered. Where the choice is free, put the cheap condition first.
+The `AND` and `OR` operators are _short-circuiting_: their operands will always be evaluated in the (left-to-right) order of appearance in the expression, and the second operand will only be evaluated if the result of the operator cannot be determined after having evaluated the first operand. For example, in the expression `genre == "metal" and year between 1970..1980`, if `genre == "metal"` evaluates to false then the sub-expression `year between 1970..1980` will not be evaluated at all because we already know the operator's result will be false. An `AND` is therefore settled by a false first operand and an `OR` by a true one; an unusable first operand settles neither, so the second operand is evaluated, and may itself warn. Since operands are never reordered, the order they are written in also decides what a predicate costs to evaluate.
 
 This short-circuiting behavior is intended to allow a [state test](#state-test-operator) to be used for checking that a value is fit to use before an operator uses it and emits a warning. A comparison cannot perform that check itself, since by the time it can tell that an occurrence is unusable it has already consumed it; refer to the state tests above for the guard idiom. A state test never evaluates to unusable, so a guard always settles an `AND` when it fails.
 
@@ -358,17 +354,15 @@ A combination that includes an unusable occurrence has no answer of its own, so 
 
 These are the rules of the logical operators applied across a bag: an existential quantifier is an `OR` over the occurrences, and a universal one an `AND`.
 
-**An operator is a single quantifier scope.** The iteration belongs to the operator, and every one of its value operands is reached within it, which is what makes an operator's test indivisible: a construct that looks like two operators joined by a logical operator has two scopes and is a different proposition, as the `BETWEEN` example above shows. Nothing in the language may therefore be defined by rewriting it into other operators.
+**An operator is a single quantifier scope.** The iteration belongs to the operator, and every one of its value operands is reached within it, which is what makes an operator's test indivisible: a construct that looks like two operators joined by a logical operator has two scopes and is a different proposition, as the `BETWEEN` example above shows.
 
-**The iteration does not short-circuit.** Every combination is evaluated even after the operator's result is settled. This changes no result -- a quantifier's answer does not depend on how many witnesses were examined -- but it decides which warnings a file produces, and that has to be decided, because a bag is unordered. If iteration stopped at the first witness, then for a value holding one matching occurrence and one unusable one, whether a warning was emitted would depend on which occurrence the iteration happened to reach first, over a collection the specification declares to have no order. A run's warnings, and with them its exit code under `--strict-exit-code`, would vary between implementations, between releases, and potentially between runs, for a predicate whose answer never changed. Exhaustive evaluation costs nothing worth counting, since the bags involved hold a handful of occurrences at most.
-
-This is the one place where Goro deliberately declines to short-circuit. The `AND` and `OR` operators do short-circuit, and are relied on to; see [Boolean operators](#boolean-operators) and [State tests](#state-test-operator) for the guard idiom that depends on it. The difference is that the operands of `AND` and `OR` appear in a written order the reader chose, whereas the occurrences within a bag do not.
+**The iteration does not short-circuit.** Every combination is evaluated even after the operator's result is settled, so the warnings a file produces never depend on the order of the occurrences in a bag. This is the one place where Goro declines to short-circuit: `AND` and `OR` do, and the [guard idiom](#state-test-operator) relies on it.
 
 The loops are nested **by quantifier, not by position**: a universally-quantified operand always forms a loop outside any existentially-quantified one. Where two operands carry the same quantifier the nesting between them is immaterial, so which side of an operator an operand is written on never changes the nesting and therefore never changes the result. That is a claim about the quantifiers and not about the operators themselves: `a < b` and `b < a` remain different propositions, as always, and the two operands of `~=` have fixed roles. Should an operator ever take more than two value operands, the same rule applies: universals outermost, existentials innermost, with the written order breaking ties among operands of the same quantifier.
 
 An unusable occurrence participates in this iteration like any other, with general operator rule 2 applying to it: every combination that includes it is unusable. Under the default existential quantifier an unusable occurrence therefore cannot prevent a match that another occurrence supplies, and under `ALL()` it cannot prevent a mismatch that another occurrence supplies; what it prevents is an answer that would have depended on it. For example, if `vorbis::year` has two occurrences, one holding `1991` and one holding data that is not a date at all, then `vorbis::year == 1991` is true, because the first occurrence settles it; `ALL(vorbis::year) == 1991` is unusable, because whether every year is 1991 turns on the one that cannot be read; and `ALL(vorbis::year) == 2000` is false, because the first occurrence already shows that not every year is 2000.
 
-Absence, by contrast, does not participate in this iteration at all: an absent operand makes the operator false before any iteration begins, by general operator rule 1. This deserves stating separately, because it is the one place where the identification of absence with the bag of cardinality zero must not be read set-theoretically. Ordinary quantifier semantics would make `ALL(genre) == "rock"` _vacuously true_ for a file with no genre whatsoever, there being no counterexample available to find. Goro makes it false instead: a predicate demanding that every genre be rock is a predicate about genres, and a file that has none does not satisfy it. Universal quantification in Goro is non-vacuous, and it is non-vacuous because absence is intercepted before iteration rather than because the quantifier itself is unusual.
+Absence, by contrast, does not participate in this iteration at all: an absent operand makes the operator false before any iteration begins, by general operator rule 1. Universal quantification is therefore not vacuous: `ALL(genre) == "rock"` is false for a file with no genre at all, where ordinary quantifier semantics would make it true.
 
 Examples:
 
@@ -433,7 +427,7 @@ Both apply equally to the result of a comparison, so that `FALLBACK(year < 2000,
 
 ### Errors
 
-Goro reports every error it possibly can when the predicate is read, before any file is processed. This is a deliberate constraint rather than a convenience: a command may be operating on a hundred thousand files, and it is not acceptable for such a run to abort halfway through because of a mistake that could have been pointed out at the start.
+Goro reports every error it possibly can when the predicate is read, before any file is processed.
 
 Reporting errors this early is possible because the type of every sub-expression in a predicate is known statically, as described under [Values](#values), and so is whether it is [definite](#definite-expressions). A file decides only a value's cardinality and the state of each of its occurrences, never its type, and never the cardinality of a definite expression. Checking therefore needs no file at all.
 
@@ -498,24 +492,24 @@ In the following examples, `x` and `y` are identifiers that resolve to an unusab
 | `(x > 1) == (x > 1)`               | 1        | the outer `==` uses an unusable boolean, which has already been reported
 | `FALLBACK(x > 1, FALSE)`           | 1        | `FALLBACK()` replaces the comparison's result after the comparison has warned
 
-Deduplication resets for every file. A predicate such as `id3v2::track == 1` applied to a collection in which 500 files have junk where the track number should be will therefore produce 500 warnings, one per affected file. This is deliberate: each warning names a file whose data needs attention, and collapsing the repeats would discard exactly the information that makes the warning actionable.
+Deduplication resets for every file. A predicate such as `id3v2::track == 1` applied to a collection in which 500 files have junk where the track number should be will therefore produce 500 warnings, one per affected file.
 
 A sub-expression that is never evaluated never warns. In particular, the short-circuiting of `AND` and `OR` can be used deliberately to avoid a warning; refer to [State tests](#state-test-operator) for the guard idiom that relies on this. Only a first operand that is true or false can short-circuit, though, so a comparison that is itself unusable does not shield what follows it the way a state test does. Within a single operator there is no such escape, since iteration over a multivalue operand is exhaustive: if an operand holds an unusable occurrence and the operator is evaluated at all, the warning is emitted, whether or not some other occurrence already settled the result.
 
 #### What a warning quotes
 
-Each warning quotes the sub-expression responsible, exactly as it was written in the predicate. Where the same source occurs in more than one place, the quoted text is that of the occurrence which actually produced the value. Because deduplication means only one of several equally responsible occurrences is reported, a warning deliberately does not name a position within the predicate.
+Each warning quotes the sub-expression responsible, exactly as it was written in the predicate. Where the same source occurs in more than one place, the quoted text is that of the occurrence which actually produced the value. A warning does not name a position within the predicate.
 
 ### Modifiers
 
 Three constructs -- `ALL`, `ANY`, and `LITERALLY` -- are _modifiers_ rather than functions. A modifier does not compute a new value from its argument; it changes how the operator that consumes the value will treat it. The defaults are existential quantification and normalized comparison, so a modifier is only ever needed to depart from them.
 
-The three are not quite the same kind of thing, and the difference is worth stating because it decides what writing one on one side of an operator does to the other side.
+The three are not quite the same kind of thing, which decides what writing one on one side of an operator does to the other side:
 
 - `ALL` and `ANY` choose a **quantifier**, which belongs to the operand it is written on. Each operand of an operator carries its own, and they are independent: one side may be universal while the other is existential.
 - `LITERALLY` chooses a **comparison mode**, which belongs to the operator. An operator either normalizes the strings it compares or it does not, and a `LITERALLY` on either operand settles that for the comparison as a whole.
 
-Because a modifier's effect is realized by an operator rather than by the modifier itself, **a modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. For `BETWEEN` that means its left operand alone, the range on its right being built out of literals rather than out of operands. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
+**A modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. For `BETWEEN` that means its left operand alone, the range on its right being built out of literals rather than out of operands. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
 
 The restriction applies in one direction only. A modifier may be applied to any operand, including one that is itself a function call, so `LITERALLY(FALLBACK(genre, "pop")) == "Pop"` is valid: modifiers go on the outside, functions on the inside.
 
@@ -573,19 +567,9 @@ Function arguments follow the same type-matching discipline as operator operands
 The functions that can be used inside predicates are:
 
 **COUNT(expr)**
-: returns the cardinality of its argument, as a number. Specifically, the result of this function is:
+: returns the number of occurrences of its argument: `0` if `expr` is absent, and otherwise the size of its bag. Unusable occurrences are counted like any other -- data that is there and cannot be read is still there -- and `COUNT()` never consumes one, so it never warns.
 
-- `0` if `expr` is absent
-- `1` if `expr` is a single occurrence
-- a positive integer greater than 1 if `expr` is a multivalue, equal to the count of its occurrences
-
-Unusable occurrences are counted like any other, so a value of two unusable occurrences has a count of 2. Data that is there and cannot be read is a different thing from data that is not there, and `COUNT()` counts what is there.
-
-This function reads cardinality and nothing else. It never interprets an occurrence, so it never consumes one and never warns, however unusable its argument turns out to be; see [Warnings](#warnings).
-
-Note that `COUNT()` answers a question about cardinality rather than about fitness for use. `COUNT(expr) == 0` is exactly `expr IS ABSENT`, and says nothing at all about whether the occurrences of a value that is not absent can be read; a [state test](#state-test-operator) is how to ask that.
-
-Note also that it counts the occurrences an identifier resolved to, which is not always the number of tags they came from. A single Id3v2 `TCON` frame holding `(17)Post-Rock` resolves to two genres, so `COUNT(id3v2::genre)` is 2 for such a file. If the count of tags is what is wanted, count the raw namespace, which resolves one occurrence per tag.
+The count is of the occurrences an identifier resolved to, which is not always the number of tags they came from. A single Id3v2 `TCON` frame holding `(17)Post-Rock` resolves to two genres, so `COUNT(id3v2::genre)` is 2 for such a file, while a raw namespace resolves one occurrence per tag.
 
 Example:
 
@@ -594,7 +578,7 @@ Example:
 **FALLBACK(expr, literal_default)**
 : returns `expr` wherever it is usable, and `literal_default` wherever it is not. An absent `expr` becomes a single usable occurrence holding `literal_default`, and an unusable occurrence becomes a usable one holding `literal_default`.
 
-Because this function substitutes for an occurrence rather than reading it, it never consumes one and therefore never warns, however many of its input's occurrences are unusable. It is an error if `literal_default` is not a literal.
+Because this function substitutes for an occurrence rather than reading it, it never consumes one and therefore never warns. It is an error if `literal_default` is not a literal.
 
 If `expr` is a multivalue, this function returns a multivalue of the same cardinality, with `FALLBACK()` applied to each occurrence of the input in turn. Its result is therefore never absent and never contains an unusable occurrence.
 
@@ -712,7 +696,7 @@ The `bytecount`, `duration` and `raw_string` productions are each a single token
 
 Inside a `raw_string`, a pair of quotes is taken as the escaped quote whenever two appear together, so the string ends only at a quote standing alone. `r"a""b"` is therefore the three characters `a"b`, and a raw string holding a single quote is written with four in a row.
 
-Because an `identifier` is never followed by a `string` in any production, reading `r"` as the start of a raw string takes nothing away: no predicate that parsed before can change meaning, and an identifier that happens to be named `r` is unaffected wherever whitespace, an operator or a `::` follows it.
+An identifier that happens to be named `r` is unaffected by the raw string prefix wherever whitespace, an operator or a `::` follows it, since an `identifier` is never followed by a `string` in any production.
 
 ### Constraints not expressed by the grammar
 

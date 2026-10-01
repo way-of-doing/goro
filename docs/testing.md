@@ -197,9 +197,9 @@ of `AND`, or a true one of `OR`, must not.
 **An unusable boolean is never reported twice.** Comparing, testing, substituting for or combining
 an unusable boolean emits nothing beyond what the operator that produced it emitted.
 
-**The state tests are complete and mutually irreducible.** The truth table in the predicate
-documentation is small enough to assert in full, and should be, because its entries are what
-establish that no one of the three tests can be derived from the others.
+**The state test truth table holds in full.** The table in the predicate documentation is small
+enough to assert in full, and should be. Its absent row matters most, being where
+`ALL(x) IS USABLE` and `NOT x IS UNUSABLE` part company.
 
 **The regex operator normalizes its subject and not its pattern.** Every other operator
 normalizes both of its operands, so an implementation that reuses the ordinary path for `~=` will
@@ -213,9 +213,11 @@ case, explicit namespace qualification and modifier wrapping do not produce dist
 while a difference anywhere below the top level does. The set of sources a predicate can produce
 is computable from the predicate alone.
 
-**Every static error is reported before a file is opened.** Each bullet of the error list needs a
-test asserting both the rejection and that nothing was processed, since the guarantee under test
-is as much about when the error arrives as about whether it arrives at all.
+**Every static error is reported before a file is opened.** Every condition the predicate
+documentation calls an error needs a test asserting both the rejection and that nothing was
+processed, since the guarantee under test is as much about when the error arrives as about whether
+it arrives at all. The list of errors in that documentation is illustrative, so it is a starting
+point for these tests rather than an inventory of them.
 
 ### Scenarios to cover
 
@@ -225,7 +227,7 @@ is as much about when the error arrives as about whether it arrives at all.
 | An ordering operator with exactly one operand under `ALL()` | The result is an aggregate comparison; an implementation reading it as "every one of these is less than every one of those" is wrong |
 | `v BETWEEN 1..10` against a multivalue of `0` and `20` | Must be false; an implementation that desugars into two comparisons returns true |
 | `ALL(x) == v` and `ALL(x) IS USABLE` for an absent `x` | Both false; universal quantification must not be vacuous |
-| Every row of the state test truth table, including the absent row | The three tests must be mutually irreducible, which is what the absent row establishes |
+| Every row of the state test truth table, including the absent row | The universally quantified tests must be false for an absent value, not the negations of the existential ones |
 | `x != v` against `NOT x == v`, for an absent `x`, an unusable `x`, and a multivalue holding one of each | For the absent and multivalue cases the two are not complementary and each must give the documented answer; for the unusable case both must be unusable |
 | `x < v` against `NOT x >= v`, for a single unusable `x` | Both unusable: negation must not turn a comparison that could not be answered into a true one |
 | `x == v` and `ALL(x) == v` and `ALL(x) == w`, for `x` holding one occurrence equal to `v` and one unusable | True, unusable and false respectively: an answered combination settles a quantifier whenever it can, and only otherwise does the unusable one decide |
@@ -240,7 +242,7 @@ is as much about when the error arrives as about whether it arrives at all.
 | The same bag with its occurrences supplied to the operator in the reverse order | The result, the warnings and the exit code must all be identical, which is the property exhaustive iteration exists to deliver |
 | A value that is absent, and one that is a single unusable occurrence, passed to `COUNT()` | Must be 0 and 1 respectively, and neither may warn |
 | Each row of the warning deduplication table | Source identity must be structural and independent of position |
-| Each bullet of the static error list | Every one reported with nothing processed, and with the exit code that says the run never started |
+| Each condition the predicate documentation calls an error | Every one reported with nothing processed, and with the exit code that says the run never started |
 | A `~=` whose pattern holds a diacritic, against a subject that holds the same one | Must not match: the subject is normalized and the pattern is not |
 | The same pair under `LITERALLY()` | Must match: an unnormalized subject keeps its diacritics |
 | A `~=` whose pattern differs from the subject only in case | Must match by default, and must not under `LITERALLY()`, since the modifier makes the match case-sensitive |

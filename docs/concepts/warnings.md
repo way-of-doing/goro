@@ -13,11 +13,7 @@ attention and that Goro cannot settle on their behalf: a tag field holding somet
 what it should be, or a file that cannot be read at all. A warning is not an error. **It never
 interrupts a run, and it never changes what the run produces for any other file.**
 
-That is a deliberate constraint rather than a convenience. A command may be operating on a
-hundred thousand files, and it is not acceptable for one malformed or damaged file among them to
-abort work that was correct for all the others.
-
-Every condition Goro can detect is therefore one of two things. An **error** is reported before
+Every condition Goro can detect is one of two things. An **error** is reported before
 any file is processed and stops the run before it starts; everything that can be known from the
 command line and the predicate alone is an error. A **warning** is reported as the run proceeds
 and stops nothing; everything that depends on the contents of a particular file is a warning.
@@ -25,13 +21,12 @@ There is no third category, and nothing about one file is ever allowed to become
 
 ### What warns
 
-Every warning belongs to exactly one of two categories. They are named here because `--no-warn`
-selects by them, and because the exit code reports them separately.
+Every warning belongs to exactly one of two categories, which `--no-warn` and the exit code
+refer to.
 
 **Data that cannot be interpreted -- the `data` category.** A tag field holding something that cannot be read as the kind
 of value it should hold yields an unusable occurrence, and using one warns. So does a regular
-expression arriving from tag data that is not a valid pattern. On a real collection this is much
-the most common warning, and it is the reason the whole mechanism exists. The rules for exactly
+expression arriving from tag data that is not a valid pattern. The rules for exactly
 when it fires -- which constructs consume an unusable occurrence and which pass it along, how a
 warning is attributed, and how warnings are deduplicated within a file -- belong to predicates and
 are described under [Warnings](predicates.md#warnings) there.
@@ -51,23 +46,16 @@ mentioning only `file::size` needs nothing but the file's metadata; one mentioni
 identifier needs the tag read; `goro hash` needs the audio itself. A file that a run never had to
 open cannot fail to be read.
 
-A file that warned this way has not been processed, and what a command's output shows for it
-follows from what that command was asked. `goro list` with a predicate was asked which files
-satisfy a condition, so a file whose predicate could not be evaluated is not listed, a condition
-that could not be evaluated not having been satisfied. `goro hash` was asked for a value per file,
-so the file appears with its hash reported as absent rather than being dropped, since dropping it
-would be indistinguishable from the file having been deleted. The two look inconsistent and are
-not: each command answers the question it was given. Neither is silent about it either way.
+A file that warned this way has not been processed. What a command's output shows for it is
+specified by each command: `goro list` with a predicate leaves it out, and `goro hash` includes it
+with its hash reported as absent.
 
-Unlike a warning about unusable data, this one is deduplicated against nothing, there being no
-sub-expression to attribute it to. It is one warning for one file, so a run that could read none
-of a thousand files emits a thousand warnings -- each of which names a file somebody may want to
-go and look at, which is exactly the information that makes them worth having.
+Unlike a data warning, this one is not deduplicated: it is one warning for one file, so a run that
+could read none of a thousand files emits a thousand warnings.
 
 ### Where warnings go
 
-Warnings are written to standard error and never to standard output, so that they cannot interfere
-with the machine-readable output of commands such as `goro list -o json`. Each one names the file
+Warnings are written to standard error and never to standard output. Each one names the file
 being processed, together with whatever identifies the cause: for unusable data, the
 sub-expression responsible as it was written in the predicate.
 
@@ -92,23 +80,8 @@ way to tell a condition that did not occur from one that was suppressed: there i
 suppressed warnings and no residual trace of them, so a run under `--no-warn=data` is
 indistinguishable from the same run over a collection whose tags are all clean.
 
-That is what the option means rather than an artefact of how it works. Suppressing a category
-says the condition is not a problem, not that it should be reported more quietly, and a run cannot
-both disregard a condition and report it.
-
-**Be deliberate about `file`.** Suppressing data warnings on a library whose tags are known to be
-imperfect is ordinary housekeeping; nobody needs to be told twice a week that a tag they have
-decided not to fix is still unfixed. Suppressing file warnings is a different matter, because a
-file that cannot be read is the condition Goro exists to find, and silencing it in a scheduled run
-removes the one signal that would report a disc going bad. The two categories exist separately
-precisely so that the noisy condition somebody has accepted need not bury the quiet one they have
-not.
-
-Suppression is by category and by nothing finer. There is no way to silence warnings for one
-identifier, one tag format or one file, and this is not a first step towards one: selecting an
-individual warning would require warnings to carry stable identities to name, which they do not,
-whereas selecting a category requires only the two names above. Anything finer is
-[deferred](../design/deferred.md) until something concrete asks for it.
+Suppression is by category only. There is no way to silence warnings for one identifier, one tag
+format or one file.
 
 ### Warnings and the exit code
 
@@ -117,9 +90,3 @@ and reporting that fact through the exit code is opt-in. With `--strict-exit-cod
 emitted at least one data warning returns `10`, and one that emitted at least one file warning
 returns `11`. See [Exit codes](exit-codes.md) for the codes, for which of them takes precedence,
 and for what suppressing a category does to them.
-
-This is the reason the distinction between the two kinds of warning is worth drawing at all.
-Unusable data means the run answered every question it was asked and disregarded some data while
-doing so. A file that could not be read means the run did not answer one of the questions, so its
-output is incomplete -- a materially different thing to learn, and one a script may reasonably
-want to branch on separately.
