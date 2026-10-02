@@ -15,7 +15,11 @@ goro/
 │   └── design/             # Design rationale, plus deferred features and open questions
 │   └── features/           # Explanatory text around Goro features 
 │   └── sessions/           # Archive of past coding agent sessions; check recents for context on what was just decided
+│   └── faq.md              # User-facing practical answers and tips that the specs deliberately leave out
+│   └── implementation.md   # Build-level concerns and open questions that need running code to settle
 │   └── testing.md          # Classes of test that matter, why, and the scenarios for each
+├── scratchpad/
+│   └── Goro.Scratchpad/    # Warehouse of experiments worth keeping (benchmarks, candidate implementations); not production code
 ├── src/
 │   └── Goro/               # Project code
 ├── tests/
@@ -27,6 +31,9 @@ goro/
 - Build: `dotnet build`
 - Test: `dotnet test`
 - Run: `dotnet run --project src/Goro --` followed by relevant arguments
+- Scratchpad: `dotnet run -c Release --project scratchpad/Goro.Scratchpad` runs whatever its `Program.cs` currently wires up
+
+The scratchpad project is deliberately not part of `Goro.slnx`, so the build and test commands above never touch it. It is a place to keep code that is useful to refer back to -- benchmark harnesses, candidate implementations compared while making a design decision -- and is not held to the project's architecture, style or testing conventions. Each experiment lives in its own folder; `Program.cs` is edited freely to run whichever one is wanted. Code there is never production code as it stands: anything that graduates to `src/` is rewritten there under the normal rules.
 
 # Workflow
 

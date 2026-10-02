@@ -48,6 +48,19 @@ symbolic or hard links: a symlink and its target, or two hard links to the
 same underlying file, are different filenames and are treated as separate
 entries even though they resolve to the same content.
 
+## FAILURES
+
+**A pathspec that cannot be resolved is an error.** Where a pathspec names a file or directory
+that does not exist, or that cannot be accessed at all, the command is rejected before any file
+is processed and nothing is done; see [Exit codes](exit-codes.md).
+
+A **glob** that resolves to no paths, by contrast, contributes no files and is not an error.
+
+**Failures met while walking are not errors.** A subdirectory that cannot be listed, or a file
+that cannot be read once processing reaches it, produces one warning and the walk continues with
+the next entry, exactly as for any other file that cannot be read; see
+[Warnings](warnings.md).
+
 ## SEE ALSO
 
 Individual command documentation may note exceptions to this behavior

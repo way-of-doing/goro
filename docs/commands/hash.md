@@ -5,12 +5,16 @@
 # Synopsis
 
 ```
-goro hash [-a <algo>] [-o <output>] [--strict-exit-code] [--] [<pathspec>...]
+goro hash [-a <algo>] [-o <output>] [--strict-exit-code] [--no-warn[=<category>,...]] [--] [<pathspec>...]
 ```
 
 # Description
 
 Read the audio-relevant part of each input file, calculate its hash, and output that information.
+
+A file whose audio cannot be read has no hash. It still appears in the output, with its hash
+reported as absent, and one warning is emitted for it; see [Warnings](../concepts/warnings.md).
+This differs from `goro list`, which leaves out a file it cannot read.
 
 # Pathspecs
 
@@ -31,7 +35,9 @@ Selects the hash function to be used. Hash function names are case-insensitive. 
 -o <format>, --output=<format>
 ```
 
-Selects the output format. Format names are case-insensitive. Valid options for `<format>` are:
+Selects the output format. Format names are case-insensitive. The order in which files appear is **unspecified**, whichever format is chosen; discovery and processing are concurrent.
+
+Valid options for `<format>` are:
 
 - `plain` (the default if -o is not specified)
 
@@ -42,6 +48,12 @@ Selects the output format. Format names are case-insensitive. Valid options for 
   ```
 
   That is: one input file per output line; displays the absolute file path, then a space, then the hash function name, then a space, and the computed audio hash.
+
+  A file whose audio could not be read carries `-` in place of the hash:
+
+  ```
+  /absolute/path/to/damaged.mp3 md5 -
+  ```
 
 - `json`
 
@@ -60,8 +72,20 @@ Selects the output format. Format names are case-insensitive. Valid options for 
   That is: an array of objects, where each object has the following properties:
   - `file`: the full absolute file path name
   - `algo`: the name of the function used to compute the hash
-  - `hash`: the computed audio hash
+  - `hash`: the computed audio hash, or `null` where the audio could not be read
 
-# Exit code
+  A file whose audio could not be read therefore appears as:
 
-This command accepts the global option `--strict-exit-code`. See [Exit codes](../concepts/exit-codes.md) for the codes it returns and what the option changes.
+  ```
+  [
+    {
+      "file": "/absolute/path/to/damaged.mp3",
+      "algo": "md5",
+      "hash": null
+    }
+  ]
+  ```
+
+# Exit code and warnings
+
+This command accepts the global options `--strict-exit-code` and `--no-warn`. See [Exit codes](../concepts/exit-codes.md) for the codes it returns and what `--strict-exit-code` changes, and [Warnings](../concepts/warnings.md) for the warning categories and what `--no-warn` suppresses.
