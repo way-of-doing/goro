@@ -31,3 +31,6 @@ bld/
 # JetBrains Rider
 *.sln.iml
 .idea/
+
+# Claude Code worktrees for isolated sessions and subagents
+.claude/worktrees/
