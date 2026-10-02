@@ -50,7 +50,7 @@ ape::"album artist" == "Various Artists"
 
 A quoted part must be preceded by `::`, so the first part of an identifier is never quoted; a string at the start of an expression is always a string value. Quoting is available wherever it is useful rather than only where it is necessary, so `ape::"artist"` is permitted and means exactly the same as `ape::artist`: the two are one identifier written two ways, not two identifiers. Escapes inside a quoted part follow the same rules as in any other string, so a name containing a double quote or a backslash can be written by preceding it with a backslash.
 
-For a list of predefined namespaces and identifiers within them together with a description of each one, see [built-in identifiers](../features/builtins/identifiers.md). A namespace is either _closed_, meaning that the identifiers it contains are known in advance, or _open_, meaning that it additionally admits identifiers whose names are derived from the tag data of the file being examined. Referring to an identifier that is not defined in a closed namespace is an error; an identifier in an open namespace is always accepted, and simply resolves to an absent value when the file holds no data for it.
+For a list of predefined namespaces and identifiers within them together with a description of each one, see [built-in identifiers](../features/builtins/identifiers.md). A namespace is either _closed_, meaning that the identifiers it contains are known in advance, or _open_, meaning that it additionally admits identifiers whose names are derived from the tag data of the file being examined. Naming a namespace that Goro does not define is an error, and so is referring to an identifier that is not defined in a closed namespace; an identifier in an open namespace is always accepted, and simply resolves to an absent value when the file holds no data for it.
 
 ### Reserved words
 
@@ -115,7 +115,7 @@ The two forms differ in nothing but how the text between the quotes is read. A r
 **number**
 : real dimensionless numbers, such as `2000`, `-1`, and `-.55`. Number literals are optionally preceded by one + or - sign character, followed by either an integer or a floating point number where the integer part is separated from the fractional part by a period. If the number has a fractional part, the integer part is optional and considered to be zero when it does not appear. The period must always be followed by at least one digit, so `1`, `1.5` and `.5` are all valid number literals while `1.` is not.
 
-A number is a [`System.Decimal`](https://learn.microsoft.com/en-us/dotnet/api/system.decimal): a base-ten value carrying 28 to 29 significant digits. `1.4kib` is exactly 1433.6 bytes, and a decimal fraction written in a predicate is the value it appears to be rather than the closest approximation a binary fraction can manage.
+A number is a [`System.Decimal`](https://learn.microsoft.com/en-us/dotnet/api/system.decimal): a base-ten value carrying 28 to 29 significant digits. Bytecounts and durations are held the same way, as a number of bytes and a number of seconds. `1.4kib` is exactly 1433.6 bytes, and a decimal fraction written in a predicate is the value it appears to be rather than the closest approximation a binary fraction can manage. A number, bytecount or duration literal whose value cannot be represented exactly in this way, being too large or carrying too many significant digits, is an error.
 
 **bytecount**
 : a numeric value that also has a unit and represents a count of bytes. A bytecount literal is an unsigned number followed immediately by a unit suffix, with no whitespace between them. The available suffixes are, in SI (powers of 10) and IEC (powers of 2) form respectively:
@@ -140,8 +140,6 @@ For example, `1.4mb`, `100b` and `10KiB` are all valid bytecount literals.
 Valid duration literals can take two forms:
 - `[#h][#m][#s]`, where hash signs `#` represent some nonnegative integer and the letters `h`, `m` and `s` are case-insensitive literals representing hours, minutes, and seconds respectively. At least one of the unit specifiers must be present, and those that do appear must appear in the order given above. The fields are unbounded and additive, so `90m` is ninety minutes and `1h100m` is two hours and forty minutes. For example, `1h10m`, `1h1s`, `90m` and `0s` are all valid duration literals.
 - `#:##` for minutes and seconds, or `#:##:##` for hours, minutes and seconds. The double hash signs `##` stand for a two-digit number from 00 to 59, written with a leading zero where it is below ten. The leading field is written as any number of digits and is **not** bounded at 59, so the conventional way of writing a long playing time works: `90:00` is ninety minutes and `250:00:00` is two hundred and fifty hours. `1:59`, `01:59`, `0:00` and `3:30` are all valid.
-
-A leading field so large that the duration could not be represented is rejected when the predicate is read, as any other literal that cannot be represented would be.
 
 Whitespace may not appear inside a duration literal: `1h10m` is a valid literal and `1h 10m` is not.
 
@@ -261,7 +259,7 @@ The state test operator `IS` asks about the cardinality and state of a value rat
 - `x IS USABLE` -- true when an occurrence of `x` can be interpreted as its type
 - `x IS UNUSABLE` -- true when an occurrence of `x` is there but cannot be so interpreted
 
-`IS ABSENT` asks about a whole value, and no quantifier affects it. The other two ask about occurrences, and are therefore quantified exactly like the operand of any other operator: existentially by default, universally under `ALL()`. That is the entire guard vocabulary of the language, and the table below is the entirety of its behaviour:
+`IS ABSENT` asks about a whole value, and applying a quantifier to its operand is an error. The other two ask about occurrences, and are therefore quantified exactly like the operand of any other operator: existentially by default, universally under `ALL()`. That is the entire guard vocabulary of the language, and the table below is the entirety of its behaviour:
 
 | value of `x`                | `IS ABSENT` | `IS USABLE` | `IS UNUSABLE` | `ALL(x) IS USABLE` | `ALL(x) IS UNUSABLE` |
 |-----------------------------|:-----------:|:-----------:|:-------------:|:------------------:|:--------------------:|
@@ -511,7 +509,7 @@ The three are not quite the same kind of thing, which decides what writing one o
 
 The restriction applies in one direction only. A modifier may be applied to any operand, including one that is itself a function call, so `LITERALLY(FALLBACK(genre, "pop")) == "Pop"` is valid: modifiers go on the outside, functions on the inside.
 
-Modifiers may be stacked as deeply as desired and in any order, a quantifier and a comparison mode being independent choices. `LITERALLY(ALL(genre))` and `ALL(LITERALLY(genre))` mean the same thing, and where the same choice is made twice the outermost wins, so `ALL(ANY(genre))` is universally quantified.
+Modifiers may be stacked as deeply as desired and in any order, a quantifier and a comparison mode being independent choices. `LITERALLY(ALL(genre))` and `ALL(LITERALLY(genre))` mean the same thing. Repeating a modifier changes nothing, so `ALL(ALL(genre))` is simply universal, but stacking contradictory quantifiers, as in `ALL(ANY(genre))`, is an error.
 
 #### Quantifiers
 
@@ -585,7 +583,7 @@ If `expr` is a multivalue, this function returns a multivalue of the same cardin
 **NUMBER(expr)**
 : converts its argument to a number.
 
-If `expr` is absent, or is already a number, this function returns the same value. It is an error to pass it a boolean. If `expr` is a bytecount, it returns the count as a number of bytes. If `expr` is a duration, it returns total number of seconds. If `expr` is a string that satisfies the rules for a numeric literal, it is converted to a number and returned. If `expr` is a string that does _not_ validate as a numeric literal, the result is an unusable occurrence, which will emit a warning the first time an attempt is made to use it. An unusable input yields an unusable result, propagated in silence.
+If `expr` is absent, or is already a number, this function returns the same value. It is an error to pass it a boolean, or a string literal that is not a valid number literal. If `expr` is a bytecount, it returns the count as a number of bytes. If `expr` is a duration, it returns total number of seconds. If `expr` is a string that satisfies the rules for a numeric literal, it is converted to a number and returned. If `expr` is a string that does _not_ validate as a numeric literal, or whose value cannot be represented exactly, the result is an unusable occurrence, which will emit a warning the first time an attempt is made to use it. An unusable input yields an unusable result, propagated in silence.
 
 If the argument is a multivalue, this function returns a multivalue of the same cardinality, with `NUMBER()` applied to each occurrence of the input in turn.
 
@@ -705,11 +703,13 @@ Not every rule in this document is grammatical, and a construct that this gramma
 - booleans are unordered, so a boolean may not be an operand of `<`, `<=`, `>`, `>=`, `BETWEEN` or `~=`, nor an endpoint of a `range`;
 - both operands of `~=` must be strings, and its right operand must be a valid regular expression if it is a literal;
 - the `operand` of a state test may be of any type, boolean included, since a state test asks about cardinality and state rather than about content;
-- an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may be one of the reserved words only when the identifier begins with `::`;
+- an `identifier` must name a namespace Goro defines, an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may be one of the reserved words only when the identifier begins with `::`;
 - a `name_part` written as a `string` names the same thing as the equivalent bare `name` when the name is one a bare `name` could have spelled, so the two forms are one identifier and not two;
-- a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a literal, and `NUMBER()` and `STRING()` do not accept a boolean;
+- a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a literal, `NUMBER()` and `STRING()` do not accept a boolean, and `NUMBER()` does not accept a string literal that is not a valid number literal;
 - the `operand` a `LITERALLY` modifier is applied to must be of type string, and must not be the operand of a state test;
+- `ALL` and `ANY` may not both be applied to the same operand, and neither may be applied to the operand of `IS ABSENT`;
 - the two endpoints of a `range` must be literals of the same type, and `min` must not be greater than `max`, compared the way the operator will compare them, so that a `LITERALLY` on the operator's other operand decides whether string endpoints are compared normalized;
 - a `number` that stands for a `bytecount` or a `duration` must not be negative, and one that stands for a `duration` must be a whole number;
 - at least one of the three unit groups of a `duration_units` must be present, so the empty string does not satisfy that production;
-- each `two_digits` of a `duration_clock` must denote a value between 0 and 59 inclusive, while its leading `digits` is unbounded and must only be small enough for the duration to be represented.
+- each `two_digits` of a `duration_clock` must denote a value between 0 and 59 inclusive, while its leading `digits` is unbounded;
+- a `number`, `bytecount` or `duration` must have a value that can be represented exactly.

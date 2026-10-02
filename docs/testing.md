@@ -240,6 +240,7 @@ point for these tests rather than an inventory of them.
 | A guard whose right operand would warn, and the same guard with the operands transposed | Short-circuiting must hold, since the observable difference is a warning that is or is not emitted |
 | An operator that finds a match among the usable occurrences of a bag that also holds an unusable one | The warning must be emitted anyway, since iteration within an operator does not short-circuit; a short-circuiting implementation would emit it or not according to the order of an unordered bag |
 | The same bag with its occurrences supplied to the operator in the reverse order | The result, the warnings and the exit code must all be identical, which is the property exhaustive iteration exists to deliver |
+| `NUMBER()` of a tag string with valid number syntax but more significant digits than a number holds | An unusable occurrence, not a rounded number |
 | `STRING()` of `1.50`, `.5`, `+5` and `-0` | `"1.5"`, `"0.5"`, `"5"` and `"0"`: one canonical form, whatever the value was written as |
 | A value that is absent, and one that is a single unusable occurrence, passed to `COUNT()` | Must be 0 and 1 respectively, and neither may warn |
 | Each row of the warning deduplication table | Source identity must be structural and independent of position |
