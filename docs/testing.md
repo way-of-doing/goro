@@ -240,6 +240,7 @@ point for these tests rather than an inventory of them.
 | A guard whose right operand would warn, and the same guard with the operands transposed | Short-circuiting must hold, since the observable difference is a warning that is or is not emitted |
 | An operator that finds a match among the usable occurrences of a bag that also holds an unusable one | The warning must be emitted anyway, since iteration within an operator does not short-circuit; a short-circuiting implementation would emit it or not according to the order of an unordered bag |
 | The same bag with its occurrences supplied to the operator in the reverse order | The result, the warnings and the exit code must all be identical, which is the property exhaustive iteration exists to deliver |
+| `STRING()` of `1.50`, `.5`, `+5` and `-0` | `"1.5"`, `"0.5"`, `"5"` and `"0"`: one canonical form, whatever the value was written as |
 | A value that is absent, and one that is a single unusable occurrence, passed to `COUNT()` | Must be 0 and 1 respectively, and neither may warn |
 | Each row of the warning deduplication table | Source identity must be structural and independent of position |
 | Each condition the predicate documentation calls an error | Every one reported with nothing processed, and with the exit code that says the run never started |
@@ -311,6 +312,9 @@ rejected on the same terms as the malformed ones.
 | A quoted string and a raw string denoting the same characters, compared with each other and used twice in one predicate | Must be one value and one warning source |
 | `5mb` against `5m`, and `1h10m` against `10 kb` and `1h 10m` | The longest token must win, and whitespace must not appear inside a literal |
 | `1..100`, `1.5..2`, and `1.` | The range operator must survive the lexer, and a trailing period must be rejected |
+| A no-break space and an ideographic space between two tokens | Both are whitespace, and the predicate parses as if a plain space had been written |
+| `NOT::x == 1`, and `and::x` | The first is `NOT` applied to `::x == 1`; the second is an error, a reserved word never beginning an identifier unless it follows a leading `::` |
+| `(ALL(genre)) == "x"` | Parses, and is rejected by static analysis: parentheses do not make a modifier's position acceptable |
 | `TRUE`, `true` and `False` as literals, `::true` as an identifier, and `year == NULL` | The boolean literals are case-insensitive keywords and qualifying one makes it an identifier; `NULL` names nothing and must be rejected with a diagnostic saying what to write instead |
 | A literal pattern using each of the four unsupported construct families | Each must be a static error, reported before any file is opened, on the same terms as a malformed pattern |
 | A pattern written as a quoted string and as the equivalent raw string, for an escape both levels understand | `"\x41"` and `r"\x41"` must both match the same subject, by the string processing the escape in one case and the pattern engine in the other |

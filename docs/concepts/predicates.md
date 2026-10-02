@@ -24,7 +24,7 @@ A predicate is read as a sequence of _tokens_: literals, identifiers, operators 
 
 **A token is always as long as it can be.** Where a stretch of text could be read as one longer token or as two shorter ones, the longer reading wins. This is what makes `5mb` a bytecount rather than a five-minute duration followed by a stray `b`, `1h10m` a single duration rather than three tokens, `r"x"` a raw string rather than an identifier followed by a string, and `NOTx` an identifier rather than the `NOT` operator applied to something called `x`.
 
-**Whitespace separates tokens and is insignificant everywhere else.** The amount and kind of whitespace between two tokens is ignored, but whitespace may never appear *inside* one: `10 kb` and `1h 10m` are not literals, and `r "x"` is not a raw string. Whitespace is therefore required wherever two tokens would otherwise run together into one, as in `NOT x`. Inside a string value whitespace is preserved exactly, so `"foo"` and `"foo "` are not equal.
+**Whitespace separates tokens and is insignificant everywhere else.** Whitespace is any character with the Unicode `White_Space` property, such as the space, the tab, the line breaks, the no-break space and the ideographic space. The amount and kind of whitespace between two tokens is ignored, but whitespace may never appear *inside* one: `10 kb` and `1h 10m` are not literals, and `r "x"` is not a raw string. Whitespace is therefore required wherever two tokens would otherwise run together into one, as in `NOT x`. Inside a string value whitespace is preserved exactly, so `"foo"` and `"foo "` are not equal.
 
 ### Case sensitivity
 
@@ -60,7 +60,7 @@ The state names `USABLE`, `UNUSABLE`, and `ABSENT` (case-insensitive) are reserv
 
 The keywords `TRUE` and `FALSE` (case-insensitive) are the two boolean literals, and are reserved on the same terms. The keyword `NULL` (case-insensitive) is reserved as well, although it names nothing that exists: Goro has no null value.
 
-This restriction applies only to bare, unqualified identifiers. If an identifier happens to coincide with a keyword, it can still be referenced by explicitly qualifying it, e.g. `::and`.
+A reserved word may still appear in an identifier, but never as its first part unless the identifier begins with `::`: `::and` and `ape::and` are identifiers, while `and::x` is not. So `NOT::x` is the `NOT` operator applied to `::x`.
 
 The modifiers `ALL`, `ANY`, and `LITERALLY` (case-insensitive) are reserved on the same terms.
 
@@ -191,7 +191,7 @@ There are some **fundamental rules which apply globally** to any operator sub-ex
 
 3. If an operator has multiple operands, it is an error for the operands to have different types. For example, `file::duration > "01:00"` is an error because `file::duration` has duration type and `"01:00"` is a literal of type string. Instead, `file::duration > 01:00` is correct because `01:00` without quotes is a valid duration literal as described earlier.
 
-4. There is a very important exception to the previous rule: _a numeric literal, though not a non-literal numeric value, may stand for a bytecount or a duration_, and is converted to whichever of the two the other operand is. For duration the converted value is that number of seconds, which may have a fractional part even though durations obtained from files never do, and the comparison is then exact -- `file::duration >= 1.5` is false for a file of one second duration and true for a file of two. For bytecount it is that number of bytes, so `file::size > 1000` selects the files larger than a thousand bytes rather than a thousand kilobytes, and `file::size > 1kb` is how to say the latter. The same holds for range literals: `file::size BETWEEN 60..120` compares `file::size` with a range of 60 to 120 bytes. A numeric literal that would convert to a bytecount or a duration may not be negative, neither of those having negative values. A numeric literal does **not** stand for a string, and a string literal does not stand for a number: `id3v2::raw::TRCK > 9` and `year == "2000"` are both errors.
+4. There is a very important exception to the previous rule: _a numeric literal, though not a non-literal numeric value, may stand for a bytecount or a duration_, and is converted to whichever of the two the other operand is. For duration the converted value is that number of seconds, which must be a whole number, as the seconds of a duration literal must be: `file::duration > 90` compares with ninety seconds, while `file::duration > 1.5` is an error. For bytecount it is that number of bytes, so `file::size > 1000` selects the files larger than a thousand bytes rather than a thousand kilobytes, and `file::size > 1kb` is how to say the latter. The same holds for range literals: `file::size BETWEEN 60..120` compares `file::size` with a range of 60 to 120 bytes. A numeric literal that would convert to a bytecount or a duration may not be negative, neither of those having negative values. A numeric literal does **not** stand for a string, and a string literal does not stand for a number: `id3v2::raw::TRCK > 9` and `year == "2000"` are both errors.
 
 5. When comparing string values, an operator _normalizes_ them by default, so that differences of case, of accents on Latin and Greek letters, and of a few kinds of character form do not matter: `artist == "motorhead"` matches when the artist is recorded as "Motörhead". Normalization is a **mode of the operator** rather than a property of either value, so it is switched off for the whole comparison by a `LITERALLY()` modifier on either operand; see [Comparison modes](#comparison-modes). [Normalization](normalization.md) defines precisely how strings are prepared in either mode.
 
@@ -271,7 +271,7 @@ The state test operator `IS` asks about the cardinality and state of a value rat
 | one usable and one unusable | false       | true        | true          | false              | false
 | two unusable occurrences    | false       | false       | true          | false              | true
 
-A state test is exempt from general operator rule 1, since reporting absence is what it is for. It also never consumes a value and therefore never warns, even for unusable occurrences.
+A state test is exempt from general operator rule 1. It also never consumes a value and therefore never warns, even for unusable occurrences.
 
 Applied to a boolean, a state test asks whether a condition could be answered: `(NUMBER(x) > 5) IS UNUSABLE` is true for a file where the comparison met data it could not interpret, and never warns on its own account, although the comparison it examines will already have warned.
 
@@ -594,7 +594,7 @@ If the argument is a multivalue, this function returns a multivalue of the same 
 
 If `expr` is absent, or is already a string, this function returns the same value. It is an error to pass it a boolean. If `expr` is a bytecount, it returns the count of bytes as a plain number without a unit. If `expr` is a duration, it returns the total duration in seconds as a plain number without a unit. If `expr` is a number, it returns that number.
 
-In every case the text is written the way a number literal is: invariant culture, no thousands separator, no exponent, and no trailing zeros in the fractional part, so that the result depends only on the value and not on how it happened to be written -- `STRING(1.50)` and `STRING(1.5)` are both `"1.5"` -- and so that it always reads back through `NUMBER()` as the value it came from. Every value of every type it accepts has a string form, so this function never produces an unusable occurrence of its own; an unusable input yields an unusable result, propagated in silence.
+In every case the text is a number literal in one canonical form: always an integer part, a sign only for a negative number, no negative zero, no thousands separator, no exponent, and no trailing zeros in the fractional part. So `STRING(1.50)` and `STRING(1.5)` are both `"1.5"`, `STRING(.5)` is `"0.5"`, `STRING(+5)` is `"5"` and `STRING(-0)` is `"0"`, and the result always reads back through `NUMBER()` as the value it came from. Every value of every type it accepts has a string form, so this function never produces an unusable occurrence of its own; an unusable input yields an unusable result, propagated in silence.
 
 If the argument is a multivalue, this function returns a multivalue of the same cardinality, with `STRING()` applied to each occurrence of the input in turn.
 
@@ -636,7 +636,7 @@ function_call   = name "(" [ expression { "," expression } ] ")" ;
 
 The four levels of `or_expr`, `and_expr`, `not_expr` and `comparison_expr` are what give the operators the precedence listed under [Grouping, precedence, and associativity](#grouping-precedence-and-associativity). `comparison_tail` appears at most once and never recurses, which is what makes the comparison, range, regex and state test operators non-associative.
 
-Because a modifier can only occur within an `operand`, and `operand` occurs only as an operand of a comparison, range, regex or state test operator, the grammar admits a modifier in every position the restriction described under [Modifiers](#modifiers) allows. It does not by itself forbid the others: `COUNT(ALL(genre))` satisfies `function_call`, whose `name` simply is not a function, so static analysis completes the restriction. This is what the modifier names are reserved for, since recognizing one is what allows a misplaced modifier to be reported as such. The recursion in `operand` is what allows modifiers to be stacked without limit. Note that `primary` admits a parenthesized `expression` but `operand` does not, so a modifier may not be wrapped in redundant grouping parentheses: `(ALL(genre)) == "x"` does not parse.
+The grammar admits a modifier wherever an `operand` can occur, and since the tail of a `comparison_expr` is optional, that is wherever an expression can occur. The restriction described under [Modifiers](#modifiers) is therefore completed by static analysis: `COUNT(ALL(genre))` parses, with `ALL(genre)` as the argument of `COUNT`, and is rejected. This is what the modifier names are reserved for, since recognizing one is what allows a misplaced modifier to be reported as such. The recursion in `operand` is what allows modifiers to be stacked without limit. Parentheses do not make a modifier's position acceptable: `(ALL(genre)) == "x"` parses, but its modifier is applied inside a parenthesized expression rather than to an operand of `==`, and it is rejected.
 
 ### Identifiers and names
 
@@ -705,11 +705,11 @@ Not every rule in this document is grammatical, and a construct that this gramma
 - booleans are unordered, so a boolean may not be an operand of `<`, `<=`, `>`, `>=`, `BETWEEN` or `~=`, nor an endpoint of a `range`;
 - both operands of `~=` must be strings, and its right operand must be a valid regular expression if it is a literal;
 - the `operand` of a state test may be of any type, boolean included, since a state test asks about cardinality and state rather than about content;
-- an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may not be one of the reserved words unless the identifier is qualified;
+- an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may be one of the reserved words only when the identifier begins with `::`;
 - a `name_part` written as a `string` names the same thing as the equivalent bare `name` when the name is one a bare `name` could have spelled, so the two forms are one identifier and not two;
 - a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a literal, and `NUMBER()` and `STRING()` do not accept a boolean;
 - the `operand` a `LITERALLY` modifier is applied to must be of type string, and must not be the operand of a state test;
 - the two endpoints of a `range` must be literals of the same type, and `min` must not be greater than `max`, compared the way the operator will compare them, so that a `LITERALLY` on the operator's other operand decides whether string endpoints are compared normalized;
-- a `number` that stands for a `bytecount` or a `duration` must not be negative, neither of those having negative values;
+- a `number` that stands for a `bytecount` or a `duration` must not be negative, and one that stands for a `duration` must be a whole number;
 - at least one of the three unit groups of a `duration_units` must be present, so the empty string does not satisfy that production;
 - each `two_digits` of a `duration_clock` must denote a value between 0 and 59 inclusive, while its leading `digits` is unbounded and must only be small enough for the duration to be represented.
