@@ -28,7 +28,7 @@ Every namespace that reads tag data comes in both forms. An **interpreted** name
 
 **Whether anything is recorded.** A format whose fields are optional -- Vorbis comments, APE items, Id3v2 frames -- records a field because a tagger wrote one, so a field that is there is a datum and a field that is not there is **absent**. A fixed-layout format, Id3v1 alone among those Goro reads, has every field present whether or not anything was ever put into one, so trailing NUL-or-space padding records nothing: a field that is padding all the way through is absent, in the interpreted and raw namespaces alike.
 
-**What the datum yields**, where it was recorded, is where the interpreted and raw namespaces part company. Interpretation trims whitespace from the start and end of the recorded text before using it, leaving whitespace inside untouched, so `" AC / DC "` yields `AC / DC`. A raw identifier trims nothing. Where a value is split, each part is trimmed, so a `TCON` frame holding `Rock; Metal` yields the genres `Rock` and `Metal`.
+**What the datum yields**, where it was recorded, is where the interpreted and raw namespaces part company. Interpretation trims whitespace from the start and end of the recorded text before using it, leaving whitespace inside untouched, so `" AC / DC "` yields `AC / DC`. A raw identifier trims nothing, except the padding of a fixed-layout field, which is not part of what was recorded: an Id3v1 field holding `Metallica` followed by spaces or NUL bytes yields `Metallica` through `id3v1::raw::artist` as well. Where a value is split, each part is trimmed, so a `TCON` frame holding `Rock; Metal` yields the genres `Rock` and `Metal`.
 
 An identifier whose type is string then yields the text it has. One of any other type interprets that text, and when it cannot the result is an **unusable occurrence** -- a field holding `last tuesday` where a date was expected being the ordinary case.
 
@@ -149,10 +149,15 @@ This namespace defines no well-known identifiers: every identifier names an item
 
 Includes identifiers to access basic file properties. This namespace is **closed**.
 
-| Identifier       | Type       | Description  |
-|------------------|------------|--------------|
-| `file::duration` | duration   | The playtime duration of the audio file, truncated to whole seconds
-| `file::size`     | bytecount  | The size of the audio file on disk
+| Identifier        | Type       | Description  |
+|-------------------|------------|--------------|
+| `file::duration`  | duration   | The playtime duration of the audio file, truncated to whole seconds
+| `file::extension` | string     | The part of the file name after its last dot, without the dot, such as `flac`
+| `file::name`      | string     | The file name, extension included, such as `01 Intro.flac`
+| `file::path`      | string     | The absolute path of the file
+| `file::size`      | bytecount  | The size of the audio file on disk
+
+A path is the one the file was discovered under: symbolic links are not resolved. It is written with `/` as the separator on every platform, so that a file Windows calls `C:\Music\01 Intro.flac` has the `file::path` `C:/Music/01 Intro.flac`. `file::extension` is absent when the name has no dot, when its only dot is the first character, or when nothing follows its last dot; `file::path` and `file::name` are never absent. None of the three is ever unusable, and none needs anything read from the file.
 
 ### Namespace `id3v1`
 
@@ -234,7 +239,7 @@ your way.
 | `id3v2::track`   | number     | Value(s) of the `TRCK` frame; this value comes from [tracknumber-shaped](#parsing-track-numbers) data
 | `id3v2::year`    | number     | Value(s) of the `TDRC` frame; this value comes from [date-shaped](#parsing-dates) data
 
-Because this namespace is open, any identifier not listed above is taken to be a frame identifier and resolves to the content of the frames of that name. `id3v2::TIT3` reads the `TIT3` frames, and an identifier naming a frame the file does not carry is absent.
+Because this namespace is open, any identifier not listed above is taken to be a frame identifier and resolves to the text of the frames of that name. `id3v2::TIT3` reads the `TIT3` frames, and an identifier naming a frame the file does not carry is absent. For the frames that carry a description alongside their value -- `TXXX`, `COMM` and `WXXX` -- the description is dropped and the value alone is used, so `id3v2::COMM` and `id3v2::comment` are the same thing.
 
 #### Frame names and tag versions
 
@@ -279,7 +284,7 @@ Provides the same Id3v2 tag information as the `id3v2` namespace, but without in
 
 This namespace defines no well-known identifiers. Every identifier in it is taken to be a frame name, exactly as in `id3v2`, and resolves to the text of the frames of that name as recorded in the file. `id3v2::raw::TRCK` is the uninterpreted counterpart of `id3v2::track` and yields a string such as `"3/12"`; `id3v2::raw::TCON` yields whatever the genre frame records, references and separators included.
 
-Frames that carry a description alongside their value -- `TXXX`, `COMM` and `WXXX` -- resolve to a string holding both, written as the description in square brackets followed by the value, as in `[MOOD] calm`. A tag holding several such frames therefore resolves to a multivalue of one such string per frame. Addressing an individual one of them by its description is not currently possible; see the deferred design notes.
+Frames that carry a description alongside their value -- `TXXX`, `COMM` and `WXXX` -- resolve to a string holding both, written as the description in square brackets followed by the value, as in `[MOOD] calm`. This combined string is Goro's presentation of two recorded fields rather than a single recorded one, and the language code of a `COMM` frame is not part of it. A tag holding several such frames therefore resolves to a multivalue of one such string per frame. Addressing an individual one of them by its description is not currently possible; see the deferred design notes.
 
 Two deviations from exact fidelity are known, both confined to Id3v2.3. A `TCON` frame whose recorded value separates genres with a forward slash is reported with semicolons in their place, and the parentheses around the reserved values `(RX)` and `(CR)` are not preserved. Neither deviation affects any identifier in the `id3v2` namespace.
 

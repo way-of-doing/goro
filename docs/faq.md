@@ -43,12 +43,26 @@ and both match `A`. They part company over everything else a pattern needs -- `\
 `\p{...}`, and a literal backslash -- which means something only to the pattern and therefore wants
 a raw string.
 
+### How do I select files by type, such as every FLAC in a folder tree?
+
+Filter on the extension:
+
+```
+goro list --filter='file::extension == "flac"' /music
+```
+
+A glob cannot do this, since it matches within one directory only. The comparison ignores case like
+any other, so `FLAC` and `flac` are both found. `file::path` works the same way for anything else
+about where a file lives: `file::path ~= "/live/"` finds the files somewhere under a directory
+called `live`. Paths are written with `/` on every platform.
+
 ### How can I make a filter faster?
 
 Put the cheap conditions first. `AND` and `OR` evaluate their operands left to right, stop as soon
-as the result is settled, and are never reordered. `file::size` needs nothing but file system
-metadata, a tag identifier needs its tag read, and a global identifier such as `artist` may consult
-several tag formats before it answers. So
+as the result is settled, and are never reordered. `file::path`, `file::name` and
+`file::extension` need nothing read at all, `file::size` needs nothing but file system metadata, a
+tag identifier needs its tag read, and a global identifier such as `artist` may consult several tag
+formats before it answers. So
 
 ```
 file::size > 10mb AND artist == "metallica"

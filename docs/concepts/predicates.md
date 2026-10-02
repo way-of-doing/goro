@@ -105,8 +105,9 @@ A **quoted string** is delimited by double quotes and processes escape sequences
 | `\t`      | tab, U+0009 |
 | `\xNN`    | the code unit given by two hexadecimal digits |
 | `\uNNNN`  | the code unit given by four hexadecimal digits |
+| `\u{N...}` | the character given by one to six hexadecimal digits, any code point other than a surrogate |
 
-A backslash followed by anything else is an error rather than a literal backslash, so text written with single backslashes is rejected instead of being silently misread. Both `\x` and `\u` take a fixed number of digits, which is what makes `"\x41B"` unambiguously `A` followed by `B`. The escapes denote UTF-16 code units, so a character outside the Basic Multilingual Plane is written as a surrogate pair, and a surrogate that is not part of a pair is an error.
+A backslash followed by anything else is an error rather than a literal backslash, so text written with single backslashes is rejected instead of being silently misread. `\x` and the unbraced `\u` take a fixed number of digits, which is what makes `"\x41B"` unambiguously `A` followed by `B`; the braced form ends at its closing brace. `\x` and the four-digit `\u` denote UTF-16 code units, so with them a character outside the Basic Multilingual Plane is written as a surrogate pair, and a surrogate that is not part of a pair is an error. The braced form `\u{...}` denotes a whole character instead, so `\u{1F3B5}` and `\uD83C\uDFB5` are the same string.
 
 A **raw string** carries the prefix `r` and processes nothing whatsoever: every character between the quotes is part of the value, and a backslash is simply a backslash, so `r"\d{4}"` and `"\\d{4}"` denote the same text. A double quote inside a raw string is written by doubling it, so `r"say ""hi"""` is the value `say "hi"`.
 
@@ -661,7 +662,8 @@ quoted_string   = '"' { string_char | escape } '"' ;
 string_char     = <any character other than '"' and "\"> ;
 escape          = "\" ( '"' | "\" | "n" | "r" | "t" )
                 | "\x" hex hex
-                | "\u" hex hex hex hex ;
+                | "\u" hex hex hex hex
+                | "\u{" hex [ hex [ hex [ hex [ hex [ hex ] ] ] ] ] "}" ;
 
 raw_string      = ( "r" | "R" ) '"' { raw_char | '""' } '"' ;
 raw_char        = <any character other than '"'> ;

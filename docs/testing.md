@@ -241,6 +241,9 @@ point for these tests rather than an inventory of them.
 | An operator that finds a match among the usable occurrences of a bag that also holds an unusable one | The warning must be emitted anyway, since iteration within an operator does not short-circuit; a short-circuiting implementation would emit it or not according to the order of an unordered bag |
 | The same bag with its occurrences supplied to the operator in the reverse order | The result, the warnings and the exit code must all be identical, which is the property exhaustive iteration exists to deliver |
 | `NUMBER()` of a tag string with valid number syntax but more significant digits than a number holds | An unusable occurrence, not a rounded number |
+| `file::extension` of `a.flac`, `a.tar.gz`, `.hidden`, `README` and `trailing.` | `flac` and `gz`, then absent three times: no dot, a leading dot only, and nothing after the last dot |
+| `file::path` of a file on Windows | Written with `/` throughout, drive letter included, so that the same predicate means the same thing on every platform |
+| `file::path` and `file::name` of a file reached through a symbolic link | The link's path and name, not the target's: paths are as discovered |
 | `STRING()` of `1.50`, `.5`, `+5` and `-0` | `"1.5"`, `"0.5"`, `"5"` and `"0"`: one canonical form, whatever the value was written as |
 | A value that is absent, and one that is a single unusable occurrence, passed to `COUNT()` | Must be 0 and 1 respectively, and neither may warn |
 | Each row of the warning deduplication table | Source identity must be structural and independent of position |
@@ -301,9 +304,10 @@ rejected on the same terms as the malformed ones.
 
 | Scenario | What it is there to catch |
 |---|---|
-| Each of the seven escapes, in a quoted string | Each must produce exactly its character |
+| Each of the eight escapes, in a quoted string | Each must produce exactly its character |
 | `"\x41B"` and the four-digit `\u` equivalent | Both escapes take a fixed number of digits, so this is `A` followed by `B` and not a three-digit read |
 | A backslash followed by a character that is not an escape, including `\N` and `\U` | Must be an error, not a dropped backslash and not a literal one |
+| `\u{1F3B5}`, and `\u{D800}` or `\u{110000}` | The first is one character; the others are errors, being a surrogate and beyond the last code point |
 | Two `\u` escapes forming a surrogate pair | Must produce the single character outside the Basic Multilingual Plane |
 | `r"\d{4}"` used as a pattern | The backslash must reach the pattern engine unprocessed |
 | `r"a""b"` | Must be the three characters `a"b` |
@@ -424,6 +428,7 @@ single-condition test exercises.
 | A file whose permissions deny reading | Must warn and continue, and the run must complete rather than abort |
 | A file removed between discovery and processing | The same treatment; the window is real on a large collection, so this must not be a distinct failure mode |
 | A file that is not audio at all, and one whose audio is truncated | Must warn and continue, not propagate an exception from the tag library |
+| A predicate mentioning only `file::path`, `file::name` or `file::extension`, against a file that cannot be opened at all | Must **not** warn, and must evaluate: nothing was read |
 | A predicate mentioning only `file::size`, against a file whose tags cannot be read | Must **not** warn: nothing needed the tags, so nothing failed |
 | The same file under a predicate mentioning a tag identifier | Must warn, and the file must not be listed |
 | `goro list` with no filter, over a file that cannot be opened | Must list it and must not warn, the command having needed nothing but the path |

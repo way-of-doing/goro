@@ -42,9 +42,12 @@ in a form Goro understands -- that file yields **one warning** and the run conti
 file.
 
 Which files this can happen to depends on what the command needs from each one. A predicate
-mentioning only `file::size` needs nothing but the file's metadata; one mentioning a tag
-identifier needs the tag read; `goro hash` needs the audio itself. A file that a run never had to
-open cannot fail to be read.
+mentioning only `file::path`, `file::name`, `file::extension` or `file::size` needs nothing but the
+file's metadata; one mentioning `file::duration` needs the audio's properties read; one mentioning
+a tag identifier needs the tags read; `goro hash` needs the audio itself. A file that a run never
+had to open cannot fail to be read. A file whose tags cannot be parsed, even if only one of them
+is damaged, is a file that cannot be read, and so is a file whose audio properties cannot be
+parsed when `file::duration` needs them.
 
 A file that warned this way has not been processed. What a command's output shows for it is
 specified by each command: `goro list` with a predicate leaves it out, and `goro hash` includes it
