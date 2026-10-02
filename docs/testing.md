@@ -315,6 +315,62 @@ rejected on the same terms as the malformed ones.
 | A literal pattern using each of the four unsupported construct families | Each must be a static error, reported before any file is opened, on the same terms as a malformed pattern |
 | A pattern written as a quoted string and as the equivalent raw string, for an escape both levels understand | `"\x41"` and `r"\x41"` must both match the same subject, by the string processing the escape in one case and the pattern engine in the other |
 
+## String normalization
+
+### Why this earns its own class of tests
+
+Normalization decides which strings compare equal, so a defect in it does not fail; it quietly
+widens or narrows every string comparison a predicate makes. It is also the class most exposed to
+scripts and encodings that nobody on the project reads, where a wrong result looks no different
+from a right one. The rules in [Normalization](concepts/normalization.md) have not been reviewed by
+an expert, which makes it more important, not less, that what they say is pinned down by tests:
+whatever is later found to be wrong should be found by changing a test, not by noticing a
+mismatch.
+
+The tests below began as smoke tests run while choosing between candidate normalizations. Most of
+them are cases that the first, simpler rule got wrong.
+
+### What the tests must establish
+
+**Every step of normalized mode, on a script it is meant to affect and on one it is meant to
+leave alone.** Accent removal is limited to Latin and Greek letters, so each test of a removal
+needs a neighbour asserting that a similar-looking mark elsewhere survives.
+
+**Literal mode changes nothing visible.** It composes characters and repairs malformed text, and
+must otherwise hand back what was recorded.
+
+**Normalization is total.** No input, however malformed, may make it throw; a run must never stop
+because a tag holds text that is not valid UTF-16.
+
+**The regex subject is prepared as every other operand is.** The pattern is not, and the
+consequences of that are asserted directly.
+
+### Scenarios to cover
+
+| Scenario | What it is there to catch |
+|---|---|
+| `Motörhead`, `METALLICA`, `İstanbul`, `Βαγγέλης` against their unaccented lowercase forms | Equal: case folding and accent removal on Latin and Greek |
+| `ΟΔΥΣΣΕΥΣ` against `οδυσσευς` | Equal: final sigma, which plain lowercasing misses |
+| `Ёлка` against `елка` | Equal: the one Cyrillic accent that is folded |
+| `Йога` against `иога`, and `Київ` against `Киів` | Different: `й` and `ї` are letters, and their marks must survive |
+| `Ørsted`, `Straße`, `Ænima`, `Łódź`, `Đà Nẵng`, `Þursaflokkurinn` against `orsted`, `strasse`, `aenima`, `lodz`, `da nang`, `thursaflokkurinn` | Equal: each entry of the letter table, which decomposition cannot reach |
+| `Đội` against `doi` | Equal: a letter carrying two diacritics, which a per-character table would miss |
+| `ガンダム` against `カンタム` | Different: kana voicing marks are not accents |
+| `कुमार` against `कमार`, and `ไม้` against `ไม` | Different: Devanagari vowel signs and Thai tone marks are kept |
+| Hebrew with points against the same word without | Different, as the rules currently stand |
+| `방탄소년단` against itself, both normalized | Equal: Hangul survives decomposition and recomposition intact |
+| `ＹＭＯ` against `ymo`, `ｶﾞﾝﾀﾞﾑ` against `ガンダム`, and `ﬁre` against `fire` | Equal: compatibility forms fold, including halfwidth kana recomposing with its voicing mark |
+| `Radio` and `head` joined by a soft hyphen, and `❤` followed by a variation selector | Equal to `radiohead` and to a plain `❤`: default-ignorable characters are removed |
+| `ö` stored precomposed against `o` followed by a combining diaeresis, in both modes | Equal in both: literal mode still composes |
+| `Motörhead` against `Motorhead`, and `Metallica` against `metallica`, in literal mode | Different: literal mode folds neither accents nor case |
+| A string holding an unpaired surrogate, in both modes | Must not throw; the surrogate becomes U+FFFD |
+| A string literal whose escapes leave an unpaired surrogate | A static error, reported before any file is opened |
+| `^mot`, `^MOT` and `motö` against the subject `Motörhead` | The first two match, the third does not: the subject is prepared, the pattern is not, and the match ignores case |
+| `소년` against `방탄소년단`, and `ガン` against `ガンダム` | Both match: the prepared subject must be recomposed for a pattern written in composed form to find it |
+| `strasse` against the subject `Straße` | Matches: letter folds apply to the subject as well |
+| `otö` against `Motörhead` under `LITERALLY()` | Matches: literal mode keeps the subject's diacritics |
+| `abc` against `abd`, and U+FFFD against U+1F600 | Ordered as written: strings compare by code point, so U+FFFD sorts before a character outside the BMP even though its UTF-16 code unit is larger |
+
 ## Unreadable files and pathspecs
 
 ### Why this earns its own class of tests
