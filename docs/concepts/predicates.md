@@ -16,7 +16,7 @@ Some Goro commands have optional arguments that can be used to configure the sco
 
 A predicate is supplied to a command as a single command line argument. Because predicate syntax uses double quotes to delimit string values, that argument normally has to be wrapped in single quotes so that the shell passes it through intact; see [goro list](../commands/list.md) for a worked example.
 
-The rest of this section describes the syntax for predicates, and the various operators and other constructs that can appear inside them.
+The rest of this section describes the syntax for predicates, and the various operators and other constructs that can appear inside them. [Evaluation](evaluation.md) defines what each of them evaluates to, compactly and precisely.
 
 ### Tokens and whitespace
 
