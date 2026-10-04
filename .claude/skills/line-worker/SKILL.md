@@ -37,6 +37,10 @@ decision recorded there without saying so in your report.
 - Do not commit, branch, merge or otherwise write to git. A hook refuses those commands; read-only
   git (`status`, `diff`, `log`, `show` and the like) is available. Your work stays as uncommitted
   changes in your worktree, which is where the coordinator collects it.
+- If you create nontrivial experimental code during your work that is not intended to go into Goro
+  main but rather as a short-lived experiment, do that by writing to 
+  `scratchpad/Goro.Scratchpad/<name>/` inside your worktree, so it is available in the same 
+  channel as the business code and all other changes.
 
 ## Verifying
 
