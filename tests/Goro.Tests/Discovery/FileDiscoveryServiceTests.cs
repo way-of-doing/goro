@@ -1,5 +1,4 @@
 using Goro.Discovery;
-using Goro.Tests.TestSupport;
 
 namespace Goro.Tests.Discovery;
 
@@ -21,24 +20,35 @@ public class FileDiscoveryServiceTests
         _tempDir.Delete(recursive: true);
     }
 
+    private Task<List<string>> DiscoverAsync(params string[] pathSpecs) =>
+        _service.DiscoverAsync(_service.Resolve(pathSpecs), CancellationToken.None).ToListAsync().AsTask();
+
+    private string WriteFile(params string[] relativePath)
+    {
+        var path = Path.Combine([_tempDir.FullName, .. relativePath]);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "audio");
+        return Path.GetFullPath(path);
+    }
+
+    private string InTemp(params string[] relativePath) => Path.Combine([_tempDir.FullName, .. relativePath]);
+
     [Test]
     public async Task DiscoverAsync_LiteralMp3File_YieldsThatFile()
     {
-        var file = Path.Combine(_tempDir.FullName, "track.mp3");
-        File.WriteAllText(file, "audio");
+        var file = WriteFile("track.mp3");
 
-        var results = await _service.DiscoverAsync([file], CancellationToken.None).ToListAsync();
+        var results = await DiscoverAsync(file);
 
-        Assert.That(results, Is.EqualTo(new[] { Path.GetFullPath(file) }));
+        Assert.That(results, Is.EqualTo(new[] { file }));
     }
 
     [Test]
     public async Task DiscoverAsync_LiteralNonMp3File_YieldsNothing()
     {
-        var file = Path.Combine(_tempDir.FullName, "notes.txt");
-        File.WriteAllText(file, "not audio");
+        var file = WriteFile("notes.txt");
 
-        var results = await _service.DiscoverAsync([file], CancellationToken.None).ToListAsync();
+        var results = await DiscoverAsync(file);
 
         Assert.That(results, Is.Empty);
     }
@@ -46,36 +56,81 @@ public class FileDiscoveryServiceTests
     [Test]
     public async Task DiscoverAsync_Directory_YieldsOnlyMp3FilesRecursively()
     {
-        var subDir = Directory.CreateDirectory(Path.Combine(_tempDir.FullName, "album"));
-        var mp3A = Path.Combine(_tempDir.FullName, "a.mp3");
-        var mp3B = Path.Combine(subDir.FullName, "b.mp3");
-        var txt = Path.Combine(_tempDir.FullName, "cover.txt");
-        File.WriteAllText(mp3A, "a");
-        File.WriteAllText(mp3B, "b");
-        File.WriteAllText(txt, "not audio");
+        var mp3A = WriteFile("a.mp3");
+        var mp3B = WriteFile("album", "b.mp3");
+        WriteFile("cover.txt");
 
-        var results = await _service.DiscoverAsync([_tempDir.FullName], CancellationToken.None).ToListAsync();
+        var results = await DiscoverAsync(_tempDir.FullName);
 
-        Assert.That(results, Is.EquivalentTo(new[] { Path.GetFullPath(mp3A), Path.GetFullPath(mp3B) }));
+        Assert.That(results, Is.EquivalentTo(new[] { mp3A, mp3B }));
     }
 
     [Test]
-    public void DiscoverAsync_NonexistentLiteralPath_ThrowsFileNotFoundException()
+    public async Task DiscoverAsync_ExtensionInAnyCase_IsACandidate()
     {
-        var missing = Path.Combine(_tempDir.FullName, "missing.mp3");
+        var lower = WriteFile("a.mp3");
+        var upper = WriteFile("b.MP3");
+        var mixed = WriteFile("c.Mp3");
 
-        Assert.ThrowsAsync<FileNotFoundException>(() =>
-            _service.DiscoverAsync([missing], CancellationToken.None).ToListAsync().AsTask());
+        var results = await DiscoverAsync(_tempDir.FullName);
+
+        Assert.That(results, Is.EquivalentTo(new[] { lower, upper, mixed }));
     }
 
     [Test]
-    public async Task DiscoverAsync_GlobWithNoDirectoryPrefix_MatchesSameAsCurrentDirectory()
+    public async Task DiscoverAsync_NamesWithoutTheMp3Extension_AreNotCandidates()
     {
-        var subDir = Directory.CreateDirectory(Path.Combine(_tempDir.FullName, "album"));
-        var mp3A = Path.Combine(_tempDir.FullName, "a.mp3");
-        var mp3B = Path.Combine(subDir.FullName, "b.mp3");
-        File.WriteAllText(mp3A, "a");
-        File.WriteAllText(mp3B, "b");
+        // ".mp3" has no extension at all, as for file::extension; the others end in something else.
+        var dotFile = WriteFile(".mp3");
+        var backup = WriteFile("track.mp3.bak");
+        var trailing = WriteFile("track.mp3.");
+
+        var results = await DiscoverAsync(_tempDir.FullName, dotFile, backup, trailing);
+
+        Assert.That(results, Is.Empty);
+    }
+
+    [Test]
+    public void Resolve_NonexistentLiteralPath_Throws()
+    {
+        var missing = InTemp("missing.mp3");
+
+        var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([missing]));
+        Assert.That(ex.PathSpec, Is.EqualTo(missing));
+    }
+
+    [Test]
+    public void Resolve_NonexistentPathAfterAValidDirectory_ThrowsBeforeAnythingIsDiscovered()
+    {
+        WriteFile("a.mp3");
+
+        Assert.Throws<PathSpecException>(() => _service.Resolve([_tempDir.FullName, InTemp("missing.mp3")]));
+    }
+
+    [Test]
+    [Platform(Exclude = "Win")]
+    public void Resolve_DirectoryThatCannotBeListed_Throws()
+    {
+        var locked = Directory.CreateDirectory(InTemp("locked"));
+        File.SetUnixFileMode(locked.FullName, UnixFileMode.None);
+        try
+        {
+            Assume.That(() => Directory.EnumerateFileSystemEntries(locked.FullName).Any(), Throws.Exception,
+                "permissions are not enforced for this user");
+
+            Assert.Throws<PathSpecException>(() => _service.Resolve([locked.FullName]));
+        }
+        finally
+        {
+            File.SetUnixFileMode(locked.FullName, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+    }
+
+    [Test]
+    public async Task DiscoverAsync_GlobWithNoDirectoryPrefix_MatchesInTheCurrentDirectoryOnly()
+    {
+        WriteFile("a.mp3");
+        WriteFile("album", "b.mp3");
 
         var originalDirectory = Directory.GetCurrentDirectory();
         try
@@ -88,15 +143,9 @@ public class FileDiscoveryServiceTests
             // comparison isn't sensitive to that platform quirk.
             var canonicalBase = Directory.GetCurrentDirectory();
 
-            var globResults = await _service.DiscoverAsync(["*.mp3"], CancellationToken.None).ToListAsync();
-            var dotResults = await _service.DiscoverAsync(["."], CancellationToken.None).ToListAsync();
+            var results = await DiscoverAsync("*.mp3");
 
-            Assert.That(globResults, Is.EquivalentTo(dotResults));
-            Assert.That(globResults, Is.EquivalentTo(new[]
-            {
-                Path.Combine(canonicalBase, "a.mp3"),
-                Path.Combine(canonicalBase, "album", "b.mp3"),
-            }));
+            Assert.That(results, Is.EqualTo(new[] { Path.Combine(canonicalBase, "a.mp3") }));
         }
         finally
         {
@@ -105,70 +154,105 @@ public class FileDiscoveryServiceTests
     }
 
     [Test]
-    public async Task DiscoverAsync_GlobWithDirectoryPrefix_MatchesRecursivelyRootedAtThatDirectory()
+    public async Task DiscoverAsync_GlobWithDirectoryPrefix_MatchesTheEntriesOfThatDirectoryOnly()
     {
-        var subDir = Directory.CreateDirectory(Path.Combine(_tempDir.FullName, "album"));
-        var nestedDir = Directory.CreateDirectory(Path.Combine(subDir.FullName, "disc1"));
-        var mp3InSub = Path.Combine(subDir.FullName, "b.mp3");
-        var mp3Nested = Path.Combine(nestedDir.FullName, "c.mp3");
-        var mp3Outside = Path.Combine(_tempDir.FullName, "a.mp3");
-        File.WriteAllText(mp3InSub, "b");
-        File.WriteAllText(mp3Nested, "c");
-        File.WriteAllText(mp3Outside, "a");
+        var mp3InAlbum = WriteFile("album", "b.mp3");
+        WriteFile("album", "disc1", "c.mp3");
+        WriteFile("a.mp3");
 
-        var pattern = Path.Combine(subDir.FullName, "*.mp3");
-        var results = await _service.DiscoverAsync([pattern], CancellationToken.None).ToListAsync();
+        var results = await DiscoverAsync(InTemp("album", "*.mp3"));
 
-        Assert.That(results, Is.EquivalentTo(new[] { Path.GetFullPath(mp3InSub), Path.GetFullPath(mp3Nested) }));
+        Assert.That(results, Is.EqualTo(new[] { mp3InAlbum }));
+    }
+
+    [Test]
+    public async Task DiscoverAsync_GlobMatchingADirectory_WalksItInFull()
+    {
+        var top = WriteFile("Abba", "x.mp3");
+        var nested = WriteFile("Abba", "Arrival", "y.mp3");
+        WriteFile("Beatles", "z.mp3");
+
+        var results = await DiscoverAsync(InTemp("Ab*"));
+
+        Assert.That(results, Is.EquivalentTo(new[] { top, nested }));
+    }
+
+    [Test]
+    public async Task DiscoverAsync_GlobMatchingNonMp3Files_PassesThemOver()
+    {
+        var mp3 = WriteFile("cover.mp3");
+        WriteFile("cover.jpg");
+
+        var results = await DiscoverAsync(InTemp("cover.*"));
+
+        Assert.That(results, Is.EqualTo(new[] { mp3 }));
+    }
+
+    [Test]
+    public async Task DiscoverAsync_GlobInADirectoryThatDoesNotExist_YieldsNothing()
+    {
+        var results = await DiscoverAsync(InTemp("missing", "*.mp3"));
+
+        Assert.That(results, Is.Empty);
+    }
+
+    [Test]
+    public void Resolve_GlobWithTwoStars_Throws()
+    {
+        var pattern = InTemp("*a*.mp3");
+
+        var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([pattern]));
+        Assert.That(ex.PathSpec, Is.EqualTo(pattern));
+    }
+
+    [TestCase("*", "c.mp3")]
+    [TestCase("alb?m", "*.mp3")]
+    [TestCase("alb?m", "c.mp3")]
+    public void Resolve_GlobWithAWildcardInADirectoryComponent_Throws(string directory, string name)
+    {
+        WriteFile("album", "c.mp3");
+
+        Assert.Throws<PathSpecException>(() => _service.Resolve([InTemp(directory, name)]));
     }
 
     [Test]
     public async Task DiscoverAsync_SameDirectoryGivenTwice_YieldsEachFileOnce()
     {
-        var mp3A = Path.Combine(_tempDir.FullName, "a.mp3");
-        File.WriteAllText(mp3A, "a");
+        var mp3A = WriteFile("a.mp3");
 
-        var results = await _service.DiscoverAsync(
-            [_tempDir.FullName, _tempDir.FullName], CancellationToken.None).ToListAsync();
+        var results = await DiscoverAsync(_tempDir.FullName, _tempDir.FullName);
 
-        Assert.That(results, Is.EqualTo(new[] { Path.GetFullPath(mp3A) }));
+        Assert.That(results, Is.EqualTo(new[] { mp3A }));
     }
 
     [Test]
     public async Task DiscoverAsync_SameLiteralFileGivenTwice_YieldsItOnce()
     {
-        var file = Path.Combine(_tempDir.FullName, "track.mp3");
-        File.WriteAllText(file, "audio");
+        var file = WriteFile("track.mp3");
 
-        var results = await _service.DiscoverAsync([file, file], CancellationToken.None).ToListAsync();
+        var results = await DiscoverAsync(file, file);
 
-        Assert.That(results, Is.EqualTo(new[] { Path.GetFullPath(file) }));
+        Assert.That(results, Is.EqualTo(new[] { file }));
     }
 
     [Test]
     public async Task DiscoverAsync_OverlappingDirectories_YieldsFilesInSubdirectoryOnce()
     {
-        var subDir = Directory.CreateDirectory(Path.Combine(_tempDir.FullName, "album"));
-        var mp3A = Path.Combine(_tempDir.FullName, "a.mp3");
-        var mp3B = Path.Combine(subDir.FullName, "b.mp3");
-        File.WriteAllText(mp3A, "a");
-        File.WriteAllText(mp3B, "b");
+        var mp3A = WriteFile("a.mp3");
+        var mp3B = WriteFile("album", "b.mp3");
 
-        var results = await _service.DiscoverAsync(
-            [_tempDir.FullName, subDir.FullName], CancellationToken.None).ToListAsync();
+        var results = await DiscoverAsync(_tempDir.FullName, InTemp("album"));
 
-        Assert.That(results, Is.EquivalentTo(new[] { Path.GetFullPath(mp3A), Path.GetFullPath(mp3B) }));
+        Assert.That(results, Is.EquivalentTo(new[] { mp3A, mp3B }));
     }
 
     [Test]
     public async Task DiscoverAsync_GlobAndLiteralMatchingSameFile_YieldsItOnce()
     {
-        var mp3A = Path.Combine(_tempDir.FullName, "a.mp3");
-        File.WriteAllText(mp3A, "a");
+        var mp3A = WriteFile("a.mp3");
 
-        var pattern = Path.Combine(_tempDir.FullName, "*.mp3");
-        var results = await _service.DiscoverAsync([pattern, mp3A], CancellationToken.None).ToListAsync();
+        var results = await DiscoverAsync(InTemp("*.mp3"), mp3A);
 
-        Assert.That(results, Is.EqualTo(new[] { Path.GetFullPath(mp3A) }));
+        Assert.That(results, Is.EqualTo(new[] { mp3A }));
     }
 }

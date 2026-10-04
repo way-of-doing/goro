@@ -94,4 +94,44 @@ public class ListCommandTests
         Assert.That(exitCode, Is.EqualTo(0));
         Assert.That(stdOut.Trim(), Is.EqualTo(Path.GetFullPath(file)));
     }
+
+    [Test]
+    public async Task List_MissingPathspecAfterAValidDirectory_IsRejectedWithNoOutput()
+    {
+        WriteMp3("track.mp3");
+        var missing = Path.Combine(_tempDir.FullName, "missing.mp3");
+        var app = GoroAppFactory.Create();
+
+        var (exitCode, stdOut, stdErr) = await app.RunCapturedAsync("list", _tempDir.FullName, missing);
+
+        Assert.That(exitCode, Is.EqualTo(2));
+        Assert.That(stdOut, Is.Empty);
+        Assert.That(stdErr, Does.Contain(missing));
+    }
+
+    [Test]
+    public async Task List_GlobBreakingTheGlobRules_IsRejectedWithNoOutput()
+    {
+        WriteMp3("track.mp3");
+        var app = GoroAppFactory.Create();
+
+        var (exitCode, stdOut, _) = await app.RunCapturedAsync("list", Path.Combine(_tempDir.FullName, "*a*.mp3"));
+
+        Assert.That(exitCode, Is.EqualTo(2));
+        Assert.That(stdOut, Is.Empty);
+    }
+
+    [Test]
+    public async Task List_OnlyANonMp3FileNamed_CompletesWithNothingListed()
+    {
+        var cover = Path.Combine(_tempDir.FullName, "cover.jpg");
+        File.WriteAllText(cover, "not audio");
+        var app = GoroAppFactory.Create();
+
+        var (exitCode, stdOut, stdErr) = await app.RunCapturedAsync("list", cover);
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(stdOut, Is.Empty);
+        Assert.That(stdErr, Is.Empty);
+    }
 }

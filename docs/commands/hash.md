@@ -18,7 +18,7 @@ This differs from `goro list`, which leaves out a file it cannot read.
 
 # Pathspecs
 
-This command accepts one or more pathspecs. See [Pathspecs](../concepts/pathspecs.md) for resolution and deduplication rules.
+This command accepts one or more pathspecs. See [Pathspecs](../concepts/pathspecs.md) for which files are considered, and for resolution and deduplication rules.
 
 # Options
 

@@ -14,7 +14,7 @@ Discover files matching pathspec(s) and output information for each.
 
 # Pathspecs
 
-This command accepts one or more pathspecs. See [Pathspecs](../concepts/pathspecs.md) for resolution and deduplication rules.
+This command accepts one or more pathspecs. See [Pathspecs](../concepts/pathspecs.md) for which files are considered, and for resolution and deduplication rules.
 
 # Filtering
 

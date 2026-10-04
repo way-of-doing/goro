@@ -446,7 +446,15 @@ single-condition test exercises.
 | A pathspec naming a file that does not exist | An error before anything is processed, code `2`, and no output at all |
 | A pathspec naming a directory that cannot be listed at all | The same, since it is equally knowable before the run starts |
 | A glob matching nothing | Not an error: it contributes no files, and with nothing else matching the run returns `21` |
+| A glob with two `*`s, and one with a wildcard in a directory component, such as `music/*/a.mp3` | Each an error before anything is processed, code `2`, and no output at all |
 | A subdirectory that cannot be listed, inside a directory pathspec | Must warn and continue, and every sibling entry must still be processed |
+| A pathspec naming a file that does not exist, given after a directory holding MP3 files | The same: every pathspec is resolved before any file is processed, so nothing from the directory may be output first |
+| A directory holding `a.mp3`, `b.MP3` and `cover.jpg` | Only the two MP3 files, whatever the case of the extension, and no warning for the image |
+| A file with another extension named directly, and nothing else | Not an error and no warning: no file is considered, and with `--strict-exit-code` the run returns `21` |
+| A glob such as `dir/*.mp3`, over MP3 files directly in `dir` and in its subdirectories | Only those directly in `dir`: a glob matches the entries of one directory |
+| A glob matching a subdirectory and a file with another extension | The subdirectory is walked in full, and the file is passed over |
+| A file with the extension `mp3` that holds no audio, under `goro list` without a filter | Listed, without a warning: a file is judged by its name, and nothing had to be read |
+| A file named `.mp3`, and one named `track.mp3.bak` | Neither is considered: the first has no extension at all, as for `file::extension`, and the second's is `bak` |
 
 ## Warning suppression
 
