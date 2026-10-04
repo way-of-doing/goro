@@ -26,7 +26,7 @@ Every expression has a type and is or is not definite, both decided when the pre
 | Expression                | Type        | Definite  |
 |---------------------------|-------------|-----------|
 | literal                   | as written  | yes
-| identifier                | as declared | no
+| identifier                | as declared | as declared
 | `COUNT(e)`                | number      | yes
 | `NUMBER(e)`               | number      | when `e` is
 | `STRING(e)`               | string      | when `e` is

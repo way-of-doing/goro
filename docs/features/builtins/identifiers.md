@@ -159,6 +159,11 @@ Includes identifiers to access basic file properties. This namespace is **closed
 
 A path is the one the file was discovered under: symbolic links are not resolved. It is written with `/` as the separator on every platform, so that a file Windows calls `C:\Music\01 Intro.flac` has the `file::path` `C:/Music/01 Intro.flac`. `file::extension` is absent when the name has no dot, when its only dot is the first character, or when nothing follows its last dot; `file::path` and `file::name` are never absent. None of the three is ever unusable, and none needs anything read from the file.
 
+`file::path`, `file::name` and `file::size` are [definite](../concepts/predicates.md#definite-expressions):
+each resolves to exactly one usable occurrence for every file a predicate is evaluated against, since
+a file whose size cannot be had is a [file that cannot be read](../concepts/warnings.md), and is not
+evaluated at all.
+
 ### Namespace `id3v1`
 
 Includes identifiers to access Id3v1 tag information. This namespace is **closed**. Identifiers within it can _never_ be multivalues because the Id3v1 tag structure does not allow it.
