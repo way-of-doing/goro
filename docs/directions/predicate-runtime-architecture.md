@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: sweeping
 touches: architecture.md, implementation.md, src/Goro, tests/Goro.Tests
 after:
-branch:
+branch: line/predicate-runtime-architecture
 ---
 # The predicate runtime
 
