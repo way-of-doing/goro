@@ -32,17 +32,6 @@ Neither command is silent about it: both emit a warning for the file.
 
 ## Predicates
 
-### How do I write a regular expression with backslashes in it?
-
-Use a raw string. In a quoted string every backslash meant for the pattern has to be doubled, so
-`r"^\d+ "` and `"^\\d+ "` are the same pattern, and the first is the one worth reading.
-
-The two forms often agree anyway, because a .NET pattern understands the same character escapes a
-quoted string does: `"\x41"` hands the pattern a literal `A` while `r"\x41"` hands it the escape,
-and both match `A`. They part company over everything else a pattern needs -- `\d`, `\s`, `\b`,
-`\p{...}`, and a literal backslash -- which means something only to the pattern and therefore wants
-a raw string.
-
 ### How do I select files by type, such as every FLAC in a folder tree?
 
 Filter on the extension:
@@ -53,7 +42,7 @@ goro list --filter='file::extension == "flac"' /music
 
 A glob cannot do this, since it matches within one directory only. The comparison ignores case like
 any other, so `FLAC` and `flac` are both found. `file::path` works the same way for anything else
-about where a file lives: `file::path ~= "/live/"` finds the files somewhere under a directory
+about where a file lives: `file::path ~= r"/live/"` finds the files somewhere under a directory
 called `live`. Paths are written with `/` on every platform.
 
 ### How do I select the files that are not tagged with some genre?

@@ -25,11 +25,10 @@ Every warning belongs to exactly one of two categories, which `--no-warn` and th
 refer to.
 
 **Data that cannot be interpreted -- the `data` category.** A tag field holding something that cannot be read as the kind
-of value it should hold yields an unusable occurrence, and using one warns. So does a regular
-expression arriving from tag data that is not a valid pattern. The rules for exactly
-when it fires -- which constructs consume an unusable occurrence and which pass it along, how a
-warning is attributed, and how warnings are deduplicated within a file -- belong to predicates and
-are described under [Warnings](predicates.md#warnings) there.
+of value it should hold yields an unusable occurrence, and using one warns. The rules for
+exactly when it fires -- which constructs consume an unusable occurrence and which pass it along,
+how a warning is attributed, and how warnings are deduplicated within a file -- belong to
+predicates and are described under [Warnings](predicates.md#warnings) there.
 
 Unusable data can leave a predicate without an answer for a file, where the answer depended on
 the data that could not be read. What a command does with such a file is the command's to say,
