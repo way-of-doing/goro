@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, concepts/warnings.md, design/rationale.md, design/deferred.md, implementation.md, testing.md
 after:
-branch:
+branch: line/drop-dynamic-regex
 ---
 # Drop regex patterns that come from tag data
 
