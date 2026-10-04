@@ -1,9 +1,5 @@
 # Rationale
 
-“Simple things should be simple, complex things should be possible.” --Alan Kay
-
-“Success has to be like falling into a BIG PIT. You can't help but win. You try to do it wrong, but nope, you fell in The Pit of Success. You Win Again!” --Rico Mariani
-
 ## Predicates initial wishlist
 
 The design of the predicate grammar and specification in Goro was kickstarted by collecting a set of wishes and related observations made when these wishes come in contact with practical reality. This section documents the most important of them.

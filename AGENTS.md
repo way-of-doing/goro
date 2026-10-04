@@ -50,6 +50,7 @@ Work is organised into lines of development, each described by a brief in `docs/
 - When a session is about a line ("resume open-namespace-names"), read its brief, the commits on its branch since it left the trunk, and whatever its Log links, before anything else.
 - Work on a line belongs on its branch, `line/<brief name>`. A broad line keeps its exploration in its own files and edits normative docs only once a direction is settled.
 - Before stopping, append a dated entry to the brief's Log: what was decided and why, what is still open, and the next step.
+- Lines of development merge into main always with a merge commit; if the line of development is a single commit itself, use that message unchanged. After successfully merging a line branch into main, delete it.
 
 ## Conventions
 
@@ -57,6 +58,7 @@ Work is organised into lines of development, each described by a brief in `docs/
 - Every new feature gets unit tests in tests/YourApp.Tests before it's considered done
 - Don't add NuGet packages without asking first
 - If a doc is ambiguous or conflicts with existing code, stop and ask rather than guessing
+- Git branches starting with `pj/` should always be completely ignored unless actively directed by the user to do differently 
 
 ## Before stopping
 

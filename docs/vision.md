@@ -1,5 +1,9 @@
 # Vision
 
+“Simple things should be simple, complex things should be possible.” --Alan Kay
+
+“Success has to be like falling into a BIG PIT. You can't help but win. You try to do it wrong, but nope, you fell in The Pit of Success. You Win Again!” --Rico Mariani
+
 Goro is a command-line utility intended to assist the administration of large (100K files or more) private music collections.
 
 Goro's headline feature is the ability to hash the _non-metadata_ range of audio files and display, save (as a tag), or compare these hashes with the actual audio contents of the file. In this way, "bit rot" issues that are unavoidable in the long term on very large data sets can be detected and corrected by replacing "spoiled" files with backed up original versions. The term "non-metadata range" refers to the contents of the file after excluding both fixed (e.g. ID3v1) and dynamic (e.g. ID3v2) tag sections and other fixed headers. To summarize: the audio range hash that Goro computes will change if, and only if, the decoded audio bitstream is going to change as well.
