@@ -55,4 +55,18 @@ public class HashCommandTests
 
         Assert.That(exitCode, Is.Not.EqualTo(0));
     }
+
+    [TestCase("plain")]
+    [TestCase("json")]
+    public async Task Hash_MissingPathspecAfterAValidFile_IsRejectedWithNoOutput(string output)
+    {
+        var missing = Path.Combine(_tempDir.FullName, "missing.mp3");
+        var app = GoroAppFactory.Create();
+
+        var (exitCode, stdOut, stdErr) = await app.RunCapturedAsync("hash", "-o", output, _mp3File, missing);
+
+        Assert.That(exitCode, Is.EqualTo(2));
+        Assert.That(stdOut, Is.Empty);
+        Assert.That(stdErr, Does.Contain(missing));
+    }
 }

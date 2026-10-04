@@ -38,13 +38,26 @@ public sealed class ListCommand(IFileDiscoveryService fileDiscovery, IPipelinePl
         var pathSpecs = OptionParsing.ResolvePathSpecs(settings.PathSpecs, context.Remaining.Raw);
         var options = new ListOptions(pathSpecs, output);
 
+        // Every pathspec is resolved before anything is planned or written, so that a rejected
+        // one leaves no output at all. See docs/concepts/pathspecs.md.
+        ResolvedPathSpecs resolved;
+        try
+        {
+            resolved = fileDiscovery.Resolve(options.PathSpecs);
+        }
+        catch (PathSpecException ex)
+        {
+            await Console.Error.WriteLineAsync($"Error: {ex.Message}");
+            return ExitCodes.Rejected;
+        }
+
         var pipeline = pipelinePlanner.PlanList(options);
-        var files = fileDiscovery.DiscoverAsync(options.PathSpecs, cancellationToken);
+        var files = fileDiscovery.DiscoverAsync(resolved, cancellationToken);
         var results = executor.ExecuteAsync(pipeline, files, cancellationToken);
 
         var renderer = output.CreateRenderer<ListResult>(r => r.File);
 
         await renderer.RenderAsync(results, Console.Out, cancellationToken);
-        return 0;
+        return ExitCodes.Completed;
     }
 }

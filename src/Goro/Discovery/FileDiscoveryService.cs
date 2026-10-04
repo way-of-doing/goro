@@ -4,11 +4,82 @@ namespace Goro.Discovery;
 
 public sealed class FileDiscoveryService : IFileDiscoveryService
 {
-    // Only .mp3 is recognized for now; extend this list as more formats are supported.
-    private static readonly string[] RecognizedExtensions = [".mp3"];
+    // A glob matches the entries of one directory with plain '*' and '?' (no Win32 quirks such
+    // as "*.*"), keeps hidden entries as a directory walk does, and leaves case to the platform.
+    private static readonly EnumerationOptions GlobOptions = new()
+    {
+        MatchType = MatchType.Simple,
+        MatchCasing = MatchCasing.PlatformDefault,
+        RecurseSubdirectories = false,
+        AttributesToSkip = 0,
+        IgnoreInaccessible = false,
+    };
+
+    public ResolvedPathSpecs Resolve(IReadOnlyList<string> pathSpecs) =>
+        new(pathSpecs.Select(ResolveOne).ToList());
+
+    private static ResolvedPathSpec ResolveOne(string pathSpec)
+    {
+        if (IsGlob(pathSpec))
+        {
+            return ResolveGlob(pathSpec);
+        }
+
+        if (Directory.Exists(pathSpec))
+        {
+            EnsureListable(pathSpec, pathSpec);
+            return new DirectoryTree(Path.GetFullPath(pathSpec));
+        }
+
+        if (File.Exists(pathSpec))
+        {
+            return new LiteralFile(Path.GetFullPath(pathSpec));
+        }
+
+        throw new PathSpecException(pathSpec, $"Pathspec not found: {pathSpec}");
+    }
+
+    private static Glob ResolveGlob(string pathSpec)
+    {
+        if (pathSpec.Count(c => c == '*') > 1)
+        {
+            throw new PathSpecException(pathSpec, $"A glob may contain at most one '*': {pathSpec}");
+        }
+
+        var directoryPart = Path.GetDirectoryName(pathSpec);
+        if (directoryPart is not null && IsGlob(directoryPart))
+        {
+            throw new PathSpecException(pathSpec, $"Wildcards may appear only in the last component of a glob: {pathSpec}");
+        }
+
+        var directory = string.IsNullOrEmpty(directoryPart) ? "." : directoryPart;
+        if (!Directory.Exists(directory))
+        {
+            // Not an error: a glob in a directory that does not exist simply matches nothing.
+            return new Glob(null, Path.GetFileName(pathSpec));
+        }
+
+        EnsureListable(pathSpec, directory);
+        return new Glob(Path.GetFullPath(directory), Path.GetFileName(pathSpec));
+    }
+
+    // A directory that exists but cannot be listed at all is as knowable before the run as one
+    // that does not exist, so it is rejected here rather than met halfway through the run.
+    private static void EnsureListable(string pathSpec, string directory)
+    {
+        try
+        {
+            using var entries = Directory.EnumerateFileSystemEntries(directory).GetEnumerator();
+            entries.MoveNext();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            throw new PathSpecException(pathSpec, $"Pathspec cannot be listed: {pathSpec}", ex);
+        }
+    }
 
     public async IAsyncEnumerable<string> DiscoverAsync(
-        IReadOnlyList<string> pathSpecs,
+        ResolvedPathSpecs pathSpecs,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await Task.Yield();
@@ -19,77 +90,56 @@ public sealed class FileDiscoveryService : IFileDiscoveryService
         // etc.) is yielded only once. See docs/concepts/pathspecs.md.
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var pathSpec in pathSpecs)
+        foreach (var entry in pathSpecs.Entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (pathSpec.Contains('*') || pathSpec.Contains('?'))
+            IEnumerable<string> files = entry switch
             {
-                foreach (var file in ResolveGlob(pathSpec))
+                LiteralFile file => [file.FullPath],
+                DirectoryTree tree => Walk(tree.FullPath),
+                Glob glob => Match(glob),
+                _ => throw new ArgumentOutOfRangeException(nameof(pathSpecs), entry, "Unknown kind of pathspec."),
+            };
+
+            foreach (var file in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (CandidateFiles.IsCandidate(file) && seen.Add(file))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (seen.Add(file))
-                    {
-                        yield return file;
-                    }
+                    yield return file;
                 }
-            }
-            else if (Directory.Exists(pathSpec))
-            {
-                foreach (var file in Directory.EnumerateFiles(pathSpec, "*", SearchOption.AllDirectories))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (IsRecognized(file))
-                    {
-                        var fullPath = Path.GetFullPath(file);
-                        if (seen.Add(fullPath))
-                        {
-                            yield return fullPath;
-                        }
-                    }
-                }
-            }
-            else if (File.Exists(pathSpec))
-            {
-                if (IsRecognized(pathSpec))
-                {
-                    var fullPath = Path.GetFullPath(pathSpec);
-                    if (seen.Add(fullPath))
-                    {
-                        yield return fullPath;
-                    }
-                }
-            }
-            else
-            {
-                throw new FileNotFoundException($"Pathspec not found: {pathSpec}", pathSpec);
             }
         }
     }
 
-    // A pathspec containing '*'/'?' is split into a directory part and a filename
-    // pattern, then matched recursively — so "*.mp3" with no directory prefix behaves
-    // the same as pathspec "." once results are filtered to recognized extensions.
-    private static IEnumerable<string> ResolveGlob(string pathSpec)
-    {
-        var directoryPart = Path.GetDirectoryName(pathSpec);
-        var filePattern = Path.GetFileName(pathSpec);
-        var directory = string.IsNullOrEmpty(directoryPart) ? "." : directoryPart;
+    private static IEnumerable<string> Walk(string directory) =>
+        Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Select(Path.GetFullPath);
 
-        if (!Directory.Exists(directory))
+    // Each entry a glob matches is treated as if it had been named directly: a directory is
+    // walked in full, and a file is a file.
+    private static IEnumerable<string> Match(Glob glob)
+    {
+        if (glob.Directory is null)
         {
             yield break;
         }
 
-        foreach (var file in Directory.EnumerateFiles(directory, filePattern, SearchOption.AllDirectories))
+        foreach (var entry in Directory.EnumerateFileSystemEntries(glob.Directory, glob.Pattern, GlobOptions))
         {
-            if (IsRecognized(file))
+            if (Directory.Exists(entry))
             {
-                yield return Path.GetFullPath(file);
+                foreach (var file in Walk(entry))
+                {
+                    yield return file;
+                }
+            }
+            else
+            {
+                yield return Path.GetFullPath(entry);
             }
         }
     }
 
-    private static bool IsRecognized(string filePath) =>
-        RecognizedExtensions.Contains(Path.GetExtension(filePath), StringComparer.OrdinalIgnoreCase);
+    private static bool IsGlob(string pathSpec) => pathSpec.Contains('*') || pathSpec.Contains('?');
 }
