@@ -202,7 +202,7 @@ enough to assert in full, and should be. Its absent row matters most, being wher
 `ALL(x) IS USABLE` and `NOT x IS UNUSABLE` part company.
 
 **The regex operator normalizes its subject and not its pattern.** Every other operator normalizes
-every string it compares, so an implementation that reuses the ordinary path for `~=` will
+every string it compares, so an implementation that reuses the ordinary path for `=~` will
 normalize the pattern too, and the symptom is a pattern that matches slightly different files
 rather than any kind of failure. The asymmetry therefore needs asserting from both sides: that a
 diacritic in the pattern matches nothing, and that the same pattern under `LITERALLY()` matches the
@@ -235,7 +235,7 @@ point for these tests rather than an inventory of them.
 | `FALSE AND y > 1` and `TRUE OR y > 1`, with `y` unusable | No warning: a settling first operand must short-circuit |
 | `FALLBACK(x > 1, FALSE)` against `FALLBACK(x, 0) > 1`, with `x` unusable | One warning and none respectively: substituting for a comparison's result does not undo the comparison's warning |
 | `(x > 1) == (x > 1)` and `(x > 1) IS UNUSABLE`, with `x` unusable | One warning in total for the first and none beyond the comparison's for the second; the second is true |
-| A boolean as an operand of `<`, `BETWEEN` or `~=`, or as an argument to `NUMBER()` or `STRING()` | A static error: booleans are unordered and not convertible |
+| A boolean as an operand of `<`, `BETWEEN` or `=~`, or as an argument to `NUMBER()` or `STRING()` | A static error: booleans are unordered and not convertible |
 | `(a == b) == (c == d)` and `a == b == c` | The first is valid and compares two booleans; the second is still a syntax error |
 | A guard whose right operand would warn, and the same guard with the operands transposed | Short-circuiting must hold, since the observable difference is a warning that is or is not emitted |
 | An operator that finds a match among the usable occurrences of a bag that also holds an unusable one | The warning must be emitted anyway, since iteration within an operator does not short-circuit; a short-circuiting implementation would emit it or not according to the order of an unordered bag |
@@ -248,9 +248,9 @@ point for these tests rather than an inventory of them.
 | A value that is absent, and one that is a single unusable occurrence, passed to `COUNT()` | Must be 0 and 1 respectively, and neither may warn |
 | Each row of the warning deduplication table | Source identity must be structural and independent of position |
 | Each condition the predicate documentation calls an error | Every one reported with nothing processed, and with the exit code that says the run never started |
-| A `~=` whose pattern holds a diacritic, against a subject that holds the same one | Must not match: the subject is normalized and the pattern is not |
+| A `=~` whose pattern holds a diacritic, against a subject that holds the same one | Must not match: the subject is normalized and the pattern is not |
 | The same pair under `LITERALLY()` | Must match: an unnormalized subject keeps its diacritics |
-| A `~=` whose pattern differs from the subject only in case | Must match by default, and must not under `LITERALLY()`, since the modifier makes the match case-sensitive |
+| A `=~` whose pattern differs from the subject only in case | Must match by default, and must not under `LITERALLY()`, since the modifier makes the match case-sensitive |
 | A pattern that would change meaning if it were decomposed, such as `e` followed by a combining acute and `?` | Must be matched as written; an implementation that normalizes the pattern turns it into a different pattern rather than a differently-spelled one |
 
 ## Predicate reading
@@ -320,7 +320,8 @@ string written directly after the operator.
 | `genre != "x"`, `LITERALLY(genre) != "x"`, `FALLBACK(genre, "") != "x"`, `ALL(a) != b` and `file::extension != "flac"` | Each is an error: `LITERALLY` is not a quantifier, a function of an identifier is no more definite than the identifier, every operand that is not definite needs a quantifier of its own, and `file::extension` can be absent, unlike the definite identifiers beside it. The diagnostic for the first must offer both `NOT genre == "x"` and `ALL(genre) != "x"` |
 | `ANY(genre) != "x"`, `LITERALLY(ALL(genre)) != "x"`, `COUNT(genre) != 1`, `file::size != 0` and `(a == b) != (c == d)` | All valid: a quantifier anywhere in a stack of modifiers satisfies the rule, and a definite operand needs none |
 | `TRUE`, `true` and `False` as literals, `::true` as an identifier, and `year == NULL` | The boolean literals are case-insensitive keywords and qualifying one makes it an identifier; `NULL` names nothing and must be rejected with a diagnostic saying what to write instead |
-| `artist ~= "^a"`, `title ~= artist`, `artist ~= (r"^a")`, `artist ~= LITERALLY(r"^a")` and `artist ~= ALL(r"^a")` | Each is a syntax error, the pattern being a raw string that is part of the operator. The diagnostic for the first must offer `r"^a"`, and the one for `LITERALLY` must offer `LITERALLY(artist) ~= r"^a"` |
+| `artist =~ "^a"`, `title =~ artist`, `artist =~ (r"^a")`, `artist =~ LITERALLY(r"^a")` and `artist =~ ALL(r"^a")` | Each is a syntax error, the pattern being a raw string that is part of the operator. The diagnostic for the first must offer `r"^a"`, and the one for `LITERALLY` must offer `LITERALLY(artist) =~ r"^a"` |
+| `artist ~= r"^a"`, `artist ~= "a"` and `artist !~ r"^a"` | Each is a syntax error, `~=` and `!~` being spellings borrowed from other languages. The diagnostic for each `~=` must offer both `=~` and `!=`, since either may have been meant, and the one for the second must offer `artist =~ r"a"` rather than `artist =~ "a"`; the one for `!~` must offer `NOT artist =~ r"^a"` |
 | `FALLBACK(year, (0))`, `file::duration > (90)` and `NUMBER(("x"))` | A literal in parentheses is a literal: the first is valid, the second compares with ninety seconds, and the third is the same static error as `NUMBER("x")` |
 | `(1)..2` | A syntax error: a range is built from literals by the grammar, which does not admit parentheses there |
 | A pattern using each of the four unsupported construct families | Each must be a static error, reported before any file is opened, on the same terms as a malformed pattern |
