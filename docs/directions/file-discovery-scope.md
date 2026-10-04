@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: focused
 touches: concepts/pathspecs.md, commands/list.md, commands/hash.md, concepts/warnings.md, testing.md
 after:
-branch:
+branch: line/file-discovery-scope
 ---
 # Which files a run considers and how it treats them
 
