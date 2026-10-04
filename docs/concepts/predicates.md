@@ -168,13 +168,14 @@ Some expressions are guaranteed by their form to produce exactly one occurrence,
 - the result of every operator: comparison, range, regex, state test, and the logical operators `AND`, `OR` and `NOT`;
 - `COUNT()`, whatever its argument;
 - `FALLBACK()`, `NUMBER()` and `STRING()` applied to a definite argument;
+- the identifiers `file::path`, `file::name` and `file::size`, which every file has exactly one of;
 - a parenthesized definite expression.
 
-An identifier is never definite, whatever its namespace.
+No other identifier is definite, whatever its namespace.
 
 Definiteness is a property of an expression, known when the predicate is read, and never a property of a value. An identifier that happens to resolve to a single occurrence for a particular file is not thereby definite, and nothing in the language can tell such a value from the result of a definite expression; the guarantee is about every file, not about this one. A definite expression is never absent, but it can still be unusable: a comparison that met data it could not interpret is definite and unusable.
 
-Definiteness matters in one place. The operands of the logical operators, and a predicate as a whole, must be definite; see [Boolean operators](#boolean-operators).
+Definiteness matters in two places. The operands of the logical operators, and a predicate as a whole, must be definite; see [Boolean operators](#boolean-operators). And an operand of `!=` that is not definite must have its quantifier written; see [Comparison operators](#comparison-operators).
 
 ### Operators
 
@@ -184,7 +185,7 @@ Values within Goro predicates can be compared with the _comparison operators_ `=
 
 There are some **fundamental rules which apply globally** to any operator sub-expression:
 
-1. **An absent operand makes a comparison, range, or regex operator false**, regardless of what its other operands might be, and iteration over any multivalue operand does not run at all. For example, if there is no Id3v2 tag, the predicates `id3v2::track == 5` and `id3v2::track != 5` will _both_ evaluate to false, because `id3v2::track` is absent in both cases. This rule does not concern the logical operators `AND`, `OR`, and `NOT`, whose operands are definite and therefore never absent; nor does it concern the state test operator `IS`, whose purpose includes observing absence.
+1. **An absent operand makes a comparison, range, or regex operator false**, regardless of what its other operands might be, and iteration over any multivalue operand does not run at all. For example, if there is no Id3v2 tag, the predicates `id3v2::track < 5` and `id3v2::track >= 5` will _both_ evaluate to false, because `id3v2::track` is absent in both cases. This rule does not concern the logical operators `AND`, `OR`, and `NOT`, whose operands are definite and therefore never absent; nor does it concern the state test operator `IS`, whose purpose includes observing absence.
 
 2. **An unusable occurrence makes unusable every combination of operand values that includes it**, and consuming it emits a warning. How the combinations are then combined into the operator's result is described under [Multivalues](#multivalues): a combination that was answered can still settle the result, so that `vorbis::year == 1991` is true for a file holding one occurrence of `1991` and one that is not a year at all. See [Warnings](#warnings) for what counts as consuming an occurrence.
 
@@ -197,6 +198,13 @@ There are some **fundamental rules which apply globally** to any operator sub-ex
 #### Comparison operators
 
 The comparison operators `==`, `!=`, `<`, `<=`, `>`, `>=` directly compare their operands. Comparisons between values of type number, bytecount, and duration are trivial; strings are compared code point by code point, after being prepared as described under [Normalization](normalization.md): normalized by default, or literally under `LITERALLY()`. Booleans, being unordered, may be compared only with `==` and `!=`, so `(year < 2000) == (genre == "rock")` is true when the two conditions agree. An absent operand makes a comparison false regardless of what comparison it is, while an unusable occurrence makes the combination being evaluated unusable; see the general operator rules above.
+
+**`!=` requires a quantifier on any operand that is not [definite](#definite-expressions).** Such an operand may be absent or hold several occurrences, and "not equal" then has more than one reading, so the predicate has to say which it means. `genre != "metal"` is an error, and the diagnostic offers the two forms that are usually meant:
+
+- `NOT genre == "metal"`: no genre is metal, which is also true for a file that records no genre at all;
+- `ALL(genre) != "metal"`: every genre is something other than metal, which is false for such a file, as every comparison with an absent operand is.
+
+`ANY(genre) != "metal"` is valid too, and is true when some genre is something other than metal, including for a file tagged both "metal" and "rock". The quantifier means exactly what it means on any other operator; it is only that `!=` will not assume one. A definite operand needs none, so `COUNT(genre) != 1` and `(year < 2000) != (genre == "rock")` are valid as written.
 
 #### Range operator
 
@@ -364,18 +372,19 @@ Absence, by contrast, does not participate in this iteration at all: an absent o
 Examples:
 
 - `genre == "metal"` matches when there are both "metal" and "rock" genre tags present, because `genre` is (by default) existentially quantified and at least one tag is equal to "metal"
-- `genre != "metal"` _also_ matches when there are both "metal" and "rock" genre tags present, because at least one tag is _not_ equal to "metal"
+- `ANY(genre) != "metal"` _also_ matches when there are both "metal" and "rock" genre tags present, because at least one tag is _not_ equal to "metal"
 - `ALL(genre) == "metal"` does _not_ match in the same scenario, because not all of the values match "metal" once `genre` is universally quantified
 - `genre BETWEEN "a".."b"` matches when any of the genre tags present sorts between "a" and "b"
 
 The regular expression operator also works transparently with multivalues in the same way: it matches when _any_ of the multiple values match the regular expression, by default.
 
-**IMPORTANT** This behavior means that the example expressions `genre != "metal"` and `NOT genre == "metal"`, which are strictly complementary if `genre` is a simple value, are no longer complementary if it is a multivalue. It is the same phenomenon described for an absent value under [Boolean operators](#boolean-operators), seen from the other side.
+**IMPORTANT** This behavior means that the example expressions `ANY(genre) != "metal"` and `NOT genre == "metal"`, which are strictly complementary if `genre` is a simple value, are no longer complementary if it is a multivalue. It is the same phenomenon described for an absent value under [Boolean operators](#boolean-operators), seen from the other side, and it is why `!=` requires the quantifier to be written; see [Comparison operators](#comparison-operators).
 
 Examples:
 
-- `genre != "metal"` _does_ match when there are both "metal" and "rock" genre tags present, because at least one tag is _not_ equal to "metal"
+- `ANY(genre) != "metal"` _does_ match when there are both "metal" and "rock" genre tags present, because at least one tag is _not_ equal to "metal"
 - `NOT genre == "metal"` _does not_ match when there are both "metal" and "rock" genre tags present, because `genre == "metal"` matches and the negation operator inverts the match
+- `ALL(genre) != "metal"` _does not_ match either, because not every tag is something other than "metal"
 
 #### Comparisons between two multivalues
 
@@ -386,7 +395,7 @@ If **neither** operand is wrapped in `ALL()` -- the default, existential case fo
 For example, suppose `a` is a multivalue of `1` and `2`, and `b` is a multivalue of `2` and `3`:
 
 - `a == b` is true, because the equality holds for at least one pair (specifically, exactly one: `2` matches `2`)
-- `a != b` is also true, because the inequality holds for several pairs (e.g. `1` does not match `2`, `2` does not match `3`)
+- `ANY(a) != ANY(b)` is also true, because the inequality holds for several pairs (e.g. `1` does not match `2`, `2` does not match `3`)
 
 If **both** operands are wrapped in `ALL()`, the result is true if and only if the operator holds for _every_ pair of values. This is well-defined but often degenerate: `ALL(a) == ALL(b)` can only be true if every value in `a` and every value in `b` are all the exact same value.
 
@@ -434,6 +443,7 @@ The errors reported when a predicate is read include:
 - a reference to an identifier that is not defined, where the namespace it names is a closed one;
 - a type mismatch between the operands of an operator, outside the numeric literal exception;
 - an operand of `AND`, `OR` or `NOT`, or a predicate as a whole, that is not a definite boolean;
+- an operand of `!=` that is not definite and carries neither `ALL` nor `ANY`;
 - a boolean used as an operand of an ordering operator, of `BETWEEN`, or of `~=`, booleans being unordered;
 - an argument of the wrong type to a function, such as a boolean passed to `NUMBER()` or `STRING()`;
 - `LITERALLY()` applied to an operand that is not a string, or to the operand of a state test;
@@ -499,7 +509,7 @@ Each warning quotes the sub-expression responsible, exactly as it was written in
 
 ### Modifiers
 
-Three constructs -- `ALL`, `ANY`, and `LITERALLY` -- are _modifiers_ rather than functions. A modifier does not compute a new value from its argument; it changes how the operator that consumes the value will treat it. The defaults are existential quantification and normalized comparison, so a modifier is only ever needed to depart from them.
+Three constructs -- `ALL`, `ANY`, and `LITERALLY` -- are _modifiers_ rather than functions. A modifier does not compute a new value from its argument; it changes how the operator that consumes the value will treat it. The defaults are existential quantification and normalized comparison, so a modifier is only ever needed to depart from them, or to state a quantifier that `!=` will not assume.
 
 The three are not quite the same kind of thing, which decides what writing one on one side of an operator does to the other side:
 
@@ -527,7 +537,7 @@ Examples:
 In case the operand that `ALL()` is applied to is not a multivalue, the modifier has no effect and the operand is treated exactly as it would have been without it.
 
 **ANY(expr)**
-: causes the operand to be evaluated with an _existential_ quantifier when it is a multivalue: an operator using this operand matches when _any one_ of the multiple values matches. This is the default behavior for every multivalue operand, so this modifier is never strictly necessary, but it is included as an explicit counterpart to `ALL()`, both to allow more expressiveness if desired (`ANY(genre) == "rock"` reads very naturally) and to make a quantifier choice explicit where it might otherwise be unclear at a glance -- for example, when comparing two multivalues where only one side is wrapped in `ALL()`.
+: causes the operand to be evaluated with an _existential_ quantifier when it is a multivalue: an operator using this operand matches when _any one_ of the multiple values matches. This is the default behavior for every multivalue operand, so this modifier changes nothing about how an operand is evaluated. It is needed on an operand of `!=` that is not definite, where the quantifier has to be written (see [Comparison operators](#comparison-operators)), and is otherwise included as an explicit counterpart to `ALL()`, both to allow more expressiveness if desired (`ANY(genre) == "rock"` reads very naturally) and to make a quantifier choice explicit where it might otherwise be unclear at a glance -- for example, when comparing two multivalues where only one side is wrapped in `ALL()`.
 
 #### Comparison modes
 
@@ -702,6 +712,7 @@ Not every rule in this document is grammatical, and a construct that this gramma
 
 - a `predicate` must be a definite expression of boolean type, so a bare `primary` such as `artist` parses but is not a valid predicate;
 - the operands of an operator must have the same type, subject to the numeric literal exception, and the operands of `AND`, `OR` and `NOT` must be definite booleans;
+- an `operand` of `!=` that is not definite must carry `ALL` or `ANY`;
 - booleans are unordered, so a boolean may not be an operand of `<`, `<=`, `>`, `>=`, `BETWEEN` or `~=`, nor an endpoint of a `range`;
 - both operands of `~=` must be strings, and its right operand must be a valid regular expression if it is a literal;
 - the `operand` of a state test may be of any type, boolean included, since a state test asks about cardinality and state rather than about content;

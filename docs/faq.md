@@ -56,6 +56,15 @@ any other, so `FLAC` and `flac` are both found. `file::path` works the same way 
 about where a file lives: `file::path ~= "/live/"` finds the files somewhere under a directory
 called `live`. Paths are written with `/` on every platform.
 
+### How do I select the files that are not tagged with some genre?
+
+Say which files you mean, since there are two candidates. `NOT genre == "metal"` selects every
+file with no metal genre, including those that record no genre at all, while
+`ALL(genre) != "metal"` selects only the files that record at least one genre, none of which is
+metal. `genre != "metal"` on its own is an error for exactly this reason. Written that way, it
+would have asked whether _some_ genre is something other than metal, which is true of a file
+tagged both "metal" and "rock"; if that really is the question, `ANY(genre) != "metal"` asks it.
+
 ### How can I make a filter faster?
 
 Put the cheap conditions first. `AND` and `OR` evaluate their operands left to right, stop as soon
