@@ -42,7 +42,7 @@ goro list --filter='file::extension == "flac"' /music
 
 A glob cannot do this, since it matches within one directory only. The comparison ignores case like
 any other, so `FLAC` and `flac` are both found. `file::path` works the same way for anything else
-about where a file lives: `file::path ~= r"/live/"` finds the files somewhere under a directory
+about where a file lives: `file::path =~ r"/live/"` finds the files somewhere under a directory
 called `live`. Paths are written with `/` on every platform.
 
 ### How do I select the files that are not tagged with some genre?

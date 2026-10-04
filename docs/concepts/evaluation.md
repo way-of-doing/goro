@@ -63,7 +63,7 @@ eval(FALLBACK(e, d))   = bag{ usable(d) }               if eval(e) is ABSENT
 
 ### Comparison, range and regex operators
 
-For a comparison, the operands are its two sides; for `BETWEEN`, the operand is its left side, the range being part of the test; for `~=`, the operand is the subject, the pattern being part of the test.
+For a comparison, the operands are its two sides; for `BETWEEN`, the operand is its left side, the range being part of the test; for `=~`, the operand is the subject, the pattern being part of the test.
 
 ```
 eval(op(e1 … en)):

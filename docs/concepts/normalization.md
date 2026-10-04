@@ -13,7 +13,7 @@ normalization - how string values are prepared before an operator compares them
 
 ### Overview
 
-Every operator that compares strings -- the comparison operators, `BETWEEN` and `~=` -- prepares
+Every operator that compares strings -- the comparison operators, `BETWEEN` and `=~` -- prepares
 them first, in one of two modes. In **normalized** mode, the default, differences of case, of
 accents on Latin and Greek letters, and of a few kinds of character form stop mattering, so that
 `artist == "motorhead"` matches "Motörhead". In **literal** mode, chosen with `LITERALLY()`, strings
@@ -93,7 +93,7 @@ or as a letter followed by a combining mark are equal in literal mode.
 
 ### Regular expressions
 
-The subject of `~=` is prepared exactly as any other operand is, in whichever mode the operator is
+The subject of `=~` is prepared exactly as any other operand is, in whichever mode the operator is
 in. The pattern is never prepared. In normalized mode the match is case-insensitive, using
 invariant rules; in literal mode it is case-sensitive.
 

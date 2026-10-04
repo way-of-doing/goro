@@ -89,7 +89,7 @@ Absence is a property of a whole value, while unusability is a property of a sin
 
 Operators and the boolean literals always produce exactly one boolean, never an absent one, which makes them [definite](#definite-expressions). A boolean can be unusable: a comparison, range or regex operator whose answer depended on an occurrence it could not interpret has no answer to give, and its result is an unusable boolean (see [General operator rules](#general-operator-rules)).
 
-Booleans are **unordered**. They may be compared with `==` and `!=`, tested with a state test, and passed to `COUNT()` and `FALLBACK()`, but it is an error to use one as an operand of an ordering operator, of `BETWEEN`, or of `~=`, or as an argument to `NUMBER()` or `STRING()`.
+Booleans are **unordered**. They may be compared with `==` and `!=`, tested with a state test, and passed to `COUNT()` and `FALLBACK()`, but it is an error to use one as an operand of an ordering operator, of `BETWEEN`, or of `=~`, or as an argument to `NUMBER()` or `STRING()`.
 
 **string**
 : a sequence of characters, written in either of two forms.
@@ -219,11 +219,11 @@ Examples:
 
 #### Regular expression match operator
 
-String values can be tested to see if they match a regular expression with the regex matching operator `~=`. Its left operand is the **subject**, the value being tested, and must be of type string. What follows the operator is the **pattern**, which is not an operand but part of the operator, as the range is part of `BETWEEN`: it is a raw string, written directly after `~=` with no parentheses or modifiers around it. `artist ~= r"^the "` is valid, while `artist ~= "^the "` and `title ~= artist` are errors. A raw string processes no escapes, so every backslash in a pattern reaches the regular expression engine as written. Regular expressions are [.NET-flavored](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expressions), with the restriction described under [Supported constructs](#supported-constructs) below.
+String values can be tested to see if they match a regular expression with the regex matching operator `=~`. Its left operand is the **subject**, the value being tested, and must be of type string. What follows the operator is the **pattern**, which is not an operand but part of the operator, as the range is part of `BETWEEN`: it is a raw string, written directly after `=~` with no parentheses or modifiers around it. `artist =~ r"^the "` is valid, while `artist =~ "^the "` and `title =~ artist` are errors. A raw string processes no escapes, so every backslash in a pattern reaches the regular expression engine as written. Regular expressions are [.NET-flavored](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expressions), with the restriction described under [Supported constructs](#supported-constructs) below.
 
 The regex matching operator will match if any substring of the subject matches the pattern, so if more exact matching is intended the anchors `^` and/or `$` have to be specified.
 
-**Only the subject is normalized, and the pattern is never touched.** The subject is prepared exactly as for any other operator, and in normalized mode the match is case-insensitive. A pattern is what the user wrote, character for character, so **a pattern cannot match anything normalization removes or changes**: `artist ~= r"motö"` finds nothing at all, while `artist ~= r"mot"` matches "Motörhead". Applying `LITERALLY()` to the subject puts it in literal mode and makes the match case-sensitive, which is the way to write a pattern that means to match a diacritic. See [Normalization](normalization.md#regular-expressions), and the [rationale](../design/rationale.md) for why the pattern is exempt.
+**Only the subject is normalized, and the pattern is never touched.** The subject is prepared exactly as for any other operator, and in normalized mode the match is case-insensitive. A pattern is what the user wrote, character for character, so **a pattern cannot match anything normalization removes or changes**: `artist =~ r"motö"` finds nothing at all, while `artist =~ r"mot"` matches "Motörhead". Applying `LITERALLY()` to the subject puts it in literal mode and makes the match case-sensitive, which is the way to write a pattern that means to match a diacritic. See [Normalization](normalization.md#regular-expressions), and the [rationale](../design/rationale.md) for why the pattern is exempt.
 
 If the subject is a multivalue, matching follows the ordinary quantifier rules described under [Multivalues](#multivalues).
 
@@ -231,8 +231,8 @@ There is no negated version of this operator; to determine if a value does not m
 
 Examples:
 
-- `artist ~= r"s$"` matches any artist whose name ends in "s" or "S"
-- `artist ~= r"^\d+ "` matches any artist whose name begins with a number followed by a space
+- `artist =~ r"s$"` matches any artist whose name ends in "s" or "S"
+- `artist =~ r"^\d+ "` matches any artist whose name begins with a number followed by a space
 
 ##### Supported constructs
 
@@ -319,14 +319,14 @@ The operands of `AND`, `OR`, and `NOT` must be [definite](#definite-expressions)
 
 Expressions can be grouped with parentheses ( ). A parenthesized sub-expression is evaluated as a unit before anything outside the parentheses, regardless of what operators surround it. For example, `(genre == "jazz" OR genre == "blues") AND year < 2000` first evaluates the genre comparison, then combines the result with the year comparison.
 
-Grouping is all that parentheses do: a parenthesized expression is in every other respect the expression it encloses. It has the same type, is definite when that expression is, is a literal when that expression is one, and is modified in the same way, so `(ALL(genre)) == "x"` is the same predicate as `ALL(genre) == "x"`. The one place parentheses cannot go is where the grammar itself places a literal: inside a range, or as the pattern of `~=`.
+Grouping is all that parentheses do: a parenthesized expression is in every other respect the expression it encloses. It has the same type, is definite when that expression is, is a literal when that expression is one, and is modified in the same way, so `(ALL(genre)) == "x"` is the same predicate as `ALL(genre) == "x"`. The one place parentheses cannot go is where the grammar itself places a literal: inside a range, or as the pattern of `=~`.
 
 When parentheses are not used to make evaluation order explicit, operators are evaluated according to a fixed precedence, from tightest-binding to loosest-binding:
 
 | Level        | Constructs                                                                            | Associativity   |
 |:------------:|---------------------------------------------------------------------------------------|-----------------|
 | 1 (tightest) | primary expressions: literals, identifiers, function calls, parenthesized expressions | --
-| 2            | `==` `!=` `<` `>` `<=` `>=` `~=` `BETWEEN` `IS`                                       | non-associative
+| 2            | `==` `!=` `<` `>` `<=` `>=` `=~` `BETWEEN` `IS`                                       | non-associative
 | 3            | `NOT`                                                                                 | unary, repeatable
 | 4            | `AND`                                                                                 | left
 | 5 (loosest)  | `OR`                                                                                  | left
@@ -335,7 +335,7 @@ An operator of higher precedence binds more tightly than one of lower precedence
 
 When a left-associative operator appears more than once in a chain without parentheses, it is evaluated left to right. For example, `a AND b AND c` is evaluated as `(a AND b) AND c`. This does not change the result for `AND` or `OR` chains, but it does determine the order in which operands are evaluated. `NOT` is a unary prefix operator and may be applied repeatedly, so `NOT NOT a` is valid and equivalent to `a`.
 
-The comparison operators, the regex operator `~=`, the range operator `BETWEEN`, and the state test operator `IS` are non-associative and cannot be chained. `a == b == c` is a syntax error rather than being read as `(a == b) == c`. A condition of that kind must be written with an explicit logical operator, as in `a == b AND b == c`. Where comparing the outcome of one comparison with another is really what is meant, the parentheses say so: `(a == b) == (c == d)` is valid, its operands being booleans.
+The comparison operators, the regex operator `=~`, the range operator `BETWEEN`, and the state test operator `IS` are non-associative and cannot be chained. `a == b == c` is a syntax error rather than being read as `(a == b) == c`. A condition of that kind must be written with an explicit logical operator, as in `a == b AND b == c`. Where comparing the outcome of one comparison with another is really what is meant, the parentheses say so: `(a == b) == (c == d)` is valid, its operands being booleans.
 
 Parentheses should be used whenever the default precedence might not match the reader's expectation, even if they are not strictly required to produce the intended result.
 
@@ -439,12 +439,12 @@ The errors reported when a predicate is read include:
 - a type mismatch between the operands of an operator, outside the numeric literal exception;
 - an operand of `AND`, `OR` or `NOT`, or a predicate as a whole, that is not a definite boolean;
 - an operand of `!=` that is not definite and carries neither `ALL` nor `ANY`;
-- a boolean used as an operand of an ordering operator, of `BETWEEN`, or of `~=`, booleans being unordered;
+- a boolean used as an operand of an ordering operator, of `BETWEEN`, or of `=~`, booleans being unordered;
 - an argument of the wrong type to a function, such as a boolean passed to `NUMBER()` or `STRING()`;
 - `LITERALLY()` applied to an operand that is not a string, or to the operand of a state test;
 - a modifier applied anywhere other than to an operand of a comparison, range, regex, or state test operator, or to another such modifier;
 - a range whose endpoints are not literals of the same type, or whose `min` is greater than its `max`;
-- a pattern of `~=` that is not a raw string, is not a valid regular expression, or uses a construct the matching engine does not support.
+- a pattern of `=~` that is not a raw string, is not a valid regular expression, or uses a construct the matching engine does not support.
 
 Only conditions that genuinely depend on the contents of a file are left to be discovered during evaluation, and neither of them ever stops a run: a value that is absent, and an occurrence that cannot be interpreted. The first is ordinary; the second is reported as a warning, as described below.
 
@@ -511,7 +511,7 @@ The three are not quite the same kind of thing, which decides what writing one o
 - `ALL` and `ANY` choose a **quantifier**, which belongs to the operand it is written on. Each operand of an operator carries its own, and they are independent: one side may be universal while the other is existential.
 - `LITERALLY` chooses a **comparison mode**, which belongs to the operator. An operator either normalizes the strings it compares or it does not, and a `LITERALLY` on either operand settles that for the comparison as a whole.
 
-**A modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. For `BETWEEN` and `~=` that means the left operand alone, the range and the pattern on the right being parts of the operator rather than operands. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
+**A modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. For `BETWEEN` and `=~` that means the left operand alone, the range and the pattern on the right being parts of the operator rather than operands. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
 
 The restriction applies in one direction only. A modifier may be applied to any operand, including one that is itself a function call, so `LITERALLY(FALLBACK(genre, "pop")) == "Pop"` is valid: modifiers go on the outside, functions on the inside.
 
@@ -543,7 +543,7 @@ A comparison mode decides how an operator compares the strings it is given. Ther
 
 Because the mode belongs to the operator, it is enough for _just one_ operand to carry the modifier -- `LITERALLY(x) == y`, `x == LITERALLY(y)`, and `LITERALLY(x) == LITERALLY(y)` all do exactly the same thing. There is no such thing as a `LITERALLY` value that could be passed around and compared against a normalized one; the modifier is a note to the operator, and the operator obeys it once.
 
-Applied to the subject of `~=`, the modifier also makes the match case-sensitive, and leaves the subject's diacritics in place, which is what allows a pattern to match one.
+Applied to the subject of `=~`, the modifier also makes the match case-sensitive, and leaves the subject's diacritics in place, which is what allows a pattern to match one.
 
 Where an operand holds several occurrences, the mode applies to the comparison of every one of them, there being only one comparison mode in play. It is an error to apply `LITERALLY()` to an operand of any type other than string, and likewise to the operand of a state test, where there is no comparison for a mode to affect. An absent value and a string multivalue are of course still permitted.
 
@@ -553,10 +553,10 @@ Examples:
 - `artist == LITERALLY("metallica")` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the equality operator from normalizing its inputs before comparing them.
 - `artist BETWEEN "m".."n"` matches "Metallica" because, after normalization by default, "Metallica" sorts between "m" and "n".
 - `LITERALLY(artist) BETWEEN "m".."n"` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the range operator from normalizing its inputs, and upper case "M" does not sort between lower case "m" and "n".
-- `artist ~= r"^met"` matches "Metallica" because the match is performed case-insensitively.
-- `LITERALLY(artist) ~= r"^met"` does _not_ match "Metallica", because `LITERALLY()` makes the match case-sensitive and "Metallica" begins with a capital "M".
-- `artist ~= r"motö"` matches nothing, because diacritics are removed from the subject and the pattern is left as written, so the `ö` in it has nothing to match.
-- `LITERALLY(artist) ~= r"otö"` matches "Motörhead", because an unnormalized subject keeps its diacritics.
+- `artist =~ r"^met"` matches "Metallica" because the match is performed case-insensitively.
+- `LITERALLY(artist) =~ r"^met"` does _not_ match "Metallica", because `LITERALLY()` makes the match case-sensitive and "Metallica" begins with a capital "M".
+- `artist =~ r"motö"` matches nothing, because diacritics are removed from the subject and the pattern is left as written, so the `ö` in it has nothing to match.
+- `LITERALLY(artist) =~ r"otö"` matches "Motörhead", because an unnormalized subject keeps its diacritics.
 
 ### Functions
 
@@ -620,7 +620,7 @@ not_expr        = "NOT" not_expr
 comparison_expr = operand [ comparison_tail ] ;
 comparison_tail = comparison_op operand
                 | "BETWEEN" range
-                | "~=" pattern
+                | "=~" pattern
                 | "IS" state ;
 
 comparison_op   = "==" | "!=" | "<=" | ">=" | "<" | ">" ;
@@ -710,8 +710,8 @@ Not every rule in this document is grammatical, and a construct that this gramma
 - a `predicate` must be a definite expression of boolean type, so a bare `primary` such as `artist` parses but is not a valid predicate;
 - the operands of an operator must have the same type, subject to the numeric literal exception, and the operands of `AND`, `OR` and `NOT` must be definite booleans;
 - an `operand` of `!=` that is not definite must carry `ALL` or `ANY`;
-- booleans are unordered, so a boolean may not be an operand of `<`, `<=`, `>`, `>=`, `BETWEEN` or `~=`, nor an endpoint of a `range`;
-- the `operand` of `~=` must be a string, and its `pattern` must be a valid regular expression using only the constructs the matching engine supports;
+- booleans are unordered, so a boolean may not be an operand of `<`, `<=`, `>`, `>=`, `BETWEEN` or `=~`, nor an endpoint of a `range`;
+- the `operand` of `=~` must be a string, and its `pattern` must be a valid regular expression using only the constructs the matching engine supports;
 - the `operand` of a state test may be of any type, boolean included, since a state test asks about cardinality and state rather than about content;
 - an `identifier` must name a namespace Goro defines, an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may be one of the reserved words only when the identifier begins with `::`;
 - a `name_part` written as a `string` names the same thing as the equivalent bare `name` when the name is one a bare `name` could have spelled, so the two forms are one identifier and not two;
