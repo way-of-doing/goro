@@ -201,12 +201,12 @@ an unusable boolean emits nothing beyond what the operator that produced it emit
 enough to assert in full, and should be. Its absent row matters most, being where
 `ALL(x) IS USABLE` and `NOT x IS UNUSABLE` part company.
 
-**The regex operator normalizes its subject and not its pattern.** Every other operator
-normalizes both of its operands, so an implementation that reuses the ordinary path for `~=` will
+**The regex operator normalizes its subject and not its pattern.** Every other operator normalizes
+every string it compares, so an implementation that reuses the ordinary path for `~=` will
 normalize the pattern too, and the symptom is a pattern that matches slightly different files
 rather than any kind of failure. The asymmetry therefore needs asserting from both sides: that a
-diacritic in the pattern matches nothing, and that the same pattern under `LITERALLY()` matches
-the subject that still has one.
+diacritic in the pattern matches nothing, and that the same pattern under `LITERALLY()` matches the
+subject that still has one.
 
 **Warning identity is structural.** The interning rules hold: differences of whitespace, letter
 case, explicit namespace qualification and modifier wrapping do not produce distinct sources,
@@ -252,8 +252,6 @@ point for these tests rather than an inventory of them.
 | The same pair under `LITERALLY()` | Must match: an unnormalized subject keeps its diacritics |
 | A `~=` whose pattern differs from the subject only in case | Must match by default, and must not under `LITERALLY()`, since the modifier makes the match case-sensitive |
 | A pattern that would change meaning if it were decomposed, such as `e` followed by a combining acute and `?` | Must be matched as written; an implementation that normalizes the pattern turns it into a different pattern rather than a differently-spelled one |
-| A pattern arriving from tag data that is invalid, or that uses an unsupported construct | Must warn and evaluate to unusable, and must not stop the run |
-| `NOT (s ~= p)`, with `p` from tag data and not a valid pattern | Unusable, not true: no file may be selected on the strength of a match that never ran |
 
 ## Predicate reading
 
@@ -267,12 +265,10 @@ and the predicate on the command line still looks exactly like what the user mea
 
 Two things concentrate the risk.
 
-**A string literal has two forms and escaping happens at two levels.** A quoted string processes
-escapes and a raw string does not, and where the value is a regular expression the pattern engine
-then processes escapes of its own. Most of the ways to get this wrong produce a valid string that
-is not the intended one: dropping a backslash before a character that is not an escape, reading
-more or fewer digits than `\x` and `\u` take, or mishandling the doubled quote that terminates a
-raw string.
+**A string literal has two forms.** A quoted string processes escapes and a raw string does not.
+Most of the ways to get this wrong produce a valid string that is not the intended one: dropping a
+backslash before a character that is not an escape, reading more or fewer digits than `\x` and `\u`
+take, or mishandling the doubled quote that terminates a raw string.
 
 **Tokenisation rests on a rule the productions cannot state.** A token is always as long as it
 can be, and several literals are only unambiguous because of it. Most mistakes here surface as
@@ -285,7 +281,7 @@ raw string decides a value rather than whether the text parses.
 predicate documentation is closed, so the tests are the list plus the negative case: a backslash
 followed by anything not on it is an error. That negative case matters more than it looks, because
 the tempting implementation -- pass the unknown character through and drop the backslash -- is what
-several languages do, and it would turn a mistyped pattern into a quietly different one.
+several languages do, and it would turn a mistyped string into a quietly different one.
 
 **A raw string is what was written.** Byte for byte, backslashes included, with a doubled quote
 standing for one quote and the string ending only at a quote that stands alone.
@@ -298,7 +294,8 @@ property of the lexer in the abstract.
 
 Static rejection of a bad pattern belongs to the error-reporting guarantee asserted in the class
 above, and is not restated here; what this class adds is that the *unsupported* constructs are
-rejected on the same terms as the malformed ones.
+rejected on the same terms as the malformed ones, and that a pattern is accepted only as a raw
+string written directly after the operator.
 
 ### Scenarios to cover
 
@@ -319,12 +316,14 @@ rejected on the same terms as the malformed ones.
 | `1..100`, `1.5..2`, and `1.` | The range operator must survive the lexer, and a trailing period must be rejected |
 | A no-break space and an ideographic space between two tokens | Both are whitespace, and the predicate parses as if a plain space had been written |
 | `NOT::x == 1`, and `and::x` | The first is `NOT` applied to `::x == 1`; the second is an error, a reserved word never beginning an identifier unless it follows a leading `::` |
-| `(ALL(genre)) == "x"` | Parses, and is rejected by static analysis: parentheses do not make a modifier's position acceptable |
+| `(ALL(genre)) == "x"` and `COUNT((ALL(genre)))` | The first is valid, the same predicate as `ALL(genre) == "x"`; the second is rejected exactly as `COUNT(ALL(genre))` is. Parentheses only group, around a modifier as anywhere else |
 | `genre != "x"`, `LITERALLY(genre) != "x"`, `FALLBACK(genre, "") != "x"`, `ALL(a) != b` and `file::extension != "flac"` | Each is an error: `LITERALLY` is not a quantifier, a function of an identifier is no more definite than the identifier, every operand that is not definite needs a quantifier of its own, and `file::extension` can be absent, unlike the definite identifiers beside it. The diagnostic for the first must offer both `NOT genre == "x"` and `ALL(genre) != "x"` |
 | `ANY(genre) != "x"`, `LITERALLY(ALL(genre)) != "x"`, `COUNT(genre) != 1`, `file::size != 0` and `(a == b) != (c == d)` | All valid: a quantifier anywhere in a stack of modifiers satisfies the rule, and a definite operand needs none |
 | `TRUE`, `true` and `False` as literals, `::true` as an identifier, and `year == NULL` | The boolean literals are case-insensitive keywords and qualifying one makes it an identifier; `NULL` names nothing and must be rejected with a diagnostic saying what to write instead |
-| A literal pattern using each of the four unsupported construct families | Each must be a static error, reported before any file is opened, on the same terms as a malformed pattern |
-| A pattern written as a quoted string and as the equivalent raw string, for an escape both levels understand | `"\x41"` and `r"\x41"` must both match the same subject, by the string processing the escape in one case and the pattern engine in the other |
+| `artist ~= "^a"`, `title ~= artist`, `artist ~= (r"^a")`, `artist ~= LITERALLY(r"^a")` and `artist ~= ALL(r"^a")` | Each is a syntax error, the pattern being a raw string that is part of the operator. The diagnostic for the first must offer `r"^a"`, and the one for `LITERALLY` must offer `LITERALLY(artist) ~= r"^a"` |
+| `FALLBACK(year, (0))`, `file::duration > (90)` and `NUMBER(("x"))` | A literal in parentheses is a literal: the first is valid, the second compares with ninety seconds, and the third is the same static error as `NUMBER("x")` |
+| `(1)..2` | A syntax error: a range is built from literals by the grammar, which does not admit parentheses there |
+| A pattern using each of the four unsupported construct families | Each must be a static error, reported before any file is opened, on the same terms as a malformed pattern |
 
 ## String normalization
 

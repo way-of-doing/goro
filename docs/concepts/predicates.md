@@ -70,7 +70,7 @@ Although the grammar does not require it, no built-in identifier in the global n
 
 ### Values
 
-Values in predicates come from _identifiers_ (preagreed names to refer to various types of data specific to each file) and _literals_ (values specified directly when writing a predicate). For example, in the predicate `year == 2000`, `year` is an identifier and `2000` is a literal value.
+Values in predicates come from _identifiers_ (preagreed names to refer to various types of data specific to each file) and _literals_ (values specified directly when writing a predicate). For example, in the predicate `year == 2000`, `year` is an identifier and `2000` is a literal value. A literal enclosed in parentheses is still a literal, so wherever a rule calls for one, `(0)` serves exactly as `0` does.
 
 Every value has three aspects. The first is always decided by the text of the predicate; the other two are decided by the file, except that the text of some expressions guarantees their cardinality (see [Definite expressions](#definite-expressions) below).
 
@@ -111,7 +111,7 @@ A backslash followed by anything else is an error rather than a literal backslas
 
 A **raw string** carries the prefix `r` and processes nothing whatsoever: every character between the quotes is part of the value, and a backslash is simply a backslash, so `r"\d{4}"` and `"\\d{4}"` denote the same text. A double quote inside a raw string is written by doubling it, so `r"say ""hi"""` is the value `say "hi"`.
 
-The two forms differ in nothing but how the text between the quotes is read. A raw string has string type like any other, may appear anywhere a quoted string may, including as a quoted part of an identifier, and two literals denoting the same characters are indistinguishable regardless of which form wrote them.
+The two forms differ in nothing but how the text between the quotes is read. A raw string has string type like any other, may appear anywhere a quoted string may, including as a quoted part of an identifier, and two literals denoting the same characters are indistinguishable regardless of which form wrote them. The pattern of the [regular expression match operator](#regular-expression-match-operator) is the one place that accepts a raw string alone.
 
 **number**
 : real dimensionless numbers, such as `2000`, `-1`, and `-.55`. Number literals are optionally preceded by one + or - sign character, followed by either an integer or a floating point number where the integer part is separated from the fractional part by a period. If the number has a fractional part, the integer part is optional and considered to be zero when it does not appear. The period must always be followed by at least one digit, so `1`, `1.5` and `.5` are all valid number literals while `1.` is not.
@@ -219,20 +219,20 @@ Examples:
 
 #### Regular expression match operator
 
-String values can be tested to see if they match a regular expression with the regex matching operator `~=`. The left operand is the **subject**, the value being tested; the right operand is the **pattern**. Both must be of type string, and it is an error if either is not. Regular expressions are [.NET-flavored](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expressions), with the restriction described under [Supported constructs](#supported-constructs) below.
+String values can be tested to see if they match a regular expression with the regex matching operator `~=`. Its left operand is the **subject**, the value being tested, and must be of type string. What follows the operator is the **pattern**, which is not an operand but part of the operator, as the range is part of `BETWEEN`: it is a raw string, written directly after `~=` with no parentheses or modifiers around it. `artist ~= r"^the "` is valid, while `artist ~= "^the "` and `title ~= artist` are errors. A raw string processes no escapes, so every backslash in a pattern reaches the regular expression engine as written. Regular expressions are [.NET-flavored](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expressions), with the restriction described under [Supported constructs](#supported-constructs) below.
 
 The regex matching operator will match if any substring of the subject matches the pattern, so if more exact matching is intended the anchors `^` and/or `$` have to be specified.
 
-**Only the subject is normalized, and the pattern is never touched.** The subject is prepared exactly as for any other operator, and in normalized mode the match is case-insensitive. A pattern is what the user wrote, character for character, so **a pattern cannot match anything normalization removes or changes**: `artist ~= "motö"` finds nothing at all, while `artist ~= "mot"` matches "Motörhead". Applying `LITERALLY()` to either operand puts the subject in literal mode and makes the match case-sensitive, which is the way to write a pattern that means to match a diacritic. See [Normalization](normalization.md#regular-expressions), and the [rationale](../design/rationale.md) for why the pattern is exempt.
+**Only the subject is normalized, and the pattern is never touched.** The subject is prepared exactly as for any other operator, and in normalized mode the match is case-insensitive. A pattern is what the user wrote, character for character, so **a pattern cannot match anything normalization removes or changes**: `artist ~= r"motö"` finds nothing at all, while `artist ~= r"mot"` matches "Motörhead". Applying `LITERALLY()` to the subject puts it in literal mode and makes the match case-sensitive, which is the way to write a pattern that means to match a diacritic. See [Normalization](normalization.md#regular-expressions), and the [rationale](../design/rationale.md) for why the pattern is exempt.
 
-If either operand is a multivalue, matching follows the ordinary quantifier and nested iteration rules described under [Multivalues](#multivalues); each individual pattern of a multivalue pattern operand is validated independently.
+If the subject is a multivalue, matching follows the ordinary quantifier rules described under [Multivalues](#multivalues).
 
 There is no negated version of this operator; to determine if a value does not match a regular expression, apply `NOT` to the result of matching it.
 
 Examples:
 
-- `artist ~= "s$"` matches any artist whose name ends in "s" or "S"
-- `artist ~= r"^\d+ "` matches any artist whose name begins with a number followed by a space. Written as a quoted string the same pattern is `"^\\d+ "`, which is why a raw string is the better habit for patterns
+- `artist ~= r"s$"` matches any artist whose name ends in "s" or "S"
+- `artist ~= r"^\d+ "` matches any artist whose name begins with a number followed by a space
 
 ##### Supported constructs
 
@@ -249,16 +249,9 @@ That engine does not support four families of construct, and a pattern using any
 
 Everything else a .NET pattern may contain is available, including captures and named captures, alternation, greedy and lazy quantifiers, character classes, Unicode categories such as `\p{Lu}`, word boundaries, and inline options.
 
+A pattern that uses one of these constructs, or that is not a valid regular expression at all, is an error reported when the predicate is read.
+
 See the [rationale](../design/rationale.md) for why this engine was chosen and what the restriction costs.
-
-##### Invalid patterns
-
-A pattern that is not a valid supported regular expression is rejected. Where this happens depends on whether the pattern is known in advance:
-
-- **A literal pattern is validated when the predicate is read**, and a bad one is an error reported before any file is processed, like every other error this document describes.
-- **A pattern arriving from tag data cannot be validated in advance.** An occurrence of the pattern operand that turns out not to be a valid supported pattern is an occurrence the operator cannot interpret as a pattern, and the operator treats it exactly as it treats any other [unusable occurrence](#unusable-occurrences): every combination that includes it is unusable, and consuming it emits a warning whose source is the pattern operand. A run is never stopped by it.
-
-Because the result is unusable rather than false, negating it does not turn it into a match: `NOT (artist ~= sometag)` is unusable, not true, when `sometag` is not a valid regular expression, so no file is selected on the strength of a match that never ran.
 
 #### State test operator
 
@@ -326,6 +319,8 @@ The operands of `AND`, `OR`, and `NOT` must be [definite](#definite-expressions)
 
 Expressions can be grouped with parentheses ( ). A parenthesized sub-expression is evaluated as a unit before anything outside the parentheses, regardless of what operators surround it. For example, `(genre == "jazz" OR genre == "blues") AND year < 2000` first evaluates the genre comparison, then combines the result with the year comparison.
 
+Grouping is all that parentheses do: a parenthesized expression is in every other respect the expression it encloses. It has the same type, is definite when that expression is, is a literal when that expression is one, and is modified in the same way, so `(ALL(genre)) == "x"` is the same predicate as `ALL(genre) == "x"`. The one place parentheses cannot go is where the grammar itself places a literal: inside a range, or as the pattern of `~=`.
+
 When parentheses are not used to make evaluation order explicit, operators are evaluated according to a fixed precedence, from tightest-binding to loosest-binding:
 
 | Level        | Constructs                                                                            | Associativity   |
@@ -363,7 +358,7 @@ These are the rules of the logical operators applied across a bag: an existentia
 
 **The iteration does not short-circuit.** Every combination is evaluated even after the operator's result is settled, so the warnings a file produces never depend on the order of the occurrences in a bag. This is the one place where Goro declines to short-circuit: `AND` and `OR` do, and the [guard idiom](#state-test-operator) relies on it.
 
-The loops are nested **by quantifier, not by position**: a universally-quantified operand always forms a loop outside any existentially-quantified one. Where two operands carry the same quantifier the nesting between them is immaterial, so which side of an operator an operand is written on never changes the nesting and therefore never changes the result. That is a claim about the quantifiers and not about the operators themselves: `a < b` and `b < a` remain different propositions, as always, and the two operands of `~=` have fixed roles. Should an operator ever take more than two value operands, the same rule applies: universals outermost, existentials innermost, with the written order breaking ties among operands of the same quantifier.
+The loops are nested **by quantifier, not by position**: a universally-quantified operand always forms a loop outside any existentially-quantified one. Where two operands carry the same quantifier the nesting between them is immaterial, so which side of an operator an operand is written on never changes the nesting and therefore never changes the result. That is a claim about the quantifiers and not about the operators themselves: `a < b` and `b < a` remain different propositions, as always. Should an operator ever take more than two value operands, the same rule applies: universals outermost, existentials innermost, with the written order breaking ties among operands of the same quantifier.
 
 An unusable occurrence participates in this iteration like any other, with general operator rule 2 applying to it: every combination that includes it is unusable. Under the default existential quantifier an unusable occurrence therefore cannot prevent a match that another occurrence supplies, and under `ALL()` it cannot prevent a mismatch that another occurrence supplies; what it prevents is an answer that would have depended on it. For example, if `vorbis::year` has two occurrences, one holding `1991` and one holding data that is not a date at all, then `vorbis::year == 1991` is true, because the first occurrence settles it; `ALL(vorbis::year) == 1991` is unusable, because whether every year is 1991 turns on the one that cannot be read; and `ALL(vorbis::year) == 2000` is false, because the first occurrence already shows that not every year is 2000.
 
@@ -421,7 +416,7 @@ Unusable occurrences arise in three ways:
 
 - from an identifier whose underlying tag data is present but cannot be interpreted as the identifier's declared type;
 - from a type conversion function whose input cannot be converted; in particular, `NUMBER()` produces an unusable number when its input cannot be converted;
-- from a comparison, range or regex operator that could not reach an answer because of an unusable occurrence among its operands, or because a pattern arriving from tag data was not a valid one; its result is an unusable boolean.
+- from a comparison, range or regex operator that could not reach an answer because of an unusable occurrence among its operands; its result is an unusable boolean.
 
 The first two are where a defect is found, and consuming the occurrence they produce causes Goro to emit a warning to alert you, as described under [Warnings](#warnings) below. The third is a consequence of the first two rather than a further defect.
 
@@ -449,9 +444,9 @@ The errors reported when a predicate is read include:
 - `LITERALLY()` applied to an operand that is not a string, or to the operand of a state test;
 - a modifier applied anywhere other than to an operand of a comparison, range, regex, or state test operator, or to another such modifier;
 - a range whose endpoints are not literals of the same type, or whose `min` is greater than its `max`;
-- a regular expression literal that is not a valid regular expression, or that uses a construct the matching engine does not support.
+- a pattern of `~=` that is not a raw string, is not a valid regular expression, or uses a construct the matching engine does not support.
 
-Only conditions that genuinely depend on the contents of a file are left to be discovered during evaluation, and neither of them ever stops a run: a value that is absent, and an occurrence that cannot be interpreted -- including a pattern arriving from tag data that turns out not to be a valid one. The first is ordinary; the second is reported as a warning, as described below.
+Only conditions that genuinely depend on the contents of a file are left to be discovered during evaluation, and neither of them ever stops a run: a value that is absent, and an occurrence that cannot be interpreted. The first is ordinary; the second is reported as a warning, as described below.
 
 ### Warnings
 
@@ -463,7 +458,7 @@ A predicate emits a warning when an unusable occurrence is consumed while it is 
 
 **Consuming an unusable occurrence means asking a question of its content.** Only consuming emits a warning. The comparison, range and regex operators are the constructs that ask such questions -- they are where data is turned into a truth value -- and everything else follows from that one rule:
 
-- The comparison, range and regex operators need the content of their operands in order to answer. They consume, so an operator handed an unusable occurrence warns, and its result for the combinations that include the occurrence is unusable. A pattern from tag data that is not a valid pattern is consumed in the same way.
+- The comparison, range and regex operators need the content of their operands in order to answer. They consume, so an operator handed an unusable occurrence warns, and its result for the combinations that include the occurrence is unusable.
 - `NUMBER()` and `STRING()` map an unusable occurrence to an unusable occurrence. They ask nothing of its content; they _propagate_ it, keeping its source, and they are silent.
 - `COUNT()` reads cardinality, which is knowable without interpreting any occurrence. It is silent.
 - `FALLBACK()` substitutes for an occurrence instead of reading it. It is silent.
@@ -475,7 +470,7 @@ This is what allows the guard `ALL(NUMBER(x)) IS USABLE AND NUMBER(x) > 5` to wo
 
 #### Where a warning comes from
 
-An unusable occurrence has a _source_: the identifier or the conversion at which it arose, or, for a pattern from tag data that is not a valid pattern, the pattern operand of the `~=` that could not use it. A function that passes an occurrence through does not change its source. A warning is emitted at the point where the occurrence is consumed, but names its source: in `STRING(id3v1::year) == "1991"` applied to a file whose Id3v1 year field holds something that is not a year, the unusable occurrence arises at `id3v1::year`, is propagated through `STRING()`, and the warning is triggered by the consuming `==` but names `id3v1::year` as the source, which is where the problem actually is.
+An unusable occurrence has a _source_: the identifier or the conversion at which it arose. A function that passes an occurrence through does not change its source. A warning is emitted at the point where the occurrence is consumed, but names its source: in `STRING(id3v1::year) == "1991"` applied to a file whose Id3v1 year field holds something that is not a year, the unusable occurrence arises at `id3v1::year`, is propagated through `STRING()`, and the warning is triggered by the consuming `==` but names `id3v1::year` as the source, which is where the problem actually is.
 
 #### Deduplication
 
@@ -516,7 +511,7 @@ The three are not quite the same kind of thing, which decides what writing one o
 - `ALL` and `ANY` choose a **quantifier**, which belongs to the operand it is written on. Each operand of an operator carries its own, and they are independent: one side may be universal while the other is existential.
 - `LITERALLY` chooses a **comparison mode**, which belongs to the operator. An operator either normalizes the strings it compares or it does not, and a `LITERALLY` on either operand settles that for the comparison as a whole.
 
-**A modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. For `BETWEEN` that means its left operand alone, the range on its right being built out of literals rather than out of operands. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
+**A modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. For `BETWEEN` and `~=` that means the left operand alone, the range and the pattern on the right being parts of the operator rather than operands. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
 
 The restriction applies in one direction only. A modifier may be applied to any operand, including one that is itself a function call, so `LITERALLY(FALLBACK(genre, "pop")) == "Pop"` is valid: modifiers go on the outside, functions on the inside.
 
@@ -548,7 +543,7 @@ A comparison mode decides how an operator compares the strings it is given. Ther
 
 Because the mode belongs to the operator, it is enough for _just one_ operand to carry the modifier -- `LITERALLY(x) == y`, `x == LITERALLY(y)`, and `LITERALLY(x) == LITERALLY(y)` all do exactly the same thing. There is no such thing as a `LITERALLY` value that could be passed around and compared against a normalized one; the modifier is a note to the operator, and the operator obeys it once.
 
-Applied to either operand of `~=`, the modifier also makes the match case-sensitive, and leaves the subject's diacritics in place, which is what allows a pattern to match one.
+Applied to the subject of `~=`, the modifier also makes the match case-sensitive, and leaves the subject's diacritics in place, which is what allows a pattern to match one.
 
 Where an operand holds several occurrences, the mode applies to the comparison of every one of them, there being only one comparison mode in play. It is an error to apply `LITERALLY()` to an operand of any type other than string, and likewise to the operand of a state test, where there is no comparison for a mode to affect. An absent value and a string multivalue are of course still permitted.
 
@@ -558,10 +553,10 @@ Examples:
 - `artist == LITERALLY("metallica")` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the equality operator from normalizing its inputs before comparing them.
 - `artist BETWEEN "m".."n"` matches "Metallica" because, after normalization by default, "Metallica" sorts between "m" and "n".
 - `LITERALLY(artist) BETWEEN "m".."n"` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the range operator from normalizing its inputs, and upper case "M" does not sort between lower case "m" and "n".
-- `artist ~= "^met"` matches "Metallica" because the match is performed case-insensitively.
-- `artist ~= LITERALLY("^met")` does _not_ match "Metallica", because `LITERALLY()` makes the match case-sensitive and "Metallica" begins with a capital "M".
-- `artist ~= "motö"` matches nothing, because diacritics are removed from the subject and the pattern is left as written, so the `ö` in it has nothing to match.
-- `LITERALLY(artist) ~= "otö"` matches "Motörhead", because an unnormalized subject keeps its diacritics.
+- `artist ~= r"^met"` matches "Metallica" because the match is performed case-insensitively.
+- `LITERALLY(artist) ~= r"^met"` does _not_ match "Metallica", because `LITERALLY()` makes the match case-sensitive and "Metallica" begins with a capital "M".
+- `artist ~= r"motö"` matches nothing, because diacritics are removed from the subject and the pattern is left as written, so the `ö` in it has nothing to match.
+- `LITERALLY(artist) ~= r"otö"` matches "Motörhead", because an unnormalized subject keeps its diacritics.
 
 ### Functions
 
@@ -625,10 +620,11 @@ not_expr        = "NOT" not_expr
 comparison_expr = operand [ comparison_tail ] ;
 comparison_tail = comparison_op operand
                 | "BETWEEN" range
-                | "~=" operand
+                | "~=" pattern
                 | "IS" state ;
 
 comparison_op   = "==" | "!=" | "<=" | ">=" | "<" | ">" ;
+pattern         = raw_string ;
 state           = "USABLE" | "UNUSABLE" | "ABSENT" ;
 
 operand         = modifier "(" operand ")"
@@ -645,7 +641,7 @@ function_call   = name "(" [ expression { "," expression } ] ")" ;
 
 The four levels of `or_expr`, `and_expr`, `not_expr` and `comparison_expr` are what give the operators the precedence listed under [Grouping, precedence, and associativity](#grouping-precedence-and-associativity). `comparison_tail` appears at most once and never recurses, which is what makes the comparison, range, regex and state test operators non-associative.
 
-The grammar admits a modifier wherever an `operand` can occur, and since the tail of a `comparison_expr` is optional, that is wherever an expression can occur. The restriction described under [Modifiers](#modifiers) is therefore completed by static analysis: `COUNT(ALL(genre))` parses, with `ALL(genre)` as the argument of `COUNT`, and is rejected. This is what the modifier names are reserved for, since recognizing one is what allows a misplaced modifier to be reported as such. The recursion in `operand` is what allows modifiers to be stacked without limit. Parentheses do not make a modifier's position acceptable: `(ALL(genre)) == "x"` parses, but its modifier is applied inside a parenthesized expression rather than to an operand of `==`, and it is rejected.
+The grammar admits a modifier wherever an `operand` can occur, and since the tail of a `comparison_expr` is optional, that is wherever an expression can occur. The restriction described under [Modifiers](#modifiers) is therefore completed by static analysis: `COUNT(ALL(genre))` parses, with `ALL(genre)` as the argument of `COUNT`, and is rejected. This is what the modifier names are reserved for, since recognizing one is what allows a misplaced modifier to be reported as such. The recursion in `operand` is what allows modifiers to be stacked without limit. Parentheses change nothing here, as everywhere else: `(ALL(genre)) == "x"` is accepted, its modifier being applied to the operand of `==`, and `COUNT((ALL(genre)))` is rejected exactly as `COUNT(ALL(genre))` is.
 
 ### Identifiers and names
 
@@ -710,11 +706,12 @@ An identifier that happens to be named `r` is unaffected by the raw string prefi
 
 Not every rule in this document is grammatical, and a construct that this grammar accepts may still be rejected. The following constraints are enforced by static analysis of a parsed predicate rather than by the grammar, and all of them are reported as [errors](#errors) when the predicate is read:
 
+- every rule below treats a parenthesized expression exactly as the expression it encloses, so a `literal` in parentheses is a literal and a modified `operand` in parentheses is still a modified operand; where the grammar itself requires a literal, as `range` and `pattern` do, parentheses are not part of it;
 - a `predicate` must be a definite expression of boolean type, so a bare `primary` such as `artist` parses but is not a valid predicate;
 - the operands of an operator must have the same type, subject to the numeric literal exception, and the operands of `AND`, `OR` and `NOT` must be definite booleans;
 - an `operand` of `!=` that is not definite must carry `ALL` or `ANY`;
 - booleans are unordered, so a boolean may not be an operand of `<`, `<=`, `>`, `>=`, `BETWEEN` or `~=`, nor an endpoint of a `range`;
-- both operands of `~=` must be strings, and its right operand must be a valid regular expression if it is a literal;
+- the `operand` of `~=` must be a string, and its `pattern` must be a valid regular expression using only the constructs the matching engine supports;
 - the `operand` of a state test may be of any type, boolean included, since a state test asks about cardinality and state rather than about content;
 - an `identifier` must name a namespace Goro defines, an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may be one of the reserved words only when the identifier begins with `::`;
 - a `name_part` written as a `string` names the same thing as the equivalent bare `name` when the name is one a bare `name` could have spelled, so the two forms are one identifier and not two;

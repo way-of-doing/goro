@@ -63,7 +63,7 @@ eval(FALLBACK(e, d))   = bag{ usable(d) }               if eval(e) is ABSENT
 
 ### Comparison, range and regex operators
 
-For a comparison, the operands are its two sides; for `BETWEEN`, the operand is its left side, the range being part of the test; for `~=`, the operands are the subject and the pattern.
+For a comparison, the operands are its two sides; for `BETWEEN`, the operand is its left side, the range being part of the test; for `~=`, the operand is the subject, the pattern being part of the test.
 
 ```
 eval(op(e1 … en)):
@@ -78,8 +78,6 @@ over(k, chosen):
     return quantify(quantifier of operand k, outcomes)
 
 test(o1 … on):
-    for a pattern occurrence that is usable but not a valid supported pattern,
-        treat it as unusable, its source being the pattern operand
     if any oj is unusable: report each such oj; return U
     prepare each string datum, and the endpoints of a range, per normalization.md in the operator's mode;
         a pattern is not prepared
