@@ -1,19 +1,18 @@
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Goro.Discovery;
 using Goro.Domain;
 using Goro.Pipeline;
 using Goro.Tests.TestSupport;
-using Goro.Warnings;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Goro.Tests.Cli;
 
 /// <summary>
-/// The "Unreadable files and pathspecs" class of docs/testing.md, for the rows that need no
-/// predicate. What a file that cannot be read does to the output, standard error and exit code,
-/// end to end.
+/// The "Unreadable files and pathspecs" class of docs/testing.md. What a file that cannot be read
+/// does to the output, standard error and exit code, end to end, with and without a predicate. The
+/// rows that need a tag identifier wait for the tag namespaces; their counterparts here use
+/// <c>file::duration</c>, which needs the file read in the same way.
 /// </summary>
 public class UnreadableFileTests
 {
@@ -173,6 +172,179 @@ public class UnreadableFileTests
         Assert.That(stdErr, Is.Empty);
     }
 
+    // --- goro list --filter: a file that cannot be read is left out, with one warning ---
+
+    private static Task<(int ExitCode, string StdOut, string StdErr)> RunAsync(params string[] args) =>
+        GoroAppFactory.Create().RunCapturedAsync(args);
+
+    private static string DataWarningLine(string path, string subExpression) =>
+        $"goro: warning: {path}: cannot interpret the data of {subExpression}";
+
+    [Test]
+    public async Task List_Filter_FileThatCannotBeRead_IsNotListed_WarnsOnce_AndTheRunCompletes([Values] UnreadableKind kind)
+    {
+        var good = _collection.Mp3("good.mp3");
+        var bad = MakeUnreadable(kind);
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--filter=file::duration >= 0", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(Lines(stdOut), Is.EqualTo(new[] { good }));
+        AssertOneFileWarning(stdErr, bad);
+    }
+
+    [Test]
+    public async Task List_Filter_FileRemovedBetweenDiscoveryAndProcessing_IsNotListed_AndWarnsOnce()
+    {
+        var good = _collection.Mp3("good.mp3");
+        var vanishing = _collection.Mp3("vanishing.mp3");
+        var app = GoroAppFactory.Create(services =>
+            services.AddSingleton<IFileDiscoveryService>(new DeletingDiscovery(new FileDiscoveryService(), vanishing)));
+
+        var (exitCode, stdOut, stdErr) = await app.RunCapturedAsync("list", "--strict-exit-code", "--filter=file::size >= 0", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(11));
+        Assert.That(Lines(stdOut), Is.EqualTo(new[] { good }));
+        AssertOneFileWarning(stdErr, vanishing);
+        Assert.That(stdErr, Does.Contain("no such file or directory"));
+    }
+
+    // Nothing had to be read, so nothing could fail to be read.
+    [TestCase(@"file::path =~ r""locked\.mp3$""")]
+    [TestCase(@"file::name == ""locked.mp3""")]
+    [TestCase(@"file::extension == ""mp3""")]
+    public async Task List_Filter_OnlyPathNameOrExtension_OverAFileThatCannotBeOpened_DoesNotWarn_AndEvaluates(string predicate)
+    {
+        var locked = _collection.Lock(_collection.Mp3("locked.mp3"));
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", $"--filter={predicate}", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(Lines(stdOut), Is.EqualTo(new[] { locked }));
+        Assert.That(stdErr, Is.Empty);
+    }
+
+    [Test]
+    public async Task List_Filter_SizeOnly_OverAFileWhoseContentsCannotBeParsed_DoesNotWarn()
+    {
+        var notAudio = _collection.NotAudio("text.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--filter=file::size > 0", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(Lines(stdOut), Is.EqualTo(new[] { notAudio }));
+        Assert.That(stdErr, Is.Empty);
+    }
+
+    // testing.md writes this row with `artist == "x"`; file::duration needs the file read the same way.
+    [Test]
+    public async Task List_Filter_UninterpretableDataThenAFileThatCannotBeRead_GivesOneFileWarningAndNoDataWarning()
+    {
+        var notAudio = _collection.NotAudio("text.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync(
+            "list", "--strict-exit-code", "--filter=NUMBER(file::name) > 1 OR file::duration > 0", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(11));
+        Assert.That(stdOut, Is.Empty);
+        AssertOneFileWarning(stdErr, notAudio);
+    }
+
+    // --- goro list --filter: a predicate without an answer ---
+
+    [Test]
+    public async Task List_Filter_PredicateUnusable_IsNotListed_AndTheDataWarningIsOnStandardError()
+    {
+        var file = _collection.Mp3("track.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--filter=NUMBER(file::name) > 1", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(stdOut, Is.Empty);
+        Assert.That(Lines(stdErr), Is.EqualTo(new[] { DataWarningLine(file, "NUMBER(file::name)") }));
+    }
+
+    // The predicate, not the command, decides here. FALLBACK replaces the comparison's result but
+    // cannot undo the warning the comparison emitted while producing it.
+    [Test]
+    public async Task List_Filter_PredicateUnusable_WrappedInFallbackToTrue_IsListed()
+    {
+        var file = _collection.Mp3("track.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--filter=FALLBACK(NUMBER(file::name) > 1, TRUE)", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(Lines(stdOut), Is.EqualTo(new[] { file }));
+        Assert.That(Lines(stdErr), Is.EqualTo(new[] { DataWarningLine(file, "NUMBER(file::name)") }));
+    }
+
+    // --- goro list --filter: exit codes, which only --strict-exit-code surfaces ---
+
+    private static string[] ListArgs(bool strict, string predicate, string root) =>
+        strict ? ["list", "--strict-exit-code", $"--filter={predicate}", root] : ["list", $"--filter={predicate}", root];
+
+    [Test]
+    public async Task List_Filter_OneUnreadableFileAmongManyReadable_Returns11([Values] bool strict)
+    {
+        for (var i = 0; i < 10; i++)
+        {
+            _collection.Mp3($"good{i}.mp3");
+        }
+
+        var bad = _collection.NotAudio("bad.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "file::duration >= 0", _collection.Root));
+
+        Assert.That(exitCode, Is.EqualTo(strict ? 11 : 0));
+        Assert.That(Lines(stdOut), Has.Length.EqualTo(10).And.No.EqualTo(bad));
+        AssertOneFileWarning(stdErr, bad);
+    }
+
+    // Within a group the higher-numbered code wins. The readable file's name is not a number, which
+    // warns; the unreadable file says only that it could not be read.
+    [Test]
+    public async Task List_Filter_UnreadableFileAndUninterpretableData_Returns11Not10([Values] bool strict)
+    {
+        var good = _collection.Mp3("good.mp3");
+        var bad = _collection.NotAudio("bad.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "NUMBER(file::name) > 1 OR file::duration >= 0", _collection.Root));
+
+        Assert.That(exitCode, Is.EqualTo(strict ? 11 : 0));
+        Assert.That(Lines(stdOut), Is.EqualTo(new[] { good }));
+        var lines = Lines(stdErr);
+        Assert.That(lines, Has.Length.EqualTo(2), stdErr);
+        Assert.That(lines, Has.One.EqualTo(DataWarningLine(good, "NUMBER(file::name)")));
+        Assert.That(lines, Has.One.StartsWith($"goro: warning: {bad}: cannot be read: "));
+    }
+
+    // An unreadable file does not count as examined.
+    [Test]
+    public async Task List_Filter_UnreadableFileWhereNothingMatched_Returns11Not20([Values] bool strict)
+    {
+        _collection.Mp3("good.mp3");
+        var bad = _collection.NotAudio("bad.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "file::duration > 100000", _collection.Root));
+
+        Assert.That(exitCode, Is.EqualTo(strict ? 11 : 0));
+        Assert.That(stdOut, Is.Empty);
+        AssertOneFileWarning(stdErr, bad);
+    }
+
+    // The 1x group takes precedence over the 2x group.
+    [Test]
+    public async Task List_Filter_DataWarningAndAnEmptyResult_Returns10Not20([Values] bool strict)
+    {
+        var file = _collection.Mp3("track.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "NUMBER(file::name) > 1", _collection.Root));
+
+        Assert.That(exitCode, Is.EqualTo(strict ? 10 : 0));
+        Assert.That(stdOut, Is.Empty);
+        Assert.That(Lines(stdErr), Is.EqualTo(new[] { DataWarningLine(file, "NUMBER(file::name)") }));
+    }
+
     // --- pathspecs ---
 
     [TestCase(true, 11)]
@@ -237,26 +409,6 @@ public class UnreadableFileTests
 
         Assert.That(exitCode, Is.EqualTo(1));
         Assert.That(stdErr, Does.Contain("goro: error: defect"));
-    }
-
-    /// <summary>Deletes one file after discovery has yielded it and before the pipeline reads it.</summary>
-    private sealed class DeletingDiscovery(IFileDiscoveryService inner, string toDelete) : IFileDiscoveryService
-    {
-        public ResolvedPathSpecs Resolve(IReadOnlyList<string> pathSpecs) => inner.Resolve(pathSpecs);
-
-        public async IAsyncEnumerable<string> DiscoverAsync(
-            ResolvedPathSpecs pathSpecs, IWarningSink warnings, [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            await foreach (var file in inner.DiscoverAsync(pathSpecs, warnings, cancellationToken))
-            {
-                if (file == toDelete)
-                {
-                    File.Delete(file);
-                }
-
-                yield return file;
-            }
-        }
     }
 
     private sealed class ThrowingPlanner : IPipelinePlanner

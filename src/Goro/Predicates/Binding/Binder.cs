@@ -10,8 +10,14 @@ namespace Goro.Predicates.Binding;
 /// whether it is definite, checks every rule the grammar does not express, interns warning sources
 /// and compiles patterns. Reports every independent error it finds.
 /// </summary>
+/// <remarks>
+/// The work is done by <see cref="Analysis"/>, one per tree. The pieces it uses each have a file of
+/// their own in the Binder folder: the error type and canonical shapes (<see cref="Bound"/>), the
+/// source interner (<see cref="Sources"/>), the bridge into the typed nodes (<see cref="TypedNodes"/>),
+/// pattern compilation (<see cref="Patterns"/>), and the diagnostics with their suggested rewrites
+/// (<see cref="BinderDiagnostics"/>).
+/// </remarks>
 public static class Binder
 {
-    public static StageResult<CompiledPredicate> Bind(SyntaxTree tree, IIdentifierCatalog catalog) =>
-        throw new NotImplementedException();
+    public static StageResult<CompiledPredicate> Bind(SyntaxTree tree, IIdentifierCatalog catalog) => Analysis.Run(tree, catalog);
 }

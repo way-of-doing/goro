@@ -42,6 +42,8 @@ In actuality, all identifiers have a namespace. If the namespace is not explicit
 
 Namespaces can also be hierarchically nested. For example, `foo::bar::baz` is a qualified identifier referring to `baz` in the namespace `foo::bar`.
 
+A leading `::` starts a name at the global namespace, where every namespace sits, so `::id3v2::TIT2` and `id3v2::TIT2` are the same identifier.
+
 An identifier is written without whitespace around its `::`, so `ape :: artist` is an error.
 
 Some of the names an identifier has to reach are not Goro's to choose. An [open namespace](../features/builtins/identifiers.md) derives the name it looks for from the identifier itself, and tag formats allow names that the rules above cannot spell -- an APE item key may contain spaces, as `Album Artist` does, and other formats permit further punctuation. For these, a part of an identifier may instead be written **as a quoted string**, in which case its contents are the name and the restrictions on identifier characters do not apply:

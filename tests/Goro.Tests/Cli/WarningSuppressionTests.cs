@@ -3,8 +3,7 @@ using Goro.Tests.TestSupport;
 namespace Goro.Tests.Cli;
 
 /// <summary>
-/// The "Warning suppression" class of docs/testing.md, for the rows that need no predicate, and the
-/// parsing of the global options. A suppressed warning was not produced, so a run that suppresses one
+/// The "Warning suppression" class of docs/testing.md, and the parsing of the global options. A suppressed warning was not produced, so a run that suppresses one
 /// must agree with a run where the condition never occurred in every channel at once: standard
 /// output, standard error and exit code.
 /// </summary>
@@ -104,6 +103,120 @@ public class WarningSuppressionTests
         Assert.That(without.ExitCode, Is.EqualTo(11));
         AssertIndistinguishable(with, without);
     }
+
+    // --- data warnings, from a predicate ---
+
+    // Every discovered file's name ends in ".mp3", so NUMBER(file::name) is never a number. The
+    // clean run is therefore the same predicate over a collection where the junk file has been
+    // renamed to one that the predicate settles before it ever converts the name.
+    private const string WarnsForJunkOnly = @"file::name == ""a.mp3"" OR (file::name == ""junk.mp3"" AND NUMBER(file::name) > 1)";
+
+    [Test]
+    public async Task NoWarnData_OverDataThatWarns_IsIndistinguishableFromTheSameRunOverCleanData()
+    {
+        _collection.Mp3("a.mp3");
+        var junk = _collection.Mp3("junk.mp3");
+
+        var warning = await RunAsync("list", "--strict-exit-code", $"--filter={WarnsForJunkOnly}", _collection.Root);
+        var suppressed = await RunAsync("list", "--strict-exit-code", "--no-warn=data", $"--filter={WarnsForJunkOnly}", _collection.Root);
+        File.Move(junk, _collection.PathOf("clean.mp3"));
+        var clean = await RunAsync("list", "--strict-exit-code", $"--filter={WarnsForJunkOnly}", _collection.Root);
+
+        Assert.That(warning.ExitCode, Is.EqualTo(10), "the scenario must actually warn");
+        Assert.That(warning.StdErr, Does.Contain(junk));
+        AssertIndistinguishable(suppressed, clean);
+        Assert.That(clean.ExitCode, Is.EqualTo(0));
+    }
+
+    // The conversion is consumed, and warns, before the false right operand settles the AND.
+    [Test]
+    public async Task NoWarnData_WhereADataWarningWouldHaveFiredAndNothingMatched_Returns20()
+    {
+        _collection.Mp3("track.mp3");
+        const string predicate = "--filter=NUMBER(file::name) > 1 AND file::size < 0";
+
+        var warning = await RunAsync("list", "--strict-exit-code", predicate, _collection.Root);
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=data", predicate, _collection.Root);
+
+        Assert.That(warning.ExitCode, Is.EqualTo(10), "the scenario must actually warn");
+        Assert.That(exitCode, Is.EqualTo(20));
+        Assert.That(stdOut, Is.Empty);
+        Assert.That(stdErr, Is.Empty);
+    }
+
+    [Test]
+    public async Task NoWarnData_WhereTheOnlyFilesPredicateWasUnusable_Returns20()
+    {
+        _collection.Mp3("track.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=data", "--filter=NUMBER(file::name) > 1", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(20));
+        Assert.That(stdOut, Is.Empty);
+        Assert.That(stdErr, Is.Empty);
+    }
+
+    // The good file's name warns; the unreadable one warns that it could not be read.
+    private const string WarnsBothWays = "--filter=NUMBER(file::name) > 1 OR file::duration >= 0";
+
+    [Test]
+    public async Task NoWarnData_WithAFilter_WhereAFileAlsoCouldNotBeRead_Still11_WithOnlyTheFileWarning()
+    {
+        var good = _collection.Mp3("good.mp3");
+        var bad = _collection.NotAudio("bad.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=data", WarnsBothWays, _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(11));
+        Assert.That(stdOut.Trim(), Is.EqualTo(good));
+        Assert.That(stdErr.Trim(), Does.StartWith($"goro: warning: {bad}: cannot be read: ").And.Not.Contain("\n"));
+    }
+
+    [Test]
+    public async Task NoWarnFile_WhereAFileCouldNotBeReadAndADataWarningFired_Returns10_WithOnlyTheDataWarning()
+    {
+        var good = _collection.Mp3("good.mp3");
+        _collection.NotAudio("bad.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=file", WarnsBothWays, _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(10));
+        Assert.That(stdOut.Trim(), Is.EqualTo(good));
+        Assert.That(stdErr.Trim(), Is.EqualTo($"goro: warning: {good}: cannot interpret the data of NUMBER(file::name)"));
+    }
+
+    [Test]
+    public async Task NoWarn_BareAllAndDataFile_WithAFilterThatWarnsBothWays_AreIdenticalInEveryChannel()
+    {
+        _collection.Mp3("good.mp3");
+        _collection.NotAudio("bad.mp3");
+
+        var bare = await RunAsync("list", "--strict-exit-code", "--no-warn", WarnsBothWays, _collection.Root);
+        var all = await RunAsync("list", "--strict-exit-code", "--no-warn=all", WarnsBothWays, _collection.Root);
+        var both = await RunAsync("list", "--strict-exit-code", "--no-warn=data,file", WarnsBothWays, _collection.Root);
+
+        Assert.That(bare.ExitCode, Is.EqualTo(0));
+        Assert.That(bare.StdErr, Is.Empty);
+        AssertIndistinguishable(all, bare);
+        AssertIndistinguishable(both, bare);
+    }
+
+    [Test]
+    public async Task NoWarnData_WithAFilterThatMeetsNoUnusableData_ChangesNothing()
+    {
+        _collection.Mp3("a.mp3");
+        _collection.Mp3("b.mp3");
+        _collection.NotAudio("bad.mp3");
+        const string predicate = @"--filter=file::name == ""a.mp3"" OR file::duration > 100000";
+
+        var without = await RunAsync("list", "--strict-exit-code", predicate, _collection.Root);
+        var with = await RunAsync("list", "--strict-exit-code", "--no-warn=data", predicate, _collection.Root);
+
+        Assert.That(without.ExitCode, Is.EqualTo(11));
+        AssertIndistinguishable(with, without);
+    }
+
+    // --- rejected command lines ---
 
     [TestCase("list")]
     [TestCase("hash")]

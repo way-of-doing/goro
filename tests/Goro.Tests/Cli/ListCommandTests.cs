@@ -106,7 +106,7 @@ public class ListCommandTests
 
         Assert.That(exitCode, Is.EqualTo(2));
         Assert.That(stdOut, Is.Empty);
-        Assert.That(stdErr, Does.Contain(missing));
+        Assert.That(stdErr, Does.StartWith("goro: error: ").And.Contain(missing));
     }
 
     [Test]

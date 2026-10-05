@@ -2,6 +2,7 @@ using Goro.Domain;
 using Goro.Hashing;
 using Goro.Output;
 using Goro.Pipeline;
+using Goro.Predicates.Binding;
 using Goro.Warnings;
 
 namespace Goro.Tests.Pipeline;
@@ -83,5 +84,18 @@ public class PipelinePlannerTests
         Assert.That(outcome.Output, Is.EqualTo(new ListResult("/music/does-not-exist.mp3")));
         Assert.That(outcome.Disposition, Is.EqualTo(FileDisposition.Matched));
         Assert.That(outcome.Warnings, Is.Empty);
+        Assert.That(stage, Is.InstanceOf<ListPipelineStage>());
+    }
+
+    [Test]
+    public void PlanList_WithAFilter_ReturnsThePredicateStageForThatPredicate()
+    {
+        var predicate = new CompiledPredicate("TRUE", new Literal<bool>(true), SourceTable.Empty);
+        var options = new ListOptions(["."], OutputFormat.Plain, predicate);
+
+        var stage = new PipelinePlanner(new FakeAudioHasher()).PlanList(options);
+
+        Assert.That(stage, Is.InstanceOf<PredicateStage>());
+        Assert.That(((PredicateStage)stage).Predicate, Is.SameAs(predicate));
     }
 }

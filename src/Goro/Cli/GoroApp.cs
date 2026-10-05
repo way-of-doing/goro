@@ -3,6 +3,7 @@ using Goro.Discovery;
 using Goro.Execution;
 using Goro.Hashing;
 using Goro.Pipeline;
+using Goro.Predicates.Identifiers;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -42,13 +43,14 @@ public sealed class GoroApp
         services.AddSingleton<IAudioHasher, TagLibAudioHasher>();
         services.AddSingleton<IPipelinePlanner, PipelinePlanner>();
         services.AddSingleton<IExecutor, ConcurrentExecutor>();
+        services.AddSingleton<IIdentifierCatalog>(BuiltInCatalog.Instance);
         services.AddTransient<HashCommand>();
         services.AddTransient<ListCommand>();
         return services;
     }
 
     public Task<int> RunAsync(IEnumerable<string> args, CancellationToken cancellationToken) =>
-        _app.RunAsync(NoWarnOption.AttachValues(args), cancellationToken);
+        _app.RunAsync(NoWarnOption.AttachValues(FilterOption.AttachValue(args)), cancellationToken);
 
     // Spectre reports a command line it cannot accept as a CommandAppException, by default with
     // exit code -1. docs/concepts/exit-codes.md gives a rejected command line 2; anything else that

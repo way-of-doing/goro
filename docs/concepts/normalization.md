@@ -100,8 +100,8 @@ invariant rules; in literal mode it is case-sensitive.
 
 A pattern therefore cannot match anything normalization removes or changes in the subject. In
 normalized mode `motö` and `straße` match nothing, while `mot` and `strasse` match "Motörhead" and
-"Straße"; and since the prepared subject is lowercase, a pattern such as `\p{Lu}` matches only in
-literal mode.
+"Straße"; and since the match ignores case, `\p{Lu}` and `[A-Z]` match a letter of either case,
+so a pattern that tells case apart works only in literal mode.
 
 ### Literals
 

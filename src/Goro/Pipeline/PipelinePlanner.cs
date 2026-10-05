@@ -9,5 +9,5 @@ public sealed class PipelinePlanner(IAudioHasher audioHasher) : IPipelinePlanner
         new HashPipelineStage(audioHasher, options.Algorithm);
 
     public IPipelineStage<string, FileOutcome<ListResult>> PlanList(ListOptions options) =>
-        new ListPipelineStage();
+        options.Filter is { } filter ? new PredicateStage(filter) : new ListPipelineStage();
 }

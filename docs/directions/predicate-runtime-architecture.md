@@ -176,3 +176,64 @@ crosses each seam, a code skeleton with tests realises it, and `architecture.md`
   `dotnet test`: 1214 passed.
 
   Next step: wave 2, the binder (G4) and the `--filter` integration with its end-to-end tests.
+
+- 2026-10-05 -- Wave 2 built and collected: the binder (G4), and `--filter` on `goro list`. The
+  37 command-line tests the `--filter` worker wrote, skipped until the binder existed, were turned
+  on at collection and passed first time. `dotnet test`: 1664 passed, and one test is skipped on
+  purpose (see the last item). Decisions:
+  - **The binder is one recursive pass** with three entry points: a condition (the root, or a
+    logical operand), an operand (where modifiers are folded into the operator), and a value. A
+    failed sub-expression binds to the error type, which counts as definite and silences every
+    check involving it. Unknown names and functions, and `NULL`, produce it. Every independent
+    error is reported, in text order.
+  - **The bridge to typed nodes** is `Apply` with small `IBoundExpressionFunc`s wherever the result
+    is generic, and type switches wherever both types are concrete.
+  - **Sources.** Only identifier references and conversions are interned, since only they can be
+    where an unusable occurrence is born. Identifiers are numbered by `IdentifierName` equality.
+    Every node gets a canonical shape, so that a conversion's identity covers its whole argument.
+    Parentheses and modifiers add nothing to a shape, and raw and quoted spellings of one string
+    are one shape.
+  - **Ranges.** Endpoints must agree as written, so `60..120kb` is an error whatever is being
+    tested, and the diagnostic offers `60kb..120kb`. A range of plain numbers takes the subject's
+    bytecount or duration type. Endpoints are prepared once, by the operator's order.
+  - **The numeric literal exception sees through modifiers**, so `ALL(90) < file::duration`
+    compares with ninety seconds.
+  - **`!=` gets one diagnostic per comparison**, offering `NOT l == r` and `ALL(…)` around each
+    operand that needs it. `NUMBER(number)` and `STRING(string)` are elided. `NUMBER("5")` stays a
+    conversion.
+  - **Diagnostics offer rewrites built from the user's text.** The closest identifier, namespace or
+    function is found by optimal string alignment distance (at most 1 edit for names up to 3
+    characters, 2 up to 6, 3 beyond). `year == "2000"` offers `year == 2000`, and
+    `id3v2::raw::TRCK > 9` offers `NUMBER(id3v2::raw::TRCK) > 9`. `year == NULL` offers
+    `year IS ABSENT`. A misplaced modifier offers the expression without it.
+  - **Patterns** are compiled at bind time. A malformed one is reported at the engine's offset,
+    mapped through the raw string's doubled quotes. An unsupported construct names its family,
+    and canaries cover ten patterns across the four families.
+  - **`--filter`** compiles the predicate before the pathspecs are resolved, and the first
+    rejection ends the run with 2, having touched no file. Predicate and pathspec errors now share
+    the `goro: error:` prefix. A predicate error is printed as the message, the predicate echoed
+    with the span marked under it (columns counted in grapheme clusters, so East Asian wide
+    characters leave the marker short, an accepted limitation), and each suggestion as the whole
+    predicate rewritten. Spectre cut short a separately written `--filter` value beginning with
+    `-`, so `--filter X` is rewritten to `--filter=X` before parsing, as `--no-warn` already is.
+  - **`PredicateStage`** returns T as listed, and F and U as examined but not listed. An
+    unreadable file gets its one file warning, worded as `goro hash` words it (D3). Any other
+    exception fails the run.
+  - **A leading `::` starts a name at the global namespace**, where every namespace sits, so
+    `::file::size` is `file::size`. PJ preferred this wording to calling the `::` redundant, so
+    that a future scoping feature could give an unrooted name a relative meaning without changing
+    any rooted one. predicates.md says so, and testing.md has the row.
+  - **Waiting for the tag line:** testing.md's D3 row written with `artist`, and "the same file
+    under a predicate mentioning a tag identifier". Their counterparts use `file::duration`.
+  - **A spec error found and fixed.** normalization.md said "`\p{Lu}` matches only in literal
+    mode". But normalized mode matches with `IgnoreCase`, and under it .NET 10 lets `\p{Lu}` and
+    `[A-Z]` match both cases, with or without the non-backtracking engine. PJ chose to fix the doc
+    rather than the matching, since matching the lowercased subject without `IgnoreCase` would
+    break `^MOT` against "Motörhead". The doc now says case classes match either case in
+    normalized mode, so a pattern that tells case apart works only in literal mode, and a test
+    asserts this.
+
+  `dotnet test`: 1668 passed.
+
+  Next step: describe the architecture in architecture.md and implementation.md, correct the
+  line-worker note on worktrees, and remove the collected worktrees.
