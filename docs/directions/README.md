@@ -139,3 +139,37 @@ Three things make a phase safe to split:
 Workers do not commit. The coordinator collects each worker's changes from its worktree, runs the
 whole test suite, records the workers' decisions and open questions in the brief's Log, and stops
 for review before anything is committed, as every session does.
+
+### Choosing each worker's model
+
+Before choosing a model, the coordinator asks whether a piece is worth fanning out at all. Every
+worker starts cold, reading `AGENTS.md`, the brief, the contract and the documents they point to,
+and for a small piece that costs more than the piece itself; such a piece is better done by the
+coordinator.
+
+A worker runs on the coordinator's model unless the coordinator names another when it starts the
+worker, and the choice is made piece by piece, by what the piece risks rather than by how large it
+is. Sonnet is the default. A piece goes to Opus when any of these holds:
+
+- **Its mistakes would be silent.** It implements behaviour where a plausible wrong version still
+  gives well-formed answers and passes plausible tests: the areas [testing](../testing.md) gives
+  classes of their own, such as quantifiers, absent against unusable, normalization, and what the
+  tag library actually does.
+- **Nothing independent checks it.** A refactor judged by an unchanged test suite has its check; a
+  worker writing both the code and the tests that judge it does not, since a misunderstanding lands
+  in both.
+- **It leaves judgement to the worker.** The task message is the plan, and a worker is trusted to
+  notice when the plan is wanting and stop. The more latitude a piece leaves, the more rests on that.
+- **It writes normative prose.** Specification and rationale text stays with Opus, or with the
+  coordinator.
+
+Haiku is worth considering only for a purely mechanical piece that the build and the test suite
+check completely.
+
+The plan presented before a wave gives each piece's model with a line saying why, so the choice is
+reviewed with the rest of the plan. A worker's model cannot change while it runs. Where a piece has
+an independent check, a worker that stops with questions it should not have needed, or whose work
+needs substantial rework, can be started again on Opus; where a piece has none, starting cheap is
+not an option, since its failure would go unnoticed. The Log entry for each wave records the model
+each piece ran on and how much rework it needed, so that this guidance is adjusted against
+experience rather than expectation.

@@ -31,11 +31,17 @@ Goro hashes today takes in every metadata block and changes with every tag edit.
   exist in the wild. Confirm the boundaries hold with them present.
 - How the boundary is found: by parsing the metadata block chain ourselves, or through anything
   TagLib exposes.
+- Damaged tag data, which is definitely part of this line. Whatever
+  [sources-and-fields](sources-and-fields.md) settles about what a damaged tag resolves to has to
+  hold for FLAC too: repeat its probe on damaged Vorbis comment blocks, on other damaged metadata
+  blocks, and on the stray Id3v2 and APE tags above, and confirm that each yields what the
+  specification says.
 
 ## Done when
 
 The answers are recorded in the rationale, `goro hash` says what it hashes for a FLAC file, the
 pathspec documentation admits `.flac`, and the code hashes FLAC files to a value that survives
-tag edits, with tests that edit tags and compare hashes as the probe does.
+tag edits, with tests that edit tags and compare hashes as the probe does, and with tests that
+pin what damaged tag data in a FLAC file resolves to.
 
 ## Log

@@ -36,12 +36,16 @@ number and CRC are inside the range.
   TagLib reads in each case, and whether Goro hashes every stream or declines the file.
 - How the packets are read: through TagLib's Ogg classes, if they expose enough, or by a reader
   of our own.
+- Damaged tag data, which is definitely part of this line. Whatever
+  [sources-and-fields](sources-and-fields.md) settles about what a damaged tag resolves to has to
+  hold for Ogg too: repeat its probe on damaged comment packets, for both codecs and including a
+  comment spread over several pages, and confirm that each yields what the specification says.
 
 ## Done when
 
 The answers are recorded in the rationale, `goro hash` says what it hashes for an Ogg file, the
 pathspec documentation admits `.ogg` and `.opus`, and the code hashes both codecs, under either
 extension, to a value that survives tag edits, with tests that edit tags and compare hashes as the
-probe does.
+probe does, and with tests that pin what damaged tag data in an Ogg file resolves to.
 
 ## Log

@@ -1,6 +1,6 @@
 ---
 name: line-worker
-description: Carries out one bounded piece of a line of development from docs/directions/, in its own git worktree, and reports back without committing. Use only when explicitly asked to fan a line's work out to workers. The worktree the harness gives it is removed if it stops with nothing changed, which is its state at a plan checkpoint, so a worker asked to stop at one writes something first (see the body).
+description: Carries out one bounded piece of a line of development from docs/directions/, in its own git worktree, and reports back without committing. Use only when explicitly asked to fan a line's work out to workers. The worktree the harness gives it is removed if it stops with nothing changed, which is its state at a plan checkpoint, so a worker asked to stop at one writes something first (see the body). Choose its model per piece when starting it, as docs/directions/README.md describes under "Choosing each worker's model".
 isolation: worktree
 model: inherit
 disallowedTools: Agent
