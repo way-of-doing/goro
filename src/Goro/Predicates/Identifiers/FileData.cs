@@ -9,9 +9,9 @@ namespace Goro.Predicates.Identifiers;
 public sealed class FileData
 {
     /// <param name="path">The file's full path, as discovered.</param>
-    public FileData(string path) => throw new NotImplementedException();
+    public FileData(string path) => Path = path;
 
-    public string Path => throw new NotImplementedException();
+    public string Path { get; }
 
     /// <exception cref="UnreadableFileException">The facet cannot be loaded.</exception>
     public T Get<T>(FileFacet<T> facet) where T : notnull => throw new NotImplementedException();
