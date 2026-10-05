@@ -47,13 +47,13 @@ public class ListCommandTests
     }
 
     [Test]
-    public async Task List_InvalidOutputValue_ReturnsNonZeroExitCode()
+    public async Task List_InvalidOutputValue_IsRejectedWith2()
     {
         var app = GoroAppFactory.Create();
 
         var (exitCode, _, _) = await app.RunCapturedAsync("list", "-o", "yaml", _tempDir.FullName);
 
-        Assert.That(exitCode, Is.Not.EqualTo(0));
+        Assert.That(exitCode, Is.EqualTo(2));
     }
 
     [Test]
@@ -106,7 +106,7 @@ public class ListCommandTests
 
         Assert.That(exitCode, Is.EqualTo(2));
         Assert.That(stdOut, Is.Empty);
-        Assert.That(stdErr, Does.Contain(missing));
+        Assert.That(stdErr.TrimEnd(), Is.EqualTo($"goro: error: Nothing at `{missing}`, goro!"));
     }
 
     [Test]

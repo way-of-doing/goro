@@ -11,18 +11,21 @@ namespace Goro.Execution;
 /// writes its result into a channel so this method can still stream results to the
 /// caller as they complete, rather than buffering the whole batch.
 ///
-/// A file that fails is reported to standard error and does not stop the rest of
-/// the batch — at the scale Goro targets (100K+ files), one bad file shouldn't abort
-/// an otherwise-successful run.
+/// A file that cannot be read does not stop the batch: the stage says so in the file's
+/// <see cref="FileOutcome{TResult}"/>, which is recorded in the run's tally like any other, warnings
+/// and all. Nothing here catches exceptions, because a stage that throws has not met a bad file but
+/// a defect, and the run cannot be trusted to complete.
 /// </summary>
 public sealed class ConcurrentExecutor(int? maxDegreeOfParallelism = null) : IExecutor
 {
     private readonly int _maxDegreeOfParallelism = maxDegreeOfParallelism ?? Environment.ProcessorCount;
 
     public async IAsyncEnumerable<TResult> ExecuteAsync<TResult>(
-        IPipelineStage<string, TResult> pipeline,
+        IPipelineStage<string, FileOutcome<TResult>> pipeline,
         IAsyncEnumerable<string> filePaths,
+        RunTally tally,
         [EnumeratorCancellation] CancellationToken cancellationToken)
+        where TResult : class
     {
         var channel = Channel.CreateUnbounded<TResult>();
 
@@ -39,14 +42,11 @@ public sealed class ConcurrentExecutor(int? maxDegreeOfParallelism = null) : IEx
                     },
                     async (filePath, token) =>
                     {
-                        try
+                        var outcome = await pipeline.ExecuteAsync(filePath, token);
+                        tally.Record(outcome);
+                        if (outcome.Output is { } output)
                         {
-                            var result = await pipeline.ExecuteAsync(filePath, token);
-                            await channel.Writer.WriteAsync(result, token);
-                        }
-                        catch (Exception ex) when (ex is not OperationCanceledException)
-                        {
-                            await Console.Error.WriteLineAsync($"goro: {filePath}: {ex.Message}");
+                            await channel.Writer.WriteAsync(output, token);
                         }
                     });
             }
@@ -61,6 +61,7 @@ public sealed class ConcurrentExecutor(int? maxDegreeOfParallelism = null) : IEx
             yield return result;
         }
 
+        // Rethrows whatever stopped the workers, so a failed run is never mistaken for a complete one.
         await pump;
     }
 }

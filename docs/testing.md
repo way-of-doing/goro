@@ -181,8 +181,9 @@ tell an exhaustive implementation from a short-circuiting one.
 **Universal quantification is non-vacuous.** `ALL(x)` in any operator is false for an absent `x`,
 where ordinary set semantics would make it true.
 
-**Unusable data never selects a file.** A predicate that evaluates to true must be true whatever
-the data that could not be read had held. Two properties together establish it, and both are
+**Unusable data never selects a file by default.** A predicate that evaluates to true must be true
+whatever the data that could not be read had held, unless it says otherwise with a state test or
+`FALLBACK()`. Two properties together establish it, and both are
 suited to generated predicates rather than hand-picked ones: a predicate without `NOT` selects
 exactly the same files whether unusable results are kept or read as false, and a predicate with
 `NOT` never selects a file that the same predicate would reject for some usable replacement of its
@@ -315,6 +316,9 @@ string written directly after the operator.
 | `5mb` against `5m`, and `1h10m` against `10 kb` and `1h 10m` | The longest token must win, and whitespace must not appear inside a literal |
 | `1..100`, `1.5..2`, and `1.` | The range operator must survive the lexer, and a trailing period must be rejected |
 | A no-break space and an ideographic space between two tokens | Both are whitespace, and the predicate parses as if a plain space had been written |
+| `ape :: artist`, `ape:: artist` and `:: artist` | Each a syntax error, an identifier being written without whitespace around its `::`; the diagnostic offers the identifier without it. `NOT ::x` is still `NOT` applied to `::x` |
+| `::"artist"` | The identifier `::artist`: a quoted part may follow any `::`, including a leading one |
+| `::file::size` and `file::size` in one predicate | One identifier and one warning source: a leading `::` starts the name at the global namespace, where every namespace sits. Each warning still quotes the spelling that produced it |
 | `NOT::x == 1`, and `and::x` | The first is `NOT` applied to `::x == 1`; the second is an error, a reserved word never beginning an identifier unless it follows a leading `::` |
 | `(ALL(genre)) == "x"` and `COUNT((ALL(genre)))` | The first is valid, the same predicate as `ALL(genre) == "x"`; the second is rejected exactly as `COUNT(ALL(genre))` is. Parentheses only group, around a modifier as anywhere else |
 | `genre != "x"`, `LITERALLY(genre) != "x"`, `FALLBACK(genre, "") != "x"`, `ALL(a) != b` and `file::extension != "flac"` | Each is an error: `LITERALLY` is not a quantifier, a function of an identifier is no more definite than the identifier, every operand that is not definite needs a quantifier of its own, and `file::extension` can be absent, unlike the definite identifiers beside it. The diagnostic for the first must offer both `NOT genre == "x"` and `ALL(genre) != "x"` |
@@ -433,6 +437,7 @@ single-condition test exercises.
 | A predicate mentioning only `file::path`, `file::name` or `file::extension`, against a file that cannot be opened at all | Must **not** warn, and must evaluate: nothing was read |
 | A predicate mentioning only `file::size`, against a file whose tags cannot be read | Must **not** warn: nothing needed the tags, so nothing failed |
 | The same file under a predicate mentioning a tag identifier | Must warn, and the file must not be listed |
+| A predicate that meets uninterpretable data in a file and then finds the file cannot be read, such as `NUMBER(file::name) > 1 OR artist == "x"` | One file warning and no data warning: a file that was not processed has nothing to say about its data |
 | `goro list` with no filter, over a file that cannot be opened | Must list it and must not warn, the command having needed nothing but the path |
 | `goro hash` over an unreadable file, in both output formats | The row must appear, with `-` in plain and `null` in JSON. Omitting the row is precisely the failure this scenario exists to catch |
 | `goro list --filter` over an unreadable file | The file must not be listed |

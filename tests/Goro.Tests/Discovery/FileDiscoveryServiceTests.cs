@@ -1,4 +1,7 @@
 using Goro.Discovery;
+using Goro.Messages;
+using Goro.Tests.TestSupport;
+using Goro.Warnings;
 
 namespace Goro.Tests.Discovery;
 
@@ -6,12 +9,14 @@ public class FileDiscoveryServiceTests
 {
     private DirectoryInfo _tempDir = null!;
     private FileDiscoveryService _service = null!;
+    private RecordingWarningSink _warnings = null!;
 
     [SetUp]
     public void SetUp()
     {
         _tempDir = Directory.CreateTempSubdirectory("goro-tests-");
         _service = new FileDiscoveryService();
+        _warnings = new RecordingWarningSink();
     }
 
     [TearDown]
@@ -21,7 +26,7 @@ public class FileDiscoveryServiceTests
     }
 
     private Task<List<string>> DiscoverAsync(params string[] pathSpecs) =>
-        _service.DiscoverAsync(_service.Resolve(pathSpecs), CancellationToken.None).ToListAsync().AsTask();
+        _service.DiscoverAsync(_service.Resolve(pathSpecs), _warnings, CancellationToken.None).ToListAsync().AsTask();
 
     private string WriteFile(params string[] relativePath)
     {
@@ -97,6 +102,7 @@ public class FileDiscoveryServiceTests
 
         var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([missing]));
         Assert.That(ex.PathSpec, Is.EqualTo(missing));
+        Assert.That(ex.Error, Is.EqualTo(new ErrorMessage.PathSpecNotFound(new Code(missing))));
     }
 
     [Test]
@@ -118,7 +124,8 @@ public class FileDiscoveryServiceTests
             Assume.That(() => Directory.EnumerateFileSystemEntries(locked.FullName).Any(), Throws.Exception,
                 "permissions are not enforced for this user");
 
-            Assert.Throws<PathSpecException>(() => _service.Resolve([locked.FullName]));
+            var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([locked.FullName]));
+            Assert.That(ex.Error, Is.EqualTo(new ErrorMessage.PathSpecNotListable(new Code(locked.FullName))));
         }
         finally
         {
@@ -203,6 +210,7 @@ public class FileDiscoveryServiceTests
 
         var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([pattern]));
         Assert.That(ex.PathSpec, Is.EqualTo(pattern));
+        Assert.That(ex.Error, Is.EqualTo(new ErrorMessage.GlobWithSeveralStars(new Code(pattern))));
     }
 
     [TestCase("*", "c.mp3")]
@@ -212,7 +220,10 @@ public class FileDiscoveryServiceTests
     {
         WriteFile("album", "c.mp3");
 
-        Assert.Throws<PathSpecException>(() => _service.Resolve([InTemp(directory, name)]));
+        var pathSpec = InTemp(directory, name);
+
+        var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([pathSpec]));
+        Assert.That(ex.Error, Is.EqualTo(new ErrorMessage.GlobWildcardBeforeLastComponent(new Code(pathSpec))));
     }
 
     [Test]
@@ -254,5 +265,108 @@ public class FileDiscoveryServiceTests
         var results = await DiscoverAsync(InTemp("*.mp3"), mp3A);
 
         Assert.That(results, Is.EqualTo(new[] { mp3A }));
+    }
+
+    [Test]
+    [Platform(Exclude = "Win")]
+    public async Task DiscoverAsync_SubdirectoryThatCannotBeListed_WarnsOnceAndWalksEverythingElse()
+    {
+        var before = WriteFile("a.mp3");
+        var sibling = WriteFile("other", "b.mp3");
+        var nested = WriteFile("other", "deeper", "c.mp3");
+        WriteFile("locked", "hidden.mp3");
+        var locked = InTemp("locked");
+        File.SetUnixFileMode(locked, UnixFileMode.None);
+        try
+        {
+            Assume.That(() => Directory.EnumerateFileSystemEntries(locked).Any(), Throws.Exception,
+                "permissions are not enforced for this user");
+
+            var results = await DiscoverAsync(_tempDir.FullName);
+
+            Assert.That(results, Is.EquivalentTo(new[] { before, sibling, nested }));
+            var warning = _warnings.Warnings.Single();
+            Assert.That(warning, Is.TypeOf<FileWarning>());
+            Assert.That(warning.Path, Is.EqualTo(Path.GetFullPath(locked)));
+        }
+        finally
+        {
+            File.SetUnixFileMode(locked, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+    }
+
+    [Test]
+    public async Task DiscoverAsync_EverythingListable_DoesNotWarn()
+    {
+        WriteFile("a.mp3");
+        WriteFile("album", "b.mp3");
+
+        await DiscoverAsync(_tempDir.FullName, InTemp("*.mp3"));
+
+        Assert.That(_warnings.Warnings, Is.Empty);
+    }
+
+    // Symbolic links are distinct filenames (docs/concepts/pathspecs.md), and a directory walk has
+    // always followed a link to a directory.
+    [Test]
+    [Platform(Exclude = "Win")]
+    public async Task DiscoverAsync_SymbolicLinkToADirectory_IsWalkedLikeTheDirectory()
+    {
+        var real = WriteFile("real", "a.mp3");
+        Directory.CreateSymbolicLink(InTemp("link"), InTemp("real"));
+
+        var results = await DiscoverAsync(_tempDir.FullName);
+
+        Assert.That(results, Is.EquivalentTo(new[] { real, Path.GetFullPath(InTemp("link", "a.mp3")) }));
+    }
+
+    // A link back up the walk is passed over: each real file is found once, by its path without the
+    // loop, and a cycle is not a warning.
+    [TestCase("up", "..")]
+    [TestCase("self", ".")]
+    [Platform(Exclude = "Win")]
+    public async Task DiscoverAsync_SymbolicLinkBackUpTheWalk_IsNotFollowed(string linkName, string relativeTarget)
+    {
+        var top = WriteFile("a.mp3");
+        var nested = WriteFile("sub", "b.mp3");
+        Directory.CreateSymbolicLink(InTemp("sub", linkName), Path.GetFullPath(Path.Combine(InTemp("sub"), relativeTarget)));
+
+        var results = await DiscoverAsync(_tempDir.FullName);
+
+        Assert.That(results, Is.EquivalentTo(new[] { top, nested }));
+        Assert.That(_warnings.Warnings, Is.Empty);
+    }
+
+    // Two links to an ancestor would double the directories to list at every level until the
+    // operating system refused the path; with the guard, the walk finishes at once.
+    [Test]
+    [CancelAfter(10_000)]
+    [Platform(Exclude = "Win")]
+    public async Task DiscoverAsync_TwoSymbolicLinksToAnAncestor_FinishQuickly(CancellationToken cancellationToken)
+    {
+        var top = WriteFile("a.mp3");
+        var nested = WriteFile("sub", "deeper", "b.mp3");
+        Directory.CreateSymbolicLink(InTemp("sub", "deeper", "first"), _tempDir.FullName);
+        Directory.CreateSymbolicLink(InTemp("sub", "deeper", "second"), InTemp("sub"));
+
+        var results = await _service.DiscoverAsync(_service.Resolve([_tempDir.FullName]), _warnings, cancellationToken).ToListAsync(cancellationToken);
+
+        Assert.That(results, Is.EquivalentTo(new[] { top, nested }));
+        Assert.That(_warnings.Warnings, Is.Empty);
+    }
+
+    // A link to a directory that is not above it on the walk is followed, even when the walk also
+    // reaches that directory directly.
+    [Test]
+    [Platform(Exclude = "Win")]
+    public async Task DiscoverAsync_SymbolicLinkToASiblingBranch_IsFollowed()
+    {
+        var real = WriteFile("music", "a.mp3");
+        Directory.CreateDirectory(InTemp("shortcuts"));
+        Directory.CreateSymbolicLink(InTemp("shortcuts", "music"), InTemp("music"));
+
+        var results = await DiscoverAsync(_tempDir.FullName);
+
+        Assert.That(results, Is.EquivalentTo(new[] { real, Path.GetFullPath(InTemp("shortcuts", "music", "a.mp3")) }));
     }
 }

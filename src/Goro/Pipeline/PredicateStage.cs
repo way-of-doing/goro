@@ -1,0 +1,65 @@
+using Goro.Domain;
+using Goro.Predicates.Binding;
+using Goro.Predicates.Evaluation;
+using Goro.Predicates.Identifiers;
+using Goro.Predicates.Values;
+using Goro.Warnings;
+
+namespace Goro.Pipeline;
+
+/// <summary>
+/// Lists the files that satisfy a predicate: <c>goro list --filter</c>. See docs/commands/list.md.
+///
+/// The predicate keeps true, false and unusable apart, and this is where <c>list</c> decides what
+/// each means: a true file is listed, a false or unusable one is not, and all three were examined.
+/// A file found unreadable while the predicate was being evaluated is not listed, is not counted as
+/// examined, and reports its one file warning and nothing else, any data warning met on the way
+/// being dropped (decision D3 of docs/design/predicate-runtime.md).
+/// </summary>
+/// <remarks>
+/// The compiled predicate is shared by every concurrent invocation; what belongs to one file, its
+/// data as it is loaded and the sources it has reported, lives in an evaluation context made for
+/// that file and dropped with it. Evaluation is synchronous (decision D2) and runs on whichever
+/// thread-pool thread the executor gave this invocation.
+///
+/// Only <see cref="UnreadableFileException"/> is caught. Anything else, such as the
+/// <see cref="NotSupportedException"/> of a tag identifier that cannot be read yet, is a defect
+/// rather than a bad file, and fails the run.
+/// </remarks>
+public sealed class PredicateStage(CompiledPredicate predicate) : IPipelineStage<string, FileOutcome<ListResult>>
+{
+    public CompiledPredicate Predicate { get; } = predicate;
+
+    public Task<FileOutcome<ListResult>> ExecuteAsync(string filePath, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Decide(filePath));
+    }
+
+    private FileOutcome<ListResult> Decide(string filePath)
+    {
+        var context = new EvaluationContext(new FileData(filePath), Predicate.Sources.Count);
+
+        Truth truth;
+        try
+        {
+            truth = Predicate.Evaluate(context);
+        }
+        catch (UnreadableFileException ex)
+        {
+            return FileOutcome<ListResult>.Unreadable(FileWarningFor(filePath, ex));
+        }
+
+        var warnings = context.Reported.Select(origin => new DataWarning(filePath, origin.Text));
+        return truth == Truth.True
+            ? FileOutcome<ListResult>.Matched(new ListResult(filePath), warnings)
+            : FileOutcome<ListResult>.Unmatched(warnings);
+    }
+
+    // The cause is described from what the file system or the tag library threw, where there is
+    // such a thing, so that a file gone or refused reads the same here as under goro hash.
+    private static FileWarning FileWarningFor(string filePath, UnreadableFileException exception) =>
+        exception.InnerException is { } inner
+            ? FileWarning.From(filePath, inner)
+            : new FileWarning(filePath, exception.Reason);
+}

@@ -42,13 +42,17 @@ In actuality, all identifiers have a namespace. If the namespace is not explicit
 
 Namespaces can also be hierarchically nested. For example, `foo::bar::baz` is a qualified identifier referring to `baz` in the namespace `foo::bar`.
 
+A leading `::` starts a name at the global namespace, where every namespace sits, so `::id3v2::TIT2` and `id3v2::TIT2` are the same identifier.
+
+An identifier is written without whitespace around its `::`, so `ape :: artist` is an error.
+
 Some of the names an identifier has to reach are not Goro's to choose. An [open namespace](../features/builtins/identifiers.md) derives the name it looks for from the identifier itself, and tag formats allow names that the rules above cannot spell -- an APE item key may contain spaces, as `Album Artist` does, and other formats permit further punctuation. For these, a part of an identifier may instead be written **as a quoted string**, in which case its contents are the name and the restrictions on identifier characters do not apply:
 
 ```
 ape::"album artist" == "Various Artists"
 ```
 
-A quoted part must be preceded by `::`, so the first part of an identifier is never quoted; a string at the start of an expression is always a string value. Quoting is available wherever it is useful rather than only where it is necessary, so `ape::"artist"` is permitted and means exactly the same as `ape::artist`: the two are one identifier written two ways, not two identifiers. Escapes inside a quoted part follow the same rules as in any other string, so a name containing a double quote or a backslash can be written by preceding it with a backslash.
+A quoted part must be preceded by `::`, so a string at the start of an expression is always a string value. Quoting is available wherever it is useful rather than only where it is necessary, so `ape::"artist"` is permitted and means exactly the same as `ape::artist`: the two are one identifier written two ways, not two identifiers. Escapes inside a quoted part follow the same rules as in any other string, so a name containing a double quote or a backslash can be written by preceding it with a backslash.
 
 For a list of predefined namespaces and identifiers within them together with a description of each one, see [built-in identifiers](../features/builtins/identifiers.md). A namespace is either _closed_, meaning that the identifiers it contains are known in advance, or _open_, meaning that it additionally admits identifiers whose names are derived from the tag data of the file being examined. Naming a namespace that Goro does not define is an error, and so is referring to an identifier that is not defined in a closed namespace; an identifier in an open namespace is always accepted, and simply resolves to an absent value when the file holds no data for it.
 
@@ -646,7 +650,7 @@ The grammar admits a modifier wherever an `operand` can occur, and since the tai
 ### Identifiers and names
 
 ```ebnf
-identifier      = [ "::" ] name { "::" name_part } ;
+identifier      = ( name | "::" name_part ) { "::" name_part } ;
 name_part       = name | string ;
 name            = letter { letter | digit | "_" } ;
 
@@ -694,9 +698,11 @@ two_digits      = digit digit ;
 
 ### Tokens
 
-The rules for dividing predicate text into tokens are given under [Tokens and whitespace](#tokens-and-whitespace) and are not restated here. Three consequences bear on the productions above.
+The rules for dividing predicate text into tokens are given under [Tokens and whitespace](#tokens-and-whitespace) and are not restated here. Four consequences bear on the productions above.
 
 The `bytecount`, `duration` and `raw_string` productions are each a single token, so no whitespace may appear anywhere within them, including between a `raw_string`'s `r` and its opening quote.
+
+An `identifier` is made of several tokens, but no whitespace may appear between them.
 
 Inside a `raw_string`, a pair of quotes is taken as the escaped quote whenever two appear together, so the string ends only at a quote standing alone. `r"a""b"` is therefore the three characters `a"b`, and a raw string holding a single quote is written with four in a row.
 

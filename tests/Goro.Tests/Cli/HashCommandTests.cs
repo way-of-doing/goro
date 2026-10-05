@@ -47,13 +47,14 @@ public class HashCommandTests
     }
 
     [Test]
-    public async Task Hash_InvalidAlgorithmValue_ReturnsNonZeroExitCode()
+    public async Task Hash_InvalidAlgorithmValue_IsRejectedWith2()
     {
         var app = GoroAppFactory.Create();
 
-        var (exitCode, _, _) = await app.RunCapturedAsync("hash", "-a", "md6", _mp3File);
+        var (exitCode, _, stdErr) = await app.RunCapturedAsync("hash", "-a", "md6", _mp3File);
 
-        Assert.That(exitCode, Is.Not.EqualTo(0));
+        Assert.That(exitCode, Is.EqualTo(2));
+        Assert.That(stdErr.TrimEnd(), Is.EqualTo("goro: error: No algorithm `md6` -- pick from md5, sha1, goro!"));
     }
 
     [TestCase("plain")]

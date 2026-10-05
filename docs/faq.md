@@ -133,6 +133,12 @@ condition Goro exists to find, and silencing it in a scheduled run removes the o
 would report a disc going bad. The two categories are separate so that the noisy condition you
 have accepted need not bury the quiet one you have not.
 
+### Why did `--no-warn data` silence everything, or complain about a pathspec?
+
+A category is attached to the option with `=`, as in `--no-warn=data`. Written with a space, the
+option stands alone and suppresses every category, and `data` is read as a pathspec, which is an
+error unless something of that name exists.
+
 ## Scripting
 
 ### How do I act on the exit code in a script?
