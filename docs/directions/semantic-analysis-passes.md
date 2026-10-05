@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: focused
 touches: architecture.md, implementation.md, src/Goro/Predicates/Binding, tests/Goro.Tests/Predicates/Binding
 after:
-branch:
+branch: line/semantic-analysis-passes
 ---
 # Bind, analyse, lower
 
