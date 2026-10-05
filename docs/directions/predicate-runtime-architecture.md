@@ -77,3 +77,102 @@ crosses each seam, a code skeleton with tests realises it, and `architecture.md`
   is G1, G2 + G3 (one worker), G5, G6 and G7; wave 2 is G4 and the `--filter` integration.
 
   Next step: PJ's review of the contract, then commit it and start wave 1.
+
+- 2026-10-05 -- Wave 1 built and collected: normalization (G1), lexer and parser (G2 + G3), the
+  evaluator (G5), warnings, run outcome and the global options (G6), and the identifier catalog
+  with the `file` namespace (G7). Each worker posted a plan at a checkpoint before writing code;
+  the coordinator answered its questions and collected its changes. The full suite then ran
+  1207 tests, all passing, none skipped. The five regex tests the evaluator had to skip without
+  normalization were turned on at collection and pass. Decisions taken along the way:
+  - **G1.** Literal and normalized preparation exactly as normalization.md says, and total. .NET's
+    `string.Normalize` throws on U+FFFE, so text is normalized around it; U+FFFE is a stable code
+    point under UAX #15, so this is exactly Unicode's result. .NET's invariant casing leaves `ı`
+    and `İ` alone, so step 5 overrides them to `i`. The Default_Ignorable_Code_Point table is from
+    UCD 16.0, which matches .NET 10's own tables. NFKD, NFC and casing come from the host's ICU.
+    The `ё` rule reads "after" as the nearest preceding character that is not a mark, as the Latin
+    and Greek rule does. Preparation is not idempotent: क + U+0345 + ा gives a different result on
+    a second pass, so every datum is prepared exactly once. The cost is on par with the scratchpad
+    candidate: about 110 ns for a mixed corpus, 30–40 ns for ASCII, with half the allocation for
+    non-ASCII text. Span-based `TryNormalize` measured slower and is not used. NUnit's adapter
+    silently drops test cases whose names contain U+FFFE or U+FFFF; `EscapedTestCase` works
+    around it.
+  - **G2 + G3.**
+    - The lexer is strict maximal munch: `x == 5AND y == 1` and `-5BETWEEN -10..0` are valid
+      predicates, while `5BETWEEN 1..10` (the bytecount `5B`, then `ETWEEN`) is not. Friendlier
+      messages for a literal that runs into letters come from the parser when the parse fails.
+    - The syntax diagnostics have kebab-case codes, and their suggestions are built from the
+      user's own text: borrowed spellings, quoted and modified patterns, `~=` and `!~`, chained
+      comparisons rewritten with `AND`, `IS NOT`, `IS NULL`, whitespace inside a literal, and
+      qualified calls. A misplaced reserved word is reported without a suggestion, since nothing
+      it could suggest exists.
+    - The parser stops at the first error by way of an exception private to it.
+    - `SyntaxPrinter` writes trees as S-expressions, and the parser is tested through it.
+  - **G5.**
+    - One routine, `OperatorEvaluation`, carries out evaluation.md's over/test/quantify for
+      comparison, range and regex. Each operator supplies a struct saying how to prepare a datum
+      and what to test.
+    - Operands are evaluated in written order before the absence check, as evaluation.md writes
+      it. Each usable datum is prepared once per operator evaluation. Comparison literals are
+      prepared at evaluation time; range endpoints arrive prepared.
+    - `EvaluationContext.Reported` is ordered by `SourceId`, keeping the first origin reported for
+      each source, so a file's warnings do not depend on bag order.
+    - Tests are hand-built bound trees over canned bindings. They cover operand-order symmetry
+      (2,400 cases), the deduplication table, both logical tables, the state test table, and
+      generated-predicate properties.
+  - **G6.**
+    - A stage returns a `FileOutcome`: what to render, what the file counts towards, and its
+      warnings. Its factories make D3 hold by construction. A `RunTally` hands each file's warnings
+      to the sink as one batch, and the sink drops suppressed categories on arrival.
+      `ExitCodes.For` applies the precedence rules.
+    - Code 20 is unreachable for `hash` and for `list` without a filter.
+    - `--no-warn` takes a value only after `=`. Spectre would read the next argument as the value,
+      so a bare `--no-warn` is rewritten before parsing.
+    - Strict parsing is on, so a rejected command line returns 2, where Spectre gave 255 and
+      silently accepted unknown options. An exception escaping a stage fails the run with 1.
+    - In `hash`, any exception from the hasher means the file cannot be read: `-` or `null`, and
+      one warning.
+    - Discovery walks one directory at a time, so a directory that cannot be listed warns and the
+      walk carries on. It follows symlinked directories as before, but never a link whose resolved
+      target is the directory itself or one of its ancestors on the walk; such a link is skipped
+      silently.
+    - `GoroApp` is now the single composition root.
+  - **G7.**
+    - The catalog is one table per namespace, mirroring identifiers.md.
+    - Tag identifiers are declared, but bound to a binding that throws `NotSupportedException`,
+      which the tag line replaces.
+    - `file::size` follows a symlink to its target, since `FileInfo` describes the link.
+    - `file::duration` reads TagLib's audio properties, truncated to whole seconds. TagLib 2.3.0
+      tolerated every one of sixteen shapes of damaged Id3v2 tag, so no deviation from warnings.md
+      is known.
+    - `id3v2::raw`, `ape::raw` and `vorbis::raw` written as identifiers are open-namespace fields
+      named "raw".
+  - **Process.** The harness removes an agent's worktree when the agent stops with nothing
+    changed, which is exactly the state at a plan checkpoint. Each worker was therefore moved to a
+    worktree the coordinator created (`.claude/worktrees/wave1-*`, detached at `c1535d1`).
+
+  After review, PJ settled the questions wave 1 raised:
+  - **Simpler prose, by changing the grammar where that costs nothing.** A quoted part may now
+    follow any `::`, a leading one included (`identifier = ( name | "::" name_part ) { "::"
+    name_part }`), so that "a quoted part must be preceded by `::`" is the whole rule. Whitespace
+    around `::` is now a syntax error (`whitespace-in-identifier`, offering the identifier
+    without it); the parser checks that an identifier's tokens touch. The `ё` rule's "after" now
+    says "when that nearest character is".
+  - **State the intent rather than an absolute.** testing.md says unusable data never selects a
+    file *by default*, a state test or `FALLBACK()` being how a predicate says otherwise. The
+    rationale's two statements of the promise now say "by default" too. warnings.md says a warning
+    names where to look: the file, or a directory that could not be listed.
+  - **The rest of the behaviour is accepted as implemented**: U+FFFE passes through unchanged, an
+    MP3 cut short mid-frame hashes without warning, a symlink cycle is skipped silently, every file
+    unreadable under `--no-warn=file` returns 0, and every operand is evaluated before the absence
+    check.
+  - implementation.md gains four requirements: prepare once, the sources of Unicode data,
+    `file::size` through a link, and damaged tags under `file::duration`. The FAQ explains
+    `--no-warn data`.
+  - `Comparison<T>` became `ComparisonTest<T>`, beside `RangeTest` and `StateTest`, since the old
+    name collided with `System.Comparison<T>` outside its namespace.
+  - The worktree lesson is in `.claude/agents/line-worker.md`: a coordinator that wants
+    checkpoints creates each worker's worktree itself.
+
+  `dotnet test`: 1214 passed.
+
+  Next step: wave 2, the binder (G4) and the `--filter` integration with its end-to-end tests.

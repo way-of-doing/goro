@@ -21,5 +21,29 @@ public sealed class StringOrder : DatumOrder<string>
 
     public override string Prepare(string datum) => Normalization.Prepare(datum, Mode);
 
-    public override int Compare(string x, string y) => throw new NotImplementedException();
+    /// <summary>
+    /// Compares two prepared strings by code point. UTF-16 code unit order differs from it only
+    /// above U+FFFF, whose surrogates sort below U+E000–U+FFFF although the code points they
+    /// encode sort above them.
+    /// </summary>
+    /// <remarks>Total over any strings, well-formed or not; it is code point order on the well-formed ones.</remarks>
+    public override int Compare(string x, string y)
+    {
+        int common = x.AsSpan().CommonPrefixLength(y);
+        if (common == x.Length || common == y.Length) return x.Length.CompareTo(y.Length);
+
+        return CodePointOrderKey(x[common]).CompareTo(CodePointOrderKey(y[common]));
+    }
+
+    /// <summary>
+    /// Moves surrogates above U+E000–U+FFFF. Where two strings first differ, either both code units
+    /// are surrogates of the same kind, ordered among themselves as their code points are, or at
+    /// most one is, and then it starts a code point above every one in the BMP.
+    /// </summary>
+    private static int CodePointOrderKey(char c) => c switch
+    {
+        >= '\uE000' => c - 0x800,
+        >= '\uD800' => c + 0x2000,
+        _ => c,
+    };
 }

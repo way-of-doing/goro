@@ -8,9 +8,11 @@ namespace Goro.Predicates.Binding;
 /// <summary>A literal: one usable occurrence, the same for every file.</summary>
 public sealed class Literal<T>(T value) : BoundExpression<T> where T : notnull
 {
+    private readonly Value<T> occurrence = Value<T>.Single(new Usable<T>(value));
+
     public T Value { get; } = value;
 
     public override bool IsDefinite => true;
 
-    public override Value<T> Evaluate(EvaluationContext context) => throw new NotImplementedException();
+    public override Value<T> Evaluate(EvaluationContext context) => occurrence;
 }

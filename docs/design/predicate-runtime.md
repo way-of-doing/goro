@@ -127,8 +127,10 @@ What the binder must produce for the runtime:
   integer, with modifiers and parentheses transparent, identifier spelling canonicalized and the
   two string forms indistinguishable. The table of sources is part of the output, since the
   set of sources a predicate can produce has to be enumerable before any file is read.
-- String literals prepared once in each mode the operator that reads them uses; compiled patterns;
-  every comparer chosen.
+- Range endpoints already prepared in the operator's mode, compiled patterns, and every order
+  chosen. Nothing else is prepared ahead: a literal operand of a comparison is a datum like any
+  other and is prepared when the operator evaluates, since preparing a string twice is not
+  guaranteed to give the same result as preparing it once.
 
 What the identifier catalog must give the binder, for every identifier it can resolve: its
 declared type, whether it is definite, and a binding the runtime can use to resolve it for a file.
@@ -248,7 +250,7 @@ and starts being something the C# compiler checks, and that decides how the eval
 **A. A typed, self-evaluating tree.** Values are `Value<T>` over the datum types `string`,
 `decimal`, `ByteCount`, `Duration` and `bool` (the middle two being small structs over `decimal`, so
 that they cannot be mixed up with a number). Bound nodes are `BoundExpression<T>`, each with an
-`Evaluate` that returns a `Value<T>`; a comparison is a `Comparison<T>` over two
+`Evaluate` that returns a `Value<T>`; a comparison is a `ComparisonTest<T>` over two
 `BoundOperand<T>`; `COUNT` is a `BoundExpression<decimal>` over any `BoundExpression<T>`. The binder
 is the one place where a type known only at run time of the compiler becomes a C# type parameter,
 through a handful of switches on Goro's type; past that point, an evaluator that compared a string

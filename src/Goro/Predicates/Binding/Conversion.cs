@@ -1,5 +1,6 @@
 // Owned by the evaluator group (G5) of the predicate-runtime-architecture line. The public
 // surface is part of the line's contract; the evaluation bodies are G5's to write.
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Values;
@@ -17,6 +18,8 @@ public delegate bool DatumConversion<in TFrom, TTo>(TFrom datum, [MaybeNullWhen(
 public sealed class Conversion<TFrom, TTo>(BoundExpression<TFrom> argument, DatumConversion<TFrom, TTo> convert, Origin origin)
     : BoundExpression<TTo> where TFrom : notnull where TTo : notnull
 {
+    private readonly Unusable<TTo> failure = new(origin);
+
     public BoundExpression<TFrom> Argument { get; } = argument;
 
     public DatumConversion<TFrom, TTo> Convert { get; } = convert;
@@ -25,5 +28,18 @@ public sealed class Conversion<TFrom, TTo>(BoundExpression<TFrom> argument, Datu
 
     public override bool IsDefinite => Argument.IsDefinite;
 
-    public override Value<TTo> Evaluate(EvaluationContext context) => throw new NotImplementedException();
+    // Maps each occurrence to one occurrence, so cardinality is kept and absence stays absence. An
+    // unusable occurrence is propagated rather than read, keeping its origin, and nothing is reported.
+    public override Value<TTo> Evaluate(EvaluationContext context)
+    {
+        var value = Argument.Evaluate(context);
+        return value.IsAbsent ? Value<TTo>.Absent : Value<TTo>.Of(value.Occurrences.Select(ConvertOccurrence));
+    }
+
+    private Occurrence<TTo> ConvertOccurrence(Occurrence<TFrom> occurrence) => occurrence switch
+    {
+        Usable<TFrom>(var datum) => Convert(datum, out var converted) ? new Usable<TTo>(converted) : failure,
+        Unusable<TFrom>(var origin) => new Unusable<TTo>(origin),
+        _ => throw new UnreachableException(),
+    };
 }

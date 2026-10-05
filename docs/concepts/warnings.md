@@ -61,9 +61,10 @@ could read none of a thousand files emits a thousand warnings.
 
 ### Where warnings go
 
-Warnings are written to standard error and never to standard output. Each one names the file
-being processed, together with whatever identifies the cause: for unusable data, the
-sub-expression responsible as it was written in the predicate.
+Warnings are written to standard error and never to standard output. Each one names where to
+look -- the file being processed, or a directory that could not be listed -- together with
+whatever identifies the cause: for unusable data, the sub-expression responsible as it was
+written in the predicate.
 
 ### Suppressing warnings
 

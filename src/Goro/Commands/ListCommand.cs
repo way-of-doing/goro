@@ -12,7 +12,7 @@ namespace Goro.Commands;
 public sealed class ListCommand(IFileDiscoveryService fileDiscovery, IPipelinePlanner pipelinePlanner, IExecutor executor)
     : AsyncCommand<ListCommand.Settings>
 {
-    public sealed class Settings : CommandSettings
+    public sealed class Settings : GlobalSettings
     {
         [CommandArgument(0, "[pathspecs]")]
         public string[] PathSpecs { get; set; } = [];
@@ -27,37 +27,20 @@ public sealed class ListCommand(IFileDiscoveryService fileDiscovery, IPipelinePl
                 return ValidationResult.Error($"Invalid output format '{Output}'. Valid values: {string.Join(", ", OutputFormatExtensions.ValidNames)}.");
             }
 
-            return ValidationResult.Success();
+            return base.Validate();
         }
     }
 
-    protected override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
+    protected override Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         OutputFormatExtensions.TryParse(settings.Output, out var output);
 
         var pathSpecs = OptionParsing.ResolvePathSpecs(settings.PathSpecs, context.Remaining.Raw);
         var options = new ListOptions(pathSpecs, output);
 
-        // Every pathspec is resolved before anything is planned or written, so that a rejected
-        // one leaves no output at all. See docs/concepts/pathspecs.md.
-        ResolvedPathSpecs resolved;
-        try
-        {
-            resolved = fileDiscovery.Resolve(options.PathSpecs);
-        }
-        catch (PathSpecException ex)
-        {
-            await Console.Error.WriteLineAsync($"Error: {ex.Message}");
-            return ExitCodes.Rejected;
-        }
-
-        var pipeline = pipelinePlanner.PlanList(options);
-        var files = fileDiscovery.DiscoverAsync(resolved, cancellationToken);
-        var results = executor.ExecuteAsync(pipeline, files, cancellationToken);
-
         var renderer = output.CreateRenderer<ListResult>(r => r.File);
 
-        await renderer.RenderAsync(results, Console.Out, cancellationToken);
-        return ExitCodes.Completed;
+        return new FileRun(fileDiscovery, executor)
+            .ExecuteAsync(settings, options.PathSpecs, () => pipelinePlanner.PlanList(options), renderer, cancellationToken);
     }
 }

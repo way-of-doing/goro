@@ -52,4 +52,27 @@ public class JsonOutputRendererTests
 
         Assert.That(writer.ToString().Replace("\r\n", "\n"), Is.EqualTo(expected));
     }
+
+    [Test]
+    public async Task RenderAsync_HashResultWithoutAHash_WritesNull()
+    {
+        var renderer = new JsonOutputRenderer<HashResult>();
+        var results = new[] { new HashResult("/absolute/path/to/damaged.mp3", "md5", null) }.AsAsyncEnumerable();
+
+        using var writer = new StringWriter();
+        await renderer.RenderAsync(results, writer, CancellationToken.None);
+
+        var expected = string.Join(
+            "\n",
+            "[",
+            "  {",
+            "    \"file\": \"/absolute/path/to/damaged.mp3\",",
+            "    \"algo\": \"md5\",",
+            "    \"hash\": null",
+            "  }",
+            "]",
+            string.Empty);
+
+        Assert.That(writer.ToString().Replace("\r\n", "\n"), Is.EqualTo(expected));
+    }
 }

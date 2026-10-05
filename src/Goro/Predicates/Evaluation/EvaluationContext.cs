@@ -9,19 +9,53 @@ namespace Goro.Predicates.Evaluation;
 /// it: the file's data as it is loaded, and the sources reported so far. The compiled predicate is
 /// shared by every concurrent evaluation; this is not.
 /// </summary>
+/// <remarks>
+/// Sources are small integers interned when the predicate was read, so the set of sources already
+/// reported can be indexed by them directly. The rationale describes that set as a bitset; since
+/// the first origin of each source has to be kept as well, for the warning to quote, it is an array
+/// of origins indexed by source instead, an empty slot being a source not yet reported. Most files
+/// report nothing, so the array is not allocated until something is.
+/// </remarks>
 public sealed class EvaluationContext
 {
-    /// <param name="sourceCount">The number of distinct sources the predicate can report.</param>
-    public EvaluationContext(FileData file, int sourceCount) => throw new NotImplementedException();
+    private readonly int sourceCount;
+    private Origin?[]? firstOrigins;
 
-    public FileData File => throw new NotImplementedException();
+    /// <param name="sourceCount">The number of distinct sources the predicate can report.</param>
+    public EvaluationContext(FileData file, int sourceCount)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        ArgumentOutOfRangeException.ThrowIfNegative(sourceCount);
+        File = file;
+        this.sourceCount = sourceCount;
+    }
+
+    public FileData File { get; }
 
     /// <summary>
     /// Records that an unusable occurrence born at <paramref name="origin"/> was consumed. Only the
     /// first report of each source is kept.
     /// </summary>
-    public void Report(Origin origin) => throw new NotImplementedException();
+    /// <exception cref="ArgumentOutOfRangeException">The source is not one the predicate can report.</exception>
+    public void Report(Origin origin)
+    {
+        var source = origin.Source.Value;
+        if ((uint)source >= (uint)sourceCount)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(origin), source, $"The predicate can report {sourceCount} sources, numbered from 0.");
+        }
 
-    /// <summary>The origins reported for this file, one per source, in the order first reported.</summary>
-    public IReadOnlyList<Origin> Reported => throw new NotImplementedException();
+        firstOrigins ??= new Origin?[sourceCount];
+        firstOrigins[source] ??= origin;
+    }
+
+    /// <summary>
+    /// The origins reported for this file, one per source, in ascending order of source. The origin
+    /// kept for a source is the first one reported, whose text is what a warning quotes. Ordering by
+    /// source rather than by time keeps a file's warnings independent of the order of the
+    /// occurrences in a bag, which the specification declares to have none.
+    /// </summary>
+    public IReadOnlyList<Origin> Reported =>
+        firstOrigins is null ? [] : [.. firstOrigins.OfType<Origin>()];
 }

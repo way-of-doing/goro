@@ -19,5 +19,29 @@ public sealed class StateTest<T>(BoundExpression<T> operand, Quantifier quantifi
 
     public TestedState State { get; } = state;
 
-    public override Truth Decide(EvaluationContext context) => throw new NotImplementedException();
+    // Reads cardinality and state only, so it reports nothing, and is never unusable.
+    public override Truth Decide(EvaluationContext context)
+    {
+        var value = Operand.Evaluate(context);
+        if (State == TestedState.Absent)
+        {
+            return Truths.Of(value.IsAbsent);
+        }
+
+        // Like every operator other than the logical ones, false for an absent operand: so
+        // ALL(x) IS USABLE is not vacuously true.
+        if (value.IsAbsent)
+        {
+            return Truth.False;
+        }
+
+        var outcomes = new Quantification(Quantifier);
+        foreach (var occurrence in value.Occurrences)
+        {
+            var usable = occurrence is Usable<T>;
+            outcomes.Add(Truths.Of(State == TestedState.Usable ? usable : !usable));
+        }
+
+        return outcomes.Result;
+    }
 }

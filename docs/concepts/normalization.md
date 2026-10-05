@@ -41,7 +41,8 @@ A string is prepared in normalized mode by the following steps, in this order.
    `Mc` or `Me`) is removed when the nearest character before it that is not itself a combining
    mark lies in one of these ranges: U+0041–005A, U+0061–007A, U+00C0–02AF, U+0370–03FF,
    U+1D00–1DBF, U+1E00–1FFF, U+2C60–2C7F, U+A720–A7FF and U+AB30–AB6F. In addition, U+0308
-   COMBINING DIAERESIS is removed after Cyrillic `е` or `Е`, so that `ё` matches `е`. Every other
+   COMBINING DIAERESIS is removed when that nearest character is Cyrillic `е` or `Е`, so that `ё`
+   matches `е`. Every other
    combining mark is kept: kana voicing marks, Thai and Indic vowel signs and tone marks, Hebrew
    and Arabic points, and the marks that make Cyrillic `й`, `ї` and `ў` letters of their own.
 5. **Case is folded.** Each character is replaced by the lowercase form of its uppercase form,

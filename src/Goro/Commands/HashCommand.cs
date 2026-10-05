@@ -13,7 +13,10 @@ namespace Goro.Commands;
 public sealed class HashCommand(IFileDiscoveryService fileDiscovery, IPipelinePlanner pipelinePlanner, IExecutor executor)
     : AsyncCommand<HashCommand.Settings>
 {
-    public sealed class Settings : CommandSettings
+    /// <summary>What a file whose audio could not be read shows in place of its hash, in plain output.</summary>
+    public const string AbsentHash = "-";
+
+    public sealed class Settings : GlobalSettings
     {
         [CommandArgument(0, "[pathspecs]")]
         public string[] PathSpecs { get; set; } = [];
@@ -36,11 +39,11 @@ public sealed class HashCommand(IFileDiscoveryService fileDiscovery, IPipelinePl
                 return ValidationResult.Error($"Invalid output format '{Output}'. Valid values: {string.Join(", ", OutputFormatExtensions.ValidNames)}.");
             }
 
-            return ValidationResult.Success();
+            return base.Validate();
         }
     }
 
-    protected override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
+    protected override Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         HashAlgorithmKindExtensions.TryParse(settings.Algorithm, out var algorithm);
         OutputFormatExtensions.TryParse(settings.Output, out var output);
@@ -48,26 +51,11 @@ public sealed class HashCommand(IFileDiscoveryService fileDiscovery, IPipelinePl
         var pathSpecs = OptionParsing.ResolvePathSpecs(settings.PathSpecs, context.Remaining.Raw);
         var options = new HashOptions(pathSpecs, algorithm, output);
 
-        // Every pathspec is resolved before anything is planned or written, so that a rejected
-        // one leaves no output at all. See docs/concepts/pathspecs.md.
-        ResolvedPathSpecs resolved;
-        try
-        {
-            resolved = fileDiscovery.Resolve(options.PathSpecs);
-        }
-        catch (PathSpecException ex)
-        {
-            await Console.Error.WriteLineAsync($"Error: {ex.Message}");
-            return ExitCodes.Rejected;
-        }
+        // A file whose audio could not be read still has its row, with the hash absent: "-" here,
+        // and null in JSON. See docs/commands/hash.md.
+        var renderer = output.CreateRenderer<HashResult>(r => $"{r.File} {r.Algo} {r.Hash ?? AbsentHash}");
 
-        var pipeline = pipelinePlanner.PlanHash(options);
-        var files = fileDiscovery.DiscoverAsync(resolved, cancellationToken);
-        var results = executor.ExecuteAsync(pipeline, files, cancellationToken);
-
-        var renderer = output.CreateRenderer<HashResult>(r => $"{r.File} {r.Algo} {r.Hash}");
-
-        await renderer.RenderAsync(results, Console.Out, cancellationToken);
-        return ExitCodes.Completed;
+        return new FileRun(fileDiscovery, executor)
+            .ExecuteAsync(settings, options.PathSpecs, () => pipelinePlanner.PlanHash(options), renderer, cancellationToken);
     }
 }

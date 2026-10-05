@@ -30,3 +30,35 @@ never having arrived. Wanting a parseable prefix while also being content with a
 partial answer is a narrow combination, and the format that would serve it -- one
 JSON object per line, valid at every prefix -- can be added as its own `-o` option
 if a real need for it turns up. Streaming the array now forecloses nothing.
+
+### Preparing a string once
+
+Every string datum is prepared for comparison exactly once, by the operator that compares it; range
+endpoints, which are known when the predicate is read, are prepared then and never again.
+Preparation in normalized mode is not idempotent on unusual input: `क` followed by U+0345 and `ा`
+keeps U+0345 the first time, since it follows a Devanagari letter, and case-folds it to Greek `ι`,
+after which a second pass removes `ा` as an accent on a Greek letter. A prepared string handed to
+preparation again is therefore a defect, however harmless it looks.
+
+### Where the Unicode data comes from
+
+Normalization draws on three sources, which need not agree on the newest characters. The
+`Default_Ignorable_Code_Point` table is Goro's own, taken from UCD 16.0; general categories come
+from .NET's tables, which are 16.0 in .NET 10; decomposition, composition and case mapping come
+from the ICU of the machine Goro runs on. Two machines can therefore prepare a character assigned
+after Unicode 16.0 differently. Moving to a newer .NET is the moment to bring Goro's own table up
+to the version its tables follow.
+
+### The size of a file reached through a symbolic link
+
+`file::size` is the size of the file a link leads to. `FileInfo` describes a symbolic link itself,
+reporting the length of the link, so the link is resolved to its final target before the length is
+read; a link whose target is gone makes the file unreadable.
+
+### Damaged tags and `file::duration`
+
+TagLibSharp reads a file's tags while it locates the audio, so the facet behind `file::duration`
+parses them too, and a strict tag parser would make a file unreadable for a predicate that never
+asked about its tags. TagLibSharp 2.3.0 tolerates every shape of damaged Id3v2 tag tried, and a
+test asserts that a file with such a tag still has a duration, so that a stricter release is noticed
+rather than shipped.

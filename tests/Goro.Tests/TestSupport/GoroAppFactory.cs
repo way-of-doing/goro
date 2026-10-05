@@ -1,41 +1,26 @@
 using Goro.Cli;
-using Goro.Commands;
-using Goro.Discovery;
-using Goro.Execution;
-using Goro.Hashing;
-using Goro.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
-using Spectre.Console.Cli;
 
 namespace Goro.Tests.TestSupport;
 
 /// <summary>
-/// Builds a <see cref="CommandApp"/> wired the same way as the real <c>Program.cs</c>
-/// composition root, for CLI-layer integration tests.
+/// Builds the same <see cref="GoroApp"/> as the real <c>Program.cs</c>, for CLI-layer integration
+/// tests, optionally with some of its services replaced.
 /// </summary>
 internal static class GoroAppFactory
 {
-    public static CommandApp Create()
+    /// <param name="configure">
+    /// Adds registrations after Goro's own, which therefore replace them, e.g. a discovery service
+    /// that yields a file which no longer exists.
+    /// </param>
+    public static GoroApp Create(Action<IServiceCollection>? configure = null)
     {
-        var services = new ServiceCollection();
-        services.AddSingleton<IFileDiscoveryService, FileDiscoveryService>();
-        services.AddSingleton<IAudioHasher, TagLibAudioHasher>();
-        services.AddSingleton<IPipelinePlanner, PipelinePlanner>();
-        services.AddSingleton<IExecutor, ConcurrentExecutor>();
-        services.AddTransient<HashCommand>();
-        services.AddTransient<ListCommand>();
-
-        var app = new CommandApp(new TypeRegistrar(services));
-        app.Configure(config =>
-        {
-            config.AddCommand<HashCommand>("hash");
-            config.AddCommand<ListCommand>("list");
-        });
-
-        return app;
+        var services = GoroApp.DefaultServices();
+        configure?.Invoke(services);
+        return new GoroApp(services);
     }
 
-    public static async Task<(int ExitCode, string StdOut, string StdErr)> RunCapturedAsync(this CommandApp app, params string[] args)
+    public static async Task<(int ExitCode, string StdOut, string StdErr)> RunCapturedAsync(this GoroApp app, params string[] args)
     {
         var originalOut = Console.Out;
         var originalError = Console.Error;

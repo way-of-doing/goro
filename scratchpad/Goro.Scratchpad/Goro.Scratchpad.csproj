@@ -13,4 +13,9 @@
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- So that experiments can measure Goro's own code beside the candidates it was chosen from. -->
+    <ProjectReference Include="..\..\src\Goro\Goro.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -20,5 +20,15 @@ public sealed class RegexMatch(BoundOperand<string> subject, Regex pattern, Comp
 
     public ComparisonMode Mode { get; } = mode;
 
-    public override Truth Decide(EvaluationContext context) => throw new NotImplementedException();
+    public override Truth Decide(EvaluationContext context) =>
+        OperatorEvaluation.Decide<string, Condition>(
+            context, [new(Subject.Expression.Evaluate(context), Subject.Quantifier)], new(Pattern, Mode));
+
+    /// <summary>The subject is prepared like any string an operator reads; the pattern never is.</summary>
+    private readonly struct Condition(Regex pattern, ComparisonMode mode) : IOperatorCondition<string>
+    {
+        public string Prepare(string datum) => Normalization.Prepare(datum, mode);
+
+        public bool HoldsOf(ReadOnlySpan<string> data) => pattern.IsMatch(data[0]);
+    }
 }

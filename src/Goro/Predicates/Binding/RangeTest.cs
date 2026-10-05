@@ -21,5 +21,20 @@ public sealed class RangeTest<T>(BoundOperand<T> subject, T minimum, T maximum, 
 
     public DatumOrder<T> Order { get; } = order;
 
-    public override Truth Decide(EvaluationContext context) => throw new NotImplementedException();
+    public override Truth Decide(EvaluationContext context) =>
+        OperatorEvaluation.Decide<T, Condition>(
+            context, [new(Subject.Expression.Evaluate(context), Subject.Quantifier)], new(Minimum, Maximum, Order));
+
+    /// <summary>
+    /// Both bounds are tested of the same occurrence, within one quantifier scope: this is one
+    /// operator, not a pair of comparisons. The endpoints are already prepared, so only the
+    /// subject's data are.
+    /// </summary>
+    private readonly struct Condition(T minimum, T maximum, DatumOrder<T> order) : IOperatorCondition<T>
+    {
+        public T Prepare(T datum) => order.Prepare(datum);
+
+        public bool HoldsOf(ReadOnlySpan<T> data) =>
+            order.Compare(minimum, data[0]) <= 0 && order.Compare(data[0], maximum) <= 0;
+    }
 }

@@ -10,9 +10,27 @@ public sealed class Fallback<T>(BoundExpression<T> argument, T @default) : Bound
 {
     public BoundExpression<T> Argument { get; } = argument;
 
+    private readonly Usable<T> substitute = new(@default);
+
     public T Default { get; } = @default;
 
     public override bool IsDefinite => Argument.IsDefinite;
 
-    public override Value<T> Evaluate(EvaluationContext context) => throw new NotImplementedException();
+    // Substitutes rather than reads, so it reports nothing.
+    public override Value<T> Evaluate(EvaluationContext context)
+    {
+        var value = Argument.Evaluate(context);
+        if (value.IsAbsent)
+        {
+            return Value<T>.Single(substitute);
+        }
+
+        var occurrences = value.Occurrences;
+        if (!occurrences.Any(occurrence => occurrence is Unusable<T>))
+        {
+            return value;
+        }
+
+        return Value<T>.Of(occurrences.Select(occurrence => occurrence is Unusable<T> ? substitute : occurrence));
+    }
 }

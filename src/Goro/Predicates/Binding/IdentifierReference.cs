@@ -16,5 +16,5 @@ public sealed class IdentifierReference<T>(IdentifierDeclaration<T> declaration,
 
     public override bool IsDefinite => Declaration.IsDefinite;
 
-    public override Value<T> Evaluate(EvaluationContext context) => throw new NotImplementedException();
+    public override Value<T> Evaluate(EvaluationContext context) => Declaration.Binding.Resolve(context.File, Origin);
 }

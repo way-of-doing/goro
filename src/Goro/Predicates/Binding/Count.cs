@@ -12,5 +12,7 @@ public sealed class Count<T>(BoundExpression<T> argument) : BoundExpression<deci
 
     public override bool IsDefinite => true;
 
-    public override Value<decimal> Evaluate(EvaluationContext context) => throw new NotImplementedException();
+    // Reads cardinality only, so it asks nothing of any occurrence and reports nothing.
+    public override Value<decimal> Evaluate(EvaluationContext context) =>
+        Value<decimal>.Single(new Usable<decimal>(Argument.Evaluate(context).Occurrences.Length));
 }

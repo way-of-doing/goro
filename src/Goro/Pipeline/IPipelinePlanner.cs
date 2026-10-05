@@ -8,7 +8,7 @@ namespace Goro.Pipeline;
 /// </summary>
 public interface IPipelinePlanner
 {
-    IPipelineStage<string, HashResult> PlanHash(HashOptions options);
+    IPipelineStage<string, FileOutcome<HashResult>> PlanHash(HashOptions options);
 
-    IPipelineStage<string, ListResult> PlanList(ListOptions options);
+    IPipelineStage<string, FileOutcome<ListResult>> PlanList(ListOptions options);
 }
