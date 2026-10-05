@@ -71,7 +71,8 @@ public sealed class GoroApp
             }
             else
             {
-                error.WriteLine($"Error: {rejected.Message}", Style.Plain);
+                // Goro's own option checks arrive this way, already worded by the provider.
+                error.WriteLine($"{MessagesFrom(resolver).ErrorPrefix}{rejected.Message}", Style.Plain);
             }
 
             return ExitCodes.Rejected;

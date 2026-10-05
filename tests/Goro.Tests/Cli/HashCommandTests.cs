@@ -54,7 +54,7 @@ public class HashCommandTests
         var (exitCode, _, stdErr) = await app.RunCapturedAsync("hash", "-a", "md6", _mp3File);
 
         Assert.That(exitCode, Is.EqualTo(2));
-        Assert.That(stdErr, Does.Contain("No algorithm `md6` — pick from "));
+        Assert.That(stdErr.TrimEnd(), Is.EqualTo("goro: error: No algorithm `md6` — pick from md5, sha1, goro!"));
     }
 
     [TestCase("plain")]
