@@ -34,7 +34,7 @@ public class PredicateDiagnosticRendererTests
 
         Assert.That(lines, Is.EqualTo(new[]
         {
-            "goro: error: We compare with `==`, goro!",
+            "goro: error: We need to use `==` to compare like that, goro!",
             "  file::name = \"a.mp3\"",
             "             ^",
             "  try: file::name == \"a.mp3\"",

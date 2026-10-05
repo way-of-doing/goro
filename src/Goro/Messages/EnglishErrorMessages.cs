@@ -37,10 +37,10 @@ public sealed class EnglishErrorMessages : IErrorMessages
         // -----------------------------------------------------------------------------------------
         // Lexical
 
-        NonAsciiName => "Names are plain ASCII — quote the fancy ones, goro!",
-        UnknownEscape(var escape) => $"`{escape}` isn't an escape — double the backslash, goro!",
+        NonAsciiName => "Names are plain ASCII -- quote the fancy ones, goro!",
+        UnknownEscape(var escape) => $"`{escape}` isn't an escape -- double the backslash, goro!",
         HexEscapeDigits => "`\\x` wants exactly two hex digits, goro!",
-        UnicodeEscapeDigits => "`\\u` wants four hex digits, or up to six in braces, goro!",
+        UnicodeEscapeDigits => "`\\u` wants four hex digits, or up to six inside braces, goro!",
         BracedEscapeDigits => "`\\u{...}` wants one to six hex digits and a `}`, goro!",
         CodePointOutOfRange(var escape) => $"`{escape}` is past the last code point U+10FFFF, goro!",
         SurrogateCodePoint(var escape) => $"`{escape}` isn't a character but a surrogate, goro!",
@@ -51,7 +51,7 @@ public sealed class EnglishErrorMessages : IErrorMessages
         UnrepresentableLiteral(var literal) => $"`{literal}` is too heavy to hold, goro!",
         SignedClockDuration => "Durations can't go negative, goro!",
         MalformedClockDuration => "Clock durations look like `1:30` or `1:02:03`, goro!",
-        UnexpectedCharacter(var character) => $"`{character}` has no business out here, goro!",
+        UnexpectedCharacter(var character) => $"`{character}` has no business out there, goro!",
 
         // -----------------------------------------------------------------------------------------
         // Syntax
@@ -71,38 +71,38 @@ public sealed class EnglishErrorMessages : IErrorMessages
         },
         UnexpectedToken(var expected, var found) => expected switch
         {
-            Expectation.OperatorOrEnd => $"Expected an operator or the end of the predicate, found `{found}`, goro!",
-            Expectation.RangeSeparator => $"Expected `..` between the two ends of the range, found `{found}`, goro!",
-            Expectation.State => $"Expected `USABLE`, `UNUSABLE` or `ABSENT`, found `{found}`, goro!",
-            Expectation.Literal => $"Expected a literal, found `{found}`, goro!",
-            Expectation.Operand => $"Expected an operand, found `{found}`, goro!",
-            Expectation.CloseParen => $"Expected `)`, found `{found}`, goro!",
-            Expectation.CommaOrCloseParen => $"Expected `,` or `)`, found `{found}`, goro!",
-            Expectation.Name => $"Expected a name after `::`, found `{found}`, goro!",
-            Expectation.NameOrQuotedName => $"Expected a name, or a quoted name, after `::`, found `{found}`, goro!",
+            Expectation.OperatorOrEnd => $"There's an unexpected `{found}` there, goro!",
+            Expectation.RangeSeparator => $"There's an unexpected `{found}` there instead of `..`, goro!",
+            Expectation.State => $"There's a `{found}` there instead of `USABLE`, `UNUSABLE` or `ABSENT`, goro!",
+            Expectation.Literal => $"There's a `{found}` there instead of a literal, goro!",
+            Expectation.Operand => $"There's a `{found}` there instead of an operand, goro!",
+            Expectation.CloseParen => $"There's a `{found}` there instead of a `)`, goro!",
+            Expectation.CommaOrCloseParen => $"There's a `{found}` there instead of a `,` or `)`, goro!",
+            Expectation.Name => $"There's a `{found}` there instead of a name, goro!",
+            Expectation.NameOrQuotedName => $"There's a `{found}` there instead of a name, goro!",
         },
         ChainedComparison => "One comparison at a time, goro!",
         PatternNotRawString => "A pattern is a raw string like `r\"^the \"`, goro!",
         ModifiedPattern => "Modifiers ride on the subject, not the pattern, goro!",
         ParenthesizedPattern => "The pattern goes without parentheses, goro!",
         QuotedPattern => "Patterns travel as raw strings, goro!",
-        IsNot => "`NOT` goes in front, goro!",
-        IsNull => "It's not null — it's `ABSENT`, goro!",
+        IsNot => "We need to put that `NOT` in front, goro!",
+        IsNull => "It's not null -- it's `ABSENT`, goro!",
         RangeEndpointNotLiteral => "Range limits go bare, goro!",
         ModifierAsWord(var modifier) => $"`{modifier}` wraps around like `{modifier}(...)`, goro!",
-        ReservedWord(var word) => $"`{word}` is a keyword, not a name, goro!",
+        ReservedWord(var word) => $"We can't use the keyword `{word}` as a name, goro!",
         ReservedWordInIdentifier(var word) => $"`{word}` can't start a name without a leading `::`, goro!",
         WhitespaceInIdentifier => "We don't need spaces around `::`, goro!",
         QualifiedFunctionCall => "Functions don't live in namespaces, goro!",
-        BorrowedEqual => "We compare with `==`, goro!",
-        BorrowedLessGreater => "Unequal is `!=` around here, goro!",
-        BorrowedAnd => "We say `AND` here, goro!",
-        BorrowedOr => "We say `OR` here, goro!",
-        BorrowedBang => "We say `NOT` here, goro!",
-        BorrowedTildeEqual => "`~=` isn't ours — pick one below, goro!",
-        BorrowedBangTilde => "No negated match — lead with `NOT`, goro!",
+        BorrowedEqual => "We need to use `==` to compare like that, goro!",
+        BorrowedLessGreater => "We need to use `!=` to compare like that, goro!",
+        BorrowedAnd => "That won't work, we need to say `AND` here, goro!",
+        BorrowedOr => "That won't work, we need to say `OR` here, goro!",
+        BorrowedBang => "That won't work, we need to say `NOT` here, goro!",
+        BorrowedTildeEqual => "`~=` isn't ours -- pick one below, goro!",
+        BorrowedBangTilde => "No negated match -- lead with `NOT`, goro!",
         SignedUnitLiteral => "Sizes and durations can't go negative, goro!",
-        FractionalDurationFields => "Duration fields are whole numbers, like `1h30m`, goro!",
+        FractionalDurationFields => "Duration fields are whole numbers like `1h30m`, goro!",
         RunOnLiteral(_, var literal, var kind, var next) => kind switch
         {
             NumericLiteral.Number => $"`{literal}` is a number running into `{next}`, goro!",
@@ -114,12 +114,12 @@ public sealed class EnglishErrorMessages : IErrorMessages
         // -----------------------------------------------------------------------------------------
         // Semantic
 
-        UnknownNamespace(var @namespace) => $"There's no `{@namespace}` namespace, goro!",
+        UnknownNamespace(var @namespace) => $"There's no namespace `{@namespace}`, goro!",
         UnknownIdentifier(var name) => $"There's no `{name}` on our map, goro!",
         UnknownIdentifierInNamespace(var @namespace, var name) => $"`{@namespace}` has no `{name}`, goro!",
-        UnknownFunction(var name) => $"No `{name}` here — we have `COUNT`, `FALLBACK`, `NUMBER` and `STRING`, goro!",
-        NullValue => "No nulls here — absent is the word, goro!",
-        NullComparison => "No nulls here — test with `IS ABSENT`, goro!",
+        UnknownFunction(var name) => $"I don't know what `{name}` means, goro!",
+        NullValue => "There are no nulls here -- absent is the word, goro!",
+        NullComparison => "That won't work -- we need to test with `IS ABSENT`, goro!",
         TypeMismatch(_, var left, _, var right, _) => $"`{Name(left)}` and `{Name(right)}` don't compare, goro!",
         TypeMismatchNumberVariable(_, var left, _, var right, _) => $"`{Name(left)}` and `{Name(right)}` don't compare; only a literal number stands in, goro!",
         FallbackTypeMismatch(_, var argument, var argumentType, var @default, var defaultType) => $"`{@default}` is `{Name(defaultType)}`, but `{argument}` is `{Name(argumentType)}`, goro!",
@@ -129,8 +129,8 @@ public sealed class EnglishErrorMessages : IErrorMessages
             UnitType.ByteCount => "A bytecount can't go negative, goro!",
             UnitType.Duration => "A duration can't go negative, goro!",
         },
-        FractionalDurationLiteral => "Durations count whole seconds, goro!",
-        BooleanCompared(var op) => $"Booleans don't do `{op}` — only `==` and `!=`, goro!",
+        FractionalDurationLiteral => "Durations count whole seconds only, goro!",
+        BooleanCompared(var op) => $"Booleans don't do `{op}` -- only `==` and `!=`, goro!",
         BooleanBetween => "Booleans don't sit in ranges, goro!",
         BooleanRange => "A range can't run between booleans, goro!",
         BooleanNotConvertible(var function, _) => $"`{function}()` won't take a boolean, goro!",
@@ -143,8 +143,8 @@ public sealed class EnglishErrorMessages : IErrorMessages
         MisplacedModifierInCall(var modifier, var function) => $"`{modifier}` can't go inside `{function}()`, goro!",
         ContradictoryQuantifiers(var inner, var outer) => $"`{inner}` inside `{outer}`? Pick one, goro!",
         LiterallyNotString(var modifier, _, _) => $"`{modifier}` only matters for strings, goro!",
-        LiterallyOnStateTest(var modifier) => $"A state test compares nothing — drop `{modifier}`, goro!",
-        QuantifierOnAbsentTest => "`IS ABSENT` takes the whole value — no quantifier, goro!",
+        LiterallyOnStateTest(var modifier) => $"`{modifier}` isn't allowed in this state test, goro!",
+        QuantifierOnAbsentTest => "`IS ABSENT` takes the whole value -- no quantifier, goro!",
         WrongArgumentCount(var function, var expected, var actual) => expected switch
         {
             1 => $"`{function}()` takes one argument, not {actual}, goro!",
@@ -162,11 +162,11 @@ public sealed class EnglishErrorMessages : IErrorMessages
         RangeEndpointTypes => "Both ends of a range need one type, goro!",
         RangeReversed(_, var minimum, var maximum, var order) => order switch
         {
-            RangeOrder.Plain => $"`{minimum}` comes after `{maximum}` — swap them, goro!",
-            RangeOrder.Literal => $"Literally, `{minimum}` comes after `{maximum}` — swap them, goro!",
-            RangeOrder.Normalized => $"Normalized, `{minimum}` comes after `{maximum}` — swap them, goro!",
+            RangeOrder.Plain => $"`{minimum}` comes after `{maximum}` -- swap them, goro!",
+            RangeOrder.Literal => $"Literally, `{minimum}` comes after `{maximum}` -- swap them, goro!",
+            RangeOrder.Normalized => $"Normalized, `{minimum}` comes after `{maximum}` -- swap them, goro!",
         },
-        InvalidPattern(_, var reason) => $"That pattern won't parse — {reason.Text.TrimEnd('.')}, goro!",
+        InvalidPattern(_, var reason) => $"That pattern won't parse -- {reason.Text.TrimEnd('.')}, goro!",
         UnsupportedPatternConstruct(var family) => family switch
         {
             PatternFamily.Lookaround => "Our regex engine doesn't do lookaround, goro!",
@@ -187,9 +187,9 @@ public sealed class EnglishErrorMessages : IErrorMessages
         // -----------------------------------------------------------------------------------------
         // Command line
 
-        InvalidAlgorithm(var algorithm, var valid) => $"No algorithm `{algorithm}` — pick from {List(valid)}, goro!",
-        InvalidOutputFormat(var format, var valid) => $"No format `{format}` — pick from {List(valid)}, goro!",
-        UnknownWarningCategory(var category, var valid) => $"No warning category `{category}` — pick from {List(valid)}, goro!",
+        InvalidAlgorithm(var algorithm, var valid) => $"No algorithm `{algorithm}` -- pick from {List(valid)}, goro!",
+        InvalidOutputFormat(var format, var valid) => $"No format `{format}` -- pick from {List(valid)}, goro!",
+        UnknownWarningCategory(var category, var valid) => $"No warning category `{category}` -- pick from {List(valid)}, goro!",
 
         _ => throw new ArgumentOutOfRangeException(nameof(message), message, "This error has no English wording."),
     };

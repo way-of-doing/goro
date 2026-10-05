@@ -62,7 +62,7 @@ public class ErrorMessageTests
     {
         var message = new ErrorMessage.InvalidPattern(new Code("r\"a(\""), new ForeignText("Not enough )'s."));
 
-        Assert.That(EnglishErrorMessages.Instance.Render(message), Is.EqualTo("That pattern won't parse — Not enough )'s, goro!"));
+        Assert.That(EnglishErrorMessages.Instance.Render(message), Is.EqualTo("That pattern won't parse -- Not enough )'s, goro!"));
     }
 
     [Test]
@@ -78,7 +78,7 @@ public class ErrorMessageTests
     {
         var message = new ErrorMessage.InvalidOutputFormat(new Code("yaml"), [new Code("plain"), new Code("json")]);
 
-        Assert.That(EnglishErrorMessages.Instance.Render(message), Is.EqualTo("No format `yaml` — pick from plain, json, goro!"));
+        Assert.That(EnglishErrorMessages.Instance.Render(message), Is.EqualTo("No format `yaml` -- pick from plain, json, goro!"));
     }
 
     [TestCase(1, "`COUNT()` takes one argument, not 2, goro!")]

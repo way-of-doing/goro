@@ -291,5 +291,12 @@ crosses each seam, a code skeleton with tests realises it, and `architecture.md`
 
   `dotnet test`: 1932 passed.
 
-  Next step: PJ finishes the wording in `src/Goro/Messages/EnglishErrorMessages.cs`, then a review
-  of the whole line and its merge into main.
+  Goro's own option errors, which reach the user through Spectre's validation, now carry the
+  provider's `goro: error:` prefix rather than `Error: `. Spectre's own parse errors (an unknown
+  option or command) keep Spectre's wording and layout, which PJ judged enough: the messages are
+  not promised to be handcrafted or localized, only kept in style where they are Goro's.
+
+  PJ then reworded the messages in `EnglishErrorMessages.cs`. Only the end-to-end tests that check
+  rendered text needed new expectations. `dotnet test`: 1932 passed.
+
+  Next step: a review of the whole line, and its merge into main, which waits for PJ.

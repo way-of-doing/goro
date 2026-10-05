@@ -50,7 +50,7 @@ public class ListFilterTests
     {
         yield return new TestCaseData(
             @"file::name = ""a.mp3""",
-            new[] { "goro: error: We compare with `==`, goro!", @"  file::name = ""a.mp3""", "             ^", @"  try: file::name == ""a.mp3""" })
+            new[] { "goro: error: We need to use `==` to compare like that, goro!", @"  file::name = ""a.mp3""", "             ^", @"  try: file::name == ""a.mp3""" })
             .SetName("A borrowed operator is answered with the one meant");
         yield return new TestCaseData(
             @"file::name =~ ""^a""",
@@ -97,7 +97,7 @@ public class ListFilterTests
         var (exitCode, stdOut, stdErr, discovery) = await RunObservedAsync("list", @"--filter=file::name = ""a.mp3""", missing);
 
         AssertRejectedBeforeAnythingWasProcessed(exitCode, stdOut, discovery);
-        Assert.That(stdErr, Does.Contain("We compare with `==`, goro!"));
+        Assert.That(stdErr, Does.Contain("We need to use `==` to compare like that, goro!"));
         Assert.That(stdErr, Does.Not.Contain(missing));
     }
 
