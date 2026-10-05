@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: sweeping
 touches: architecture.md, implementation.md, src/Goro, tests/Goro.Tests
 after:
@@ -300,3 +300,8 @@ crosses each seam, a code skeleton with tests realises it, and `architecture.md`
   rendered text needed new expectations. `dotnet test`: 1932 passed.
 
   Next step: a review of the whole line, and its merge into main, which waits for PJ.
+
+- 2026-10-05 -- Landed: reviewed by PJ, marked `landed`, and merged into main. Left for later lines:
+  the tag namespaces (every tag identifier is declared but not yet readable, and testing.md's
+  tag-dependent rows wait for them), `--filter` on `goro hash` (deferred.md), and streaming the
+  JSON array (implementation.md).
