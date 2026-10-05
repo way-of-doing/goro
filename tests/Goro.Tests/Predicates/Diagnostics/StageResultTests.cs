@@ -1,3 +1,4 @@
+using Goro.Messages;
 using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Syntax;
 
@@ -5,7 +6,7 @@ namespace Goro.Tests.Predicates.Diagnostics;
 
 public class StageResultTests
 {
-    private static readonly Diagnostic AnError = new("some-error", new TextSpan(0, 1), "Something is wrong.");
+    private static readonly Diagnostic AnError = new("some-error", new TextSpan(0, 1), new ErrorMessage.EmptyPredicate());
 
     [Test]
     public void Then_AfterSuccess_RunsTheNextStage()

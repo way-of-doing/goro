@@ -1,3 +1,4 @@
+using Goro.Messages;
 using Goro.Predicates.Binding;
 using Goro.Predicates.Text;
 using Goro.Predicates.Values;
@@ -30,7 +31,8 @@ public class RangeBindingTests
     [Test]
     public void Range_OfANumberAndAUnit_SaysWhatIsUnclear()
     {
-        Assert.That(Error("file::size BETWEEN 60..120kb").Message, Does.Contain("60 bytes or 60kb"));
+        Assert.That(Error("file::size BETWEEN 60..120kb").Message,
+            Is.EqualTo(new ErrorMessage.RangeUnitAmbiguous(new Code("60"), UnitType.ByteCount, new Code("60kb"))));
     }
 
     [TestCase("file::duration BETWEEN 60..1:00")]

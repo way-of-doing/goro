@@ -22,4 +22,11 @@ public class GoroTypesTests
     {
         Assert.Throws<TypeInitializationException>(() => GoroTypes.Of<int>());
     }
+
+    [Test]
+    public void Name_IsTheLanguagesOwnSpellingOfEachType()
+    {
+        Assert.That(Enum.GetValues<GoroType>().Select(GoroTypes.Name),
+            Is.EqualTo(new[] { "string", "number", "bytecount", "duration", "boolean" }));
+    }
 }

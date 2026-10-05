@@ -1,6 +1,7 @@
 using Goro.Cli;
 using Goro.Discovery;
 using Goro.Execution;
+using Goro.Messages;
 using Goro.Output;
 using Goro.Pipeline;
 using Goro.Warnings;
@@ -12,7 +13,7 @@ namespace Goro.Commands;
 /// the pathspecs, discover, run the pipeline over each file, render, and choose the exit code from
 /// what the run found.
 /// </summary>
-internal sealed class FileRun(IFileDiscoveryService fileDiscovery, IExecutor executor)
+internal sealed class FileRun(IFileDiscoveryService fileDiscovery, IExecutor executor, IErrorMessages messages)
 {
     public async Task<int> ExecuteAsync<TResult>(
         GlobalSettings settings,
@@ -31,7 +32,7 @@ internal sealed class FileRun(IFileDiscoveryService fileDiscovery, IExecutor exe
         }
         catch (PathSpecException ex)
         {
-            await Console.Error.WriteLineAsync($"{ErrorMessages.ErrorPrefix()}{ex.Message}");
+            await Console.Error.WriteLineAsync($"{messages.ErrorPrefix}{messages.Render(ex.Error)}");
             return ExitCodes.Rejected;
         }
 

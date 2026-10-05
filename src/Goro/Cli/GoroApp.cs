@@ -2,6 +2,7 @@ using Goro.Commands;
 using Goro.Discovery;
 using Goro.Execution;
 using Goro.Hashing;
+using Goro.Messages;
 using Goro.Pipeline;
 using Goro.Predicates.Identifiers;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,6 +45,7 @@ public sealed class GoroApp
         services.AddSingleton<IPipelinePlanner, PipelinePlanner>();
         services.AddSingleton<IExecutor, ConcurrentExecutor>();
         services.AddSingleton<IIdentifierCatalog>(BuiltInCatalog.Instance);
+        services.AddSingleton<IErrorMessages>(EnglishErrorMessages.Instance);
         services.AddTransient<HashCommand>();
         services.AddTransient<ListCommand>();
         return services;
@@ -75,7 +77,21 @@ public sealed class GoroApp
             return ExitCodes.Rejected;
         }
 
-        error.WriteLine($"{ErrorMessages.ErrorPrefix()}{exception.Message}", Style.Plain);
+        error.WriteLine($"{MessagesFrom(resolver).ErrorPrefix}{exception.Message}", Style.Plain);
         return ExitCodes.Failed;
+    }
+
+    // The registered provider, if the run got far enough to have one; reporting a failure must not
+    // fail in turn, so the English provider stands in for a resolver that is missing or disposed.
+    private static IErrorMessages MessagesFrom(ITypeResolver? resolver)
+    {
+        try
+        {
+            return resolver?.Resolve(typeof(IErrorMessages)) as IErrorMessages ?? EnglishErrorMessages.Instance;
+        }
+        catch (ObjectDisposedException)
+        {
+            return EnglishErrorMessages.Instance;
+        }
     }
 }

@@ -2,6 +2,7 @@ using Goro.Cli;
 using Goro.Discovery;
 using Goro.Domain;
 using Goro.Execution;
+using Goro.Messages;
 using Goro.Output;
 using Goro.Pipeline;
 using Goro.Predicates.Binding;
@@ -15,7 +16,8 @@ public sealed class ListCommand(
     IFileDiscoveryService fileDiscovery,
     IPipelinePlanner pipelinePlanner,
     IExecutor executor,
-    IIdentifierCatalog identifiers)
+    IIdentifierCatalog identifiers,
+    IErrorMessages messages)
     : AsyncCommand<ListCommand.Settings>
 {
     public sealed class Settings : GlobalSettings
@@ -31,9 +33,12 @@ public sealed class ListCommand(
 
         public override ValidationResult Validate()
         {
+            // Spectre validates settings with no access to the container, so this message is
+            // rendered by the English provider directly rather than the registered one.
             if (!OutputFormatExtensions.TryParse(Output, out _))
             {
-                return ValidationResult.Error(ErrorMessages.InvalidOutputFormat(Output, OutputFormatExtensions.ValidNames));
+                return ValidationResult.Error(EnglishErrorMessages.Instance.Render(
+                    new ErrorMessage.InvalidOutputFormat(new Code(Output ?? ""), [.. OutputFormatExtensions.ValidNames.Select(name => new Code(name))])));
             }
 
             return base.Validate();
@@ -53,7 +58,7 @@ public sealed class ListCommand(
             var compiled = PredicateCompiler.Compile(text, identifiers);
             if (!compiled.Succeeded)
             {
-                PredicateDiagnosticRenderer.Write(Console.Error, text, compiled.Diagnostics);
+                PredicateDiagnosticRenderer.Write(Console.Error, messages, text, compiled.Diagnostics);
                 return Task.FromResult(ExitCodes.Rejected);
             }
 
@@ -65,7 +70,7 @@ public sealed class ListCommand(
 
         var renderer = output.CreateRenderer<ListResult>(r => r.File);
 
-        return new FileRun(fileDiscovery, executor)
+        return new FileRun(fileDiscovery, executor, messages)
             .ExecuteAsync(settings, options.PathSpecs, () => pipelinePlanner.PlanList(options), renderer, cancellationToken);
     }
 }

@@ -1,3 +1,4 @@
+using Goro.Messages;
 using Goro.Warnings;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -31,7 +32,10 @@ public abstract class GlobalSettings : CommandSettings
     {
         if (NoWarn is { IsSet: true } && !WarningCategories.TryParse(NoWarn.Value, out _, out var unknown))
         {
-            return ValidationResult.Error(ErrorMessages.UnknownWarningCategory(unknown, WarningCategories.ValidNames));
+            // Spectre validates settings with no access to the container, so this message is
+            // rendered by the English provider directly rather than the registered one.
+            return ValidationResult.Error(EnglishErrorMessages.Instance.Render(
+                new ErrorMessage.UnknownWarningCategory(new Code(unknown ?? ""), [.. WarningCategories.ValidNames.Select(name => new Code(name))])));
         }
 
         return ValidationResult.Success();

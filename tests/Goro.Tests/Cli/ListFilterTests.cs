@@ -50,7 +50,7 @@ public class ListFilterTests
     {
         yield return new TestCaseData(
             @"file::name = ""a.mp3""",
-            new[] { "goro: error: Equality is written `==`.", @"  file::name = ""a.mp3""", "             ^", @"  try: file::name == ""a.mp3""" })
+            new[] { "goro: error: We compare with `==`, goro!", @"  file::name = ""a.mp3""", "             ^", @"  try: file::name == ""a.mp3""" })
             .SetName("A borrowed operator is answered with the one meant");
         yield return new TestCaseData(
             @"file::name =~ ""^a""",
@@ -84,7 +84,7 @@ public class ListFilterTests
         var (exitCode, stdOut, stdErr, discovery) = await RunObservedAsync("list", "--filter", "", _collection.Root);
 
         AssertRejectedBeforeAnythingWasProcessed(exitCode, stdOut, discovery);
-        Assert.That(stdErr.Trim(), Is.EqualTo("goro: error: The predicate is empty."));
+        Assert.That(stdErr.Trim(), Is.EqualTo("goro: error: Give the filter something to check, goro!"));
     }
 
     // The predicate is checked first, needing nothing but its own text, and the first rejection
@@ -97,7 +97,7 @@ public class ListFilterTests
         var (exitCode, stdOut, stdErr, discovery) = await RunObservedAsync("list", @"--filter=file::name = ""a.mp3""", missing);
 
         AssertRejectedBeforeAnythingWasProcessed(exitCode, stdOut, discovery);
-        Assert.That(stdErr, Does.Contain("Equality is written `==`."));
+        Assert.That(stdErr, Does.Contain("We compare with `==`, goro!"));
         Assert.That(stdErr, Does.Not.Contain(missing));
     }
 

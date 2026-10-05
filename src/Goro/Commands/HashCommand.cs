@@ -3,6 +3,7 @@ using Goro.Discovery;
 using Goro.Domain;
 using Goro.Execution;
 using Goro.Hashing;
+using Goro.Messages;
 using Goro.Output;
 using Goro.Pipeline;
 using Spectre.Console;
@@ -10,7 +11,7 @@ using Spectre.Console.Cli;
 
 namespace Goro.Commands;
 
-public sealed class HashCommand(IFileDiscoveryService fileDiscovery, IPipelinePlanner pipelinePlanner, IExecutor executor)
+public sealed class HashCommand(IFileDiscoveryService fileDiscovery, IPipelinePlanner pipelinePlanner, IExecutor executor, IErrorMessages messages)
     : AsyncCommand<HashCommand.Settings>
 {
     /// <summary>What a file whose audio could not be read shows in place of its hash, in plain output.</summary>
@@ -29,14 +30,18 @@ public sealed class HashCommand(IFileDiscoveryService fileDiscovery, IPipelinePl
 
         public override ValidationResult Validate()
         {
+            // Spectre validates settings with no access to the container, so these messages are
+            // rendered by the English provider directly rather than the registered one.
             if (!HashAlgorithmKindExtensions.TryParse(Algorithm, out _))
             {
-                return ValidationResult.Error(ErrorMessages.InvalidAlgorithm(Algorithm, HashAlgorithmKindExtensions.ValidNames));
+                return ValidationResult.Error(EnglishErrorMessages.Instance.Render(
+                    new ErrorMessage.InvalidAlgorithm(new Code(Algorithm ?? ""), [.. HashAlgorithmKindExtensions.ValidNames.Select(name => new Code(name))])));
             }
 
             if (!OutputFormatExtensions.TryParse(Output, out _))
             {
-                return ValidationResult.Error(ErrorMessages.InvalidOutputFormat(Output, OutputFormatExtensions.ValidNames));
+                return ValidationResult.Error(EnglishErrorMessages.Instance.Render(
+                    new ErrorMessage.InvalidOutputFormat(new Code(Output ?? ""), [.. OutputFormatExtensions.ValidNames.Select(name => new Code(name))])));
             }
 
             return base.Validate();
@@ -55,7 +60,7 @@ public sealed class HashCommand(IFileDiscoveryService fileDiscovery, IPipelinePl
         // and null in JSON. See docs/commands/hash.md.
         var renderer = output.CreateRenderer<HashResult>(r => $"{r.File} {r.Algo} {r.Hash ?? AbsentHash}");
 
-        return new FileRun(fileDiscovery, executor)
+        return new FileRun(fileDiscovery, executor, messages)
             .ExecuteAsync(settings, options.PathSpecs, () => pipelinePlanner.PlanHash(options), renderer, cancellationToken);
     }
 }

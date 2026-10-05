@@ -1,3 +1,4 @@
+using Goro.Messages;
 using static Goro.Tests.Predicates.Syntax.SyntaxAssert;
 using Codes = Goro.Predicates.Syntax.SyntaxDiagnosticCodes;
 
@@ -321,7 +322,8 @@ public class ParserDiagnosticTests
     [Test]
     public void LiteralRunningIntoText_SaysHowItWasRead()
     {
-        Assert.That(Error("5BETWEEN 1..10").Message, Does.Contain("`5B` reads as a bytecount").And.Contain("`ETWEEN`"));
+        Assert.That(Error("5BETWEEN 1..10").Message, Is.EqualTo(
+            new ErrorMessage.RunOnLiteral(new Code("5BETWEEN"), new Code("5B"), NumericLiteral.ByteCount, new Code("ETWEEN"))));
     }
 
     [Test]
@@ -329,7 +331,7 @@ public class ParserDiagnosticTests
     {
         var error = Error("file::duration > 1.5h");
         Assert.That(error.Code, Is.EqualTo(Codes.MalformedLiteral));
-        Assert.That(error.Message, Does.Contain("whole numbers"));
+        Assert.That(error.Message, Is.EqualTo(new ErrorMessage.FractionalDurationFields(new Code("1.5h"))));
     }
 
     [TestCase("x > -5mb", "-5mb")]
@@ -394,7 +396,7 @@ public class ParserDiagnosticTests
         const string text = "x == 1 y";
         var error = Error(text);
         Assert.That(error.Span.Of(text), Is.EqualTo("y"));
-        Assert.That(error.Message, Does.Contain("`y`"));
+        Assert.That(error.Message, Is.EqualTo(new ErrorMessage.UnexpectedToken(Expectation.OperatorOrEnd, new Code("y"))));
     }
 
     [Test]

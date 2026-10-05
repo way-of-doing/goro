@@ -1,5 +1,6 @@
 // Owned by the binder group (G4) of the predicate-runtime-architecture line.
 using System.Text.RegularExpressions;
+using Goro.Messages;
 using Goro.Predicates.Text;
 
 namespace Goro.Predicates.Binding;
@@ -47,15 +48,15 @@ internal static class Patterns
     }
 
     // The engine names the construct in its message; the specification groups them in four families.
-    private static string Family(string message) => message switch
+    private static PatternFamily Family(string message) => message switch
     {
         _ when message.Contains("lookahead", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("lookbehind", StringComparison.OrdinalIgnoreCase) => ErrorMessages.Lookaround(),
-        _ when message.Contains("backreference", StringComparison.OrdinalIgnoreCase) => ErrorMessages.Backreference(),
-        _ when message.Contains("atomic", StringComparison.OrdinalIgnoreCase) => ErrorMessages.AtomicGroup(),
+            || message.Contains("lookbehind", StringComparison.OrdinalIgnoreCase) => PatternFamily.Lookaround,
+        _ when message.Contains("backreference", StringComparison.OrdinalIgnoreCase) => PatternFamily.Backreference,
+        _ when message.Contains("atomic", StringComparison.OrdinalIgnoreCase) => PatternFamily.AtomicGroup,
         _ when message.Contains("conditional", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("balancing", StringComparison.OrdinalIgnoreCase) => ErrorMessages.ConditionalOrBalancingGroup(),
-        _ => ErrorMessages.UnknownConstruct(),
+            || message.Contains("balancing", StringComparison.OrdinalIgnoreCase) => PatternFamily.ConditionalOrBalancingGroup,
+        _ => PatternFamily.Unknown,
     };
 }
 
@@ -66,8 +67,9 @@ internal abstract record PatternFailure
     }
 
     /// <param name="Offset">Where in the pattern the engine gave up, as it counts.</param>
+    /// <param name="Reason">Why, in the engine's own words.</param>
     public sealed record Malformed(int Offset, string Reason) : PatternFailure;
 
-    /// <param name="Family">The construct, as the specification groups them, with its article.</param>
-    public sealed record Unsupported(string Family) : PatternFailure;
+    /// <param name="Family">The construct, as the specification groups them.</param>
+    public sealed record Unsupported(PatternFamily Family) : PatternFailure;
 }

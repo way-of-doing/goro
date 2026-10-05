@@ -1,3 +1,4 @@
+using Goro.Messages;
 using Goro.Predicates.Binding;
 using Goro.Predicates.Values;
 using static Goro.Tests.Predicates.Binding.Support.BindAssert;
@@ -38,7 +39,8 @@ public class TypeBindingTests
     {
         var error = Error("file::size > COUNT(genre)");
 
-        Assert.That(error.Message, Does.Contain("Only a number literal"));
+        Assert.That(error.Message, Is.EqualTo(new ErrorMessage.TypeMismatchNumberVariable(
+            new Code("file::size"), GoroType.ByteCount, new Code("COUNT(genre)"), GoroType.Number, new Code(">"))));
     }
 
     [TestCase("file::duration > (90)")]

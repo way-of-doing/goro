@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
+using Goro.Messages;
 using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Values;
 using static Goro.Predicates.Syntax.SyntaxDiagnosticCodes;
@@ -186,7 +187,7 @@ public static class Lexer
             }
 
             var word = text[start..end];
-            return Fail(NonAsciiName, TextSpan.FromBounds(start, end), ErrorMessages.NonAsciiName(word));
+            return Fail(NonAsciiName, TextSpan.FromBounds(start, end), new ErrorMessage.NonAsciiName(new Code(word)));
         }
 
         // ------------------------------------------------------------------------------------------
@@ -283,20 +284,20 @@ public static class Lexer
                 case 'r': decoded = "\r"; return true;
                 case 't': decoded = "\t"; return true;
                 case 'x':
-                    return TryScanFixedHex(start, 2, ErrorMessages.HexEscapeDigits(), out decoded);
+                    return TryScanFixedHex(start, 2, new ErrorMessage.HexEscapeDigits(), out decoded);
                 case 'u' when At(position) == '{':
                     return TryScanBracedEscape(start, out decoded);
                 case 'u':
-                    return TryScanFixedHex(start, 4, ErrorMessages.UnicodeEscapeDigits(), out decoded);
+                    return TryScanFixedHex(start, 4, new ErrorMessage.UnicodeEscapeDigits(), out decoded);
                 default:
                     var length = char.IsHighSurrogate(letter) && char.IsLowSurrogate(At(position)) ? 2 : 1;
                     var span = new TextSpan(start, 1 + length);
-                    Fail(UnknownEscape, span, ErrorMessages.UnknownEscape(span.Of(text)));
+                    Fail(UnknownEscape, span, new ErrorMessage.UnknownEscape(new Code(span.Of(text))));
                     return false;
             }
         }
 
-        private bool TryScanFixedHex(int start, int digits, string rule, out string decoded)
+        private bool TryScanFixedHex(int start, int digits, ErrorMessage rule, out string decoded)
         {
             decoded = "";
             var hexStart = position;
@@ -332,7 +333,7 @@ public static class Lexer
                     position++;
                 }
 
-                Fail(MalformedEscape, TextSpan.FromBounds(start, position), ErrorMessages.BracedEscapeDigits());
+                Fail(MalformedEscape, TextSpan.FromBounds(start, position), new ErrorMessage.BracedEscapeDigits());
                 return false;
             }
 
@@ -341,13 +342,13 @@ public static class Lexer
             var span = TextSpan.FromBounds(start, position);
             if (codePoint > 0x10FFFF)
             {
-                Fail(CodePointOutOfRange, span, ErrorMessages.CodePointOutOfRange(span.Of(text)));
+                Fail(CodePointOutOfRange, span, new ErrorMessage.CodePointOutOfRange(new Code(span.Of(text))));
                 return false;
             }
 
             if (codePoint is >= 0xD800 and <= 0xDFFF)
             {
-                Fail(SurrogateCodePoint, span, ErrorMessages.SurrogateCodePoint(span.Of(text)));
+                Fail(SurrogateCodePoint, span, new ErrorMessage.SurrogateCodePoint(new Code(span.Of(text))));
                 return false;
             }
 
@@ -385,10 +386,10 @@ public static class Lexer
         }
 
         private Token? RejectUnterminatedString(int start) =>
-            Fail(UnterminatedString, TextSpan.FromBounds(start, text.Length), ErrorMessages.UnterminatedString());
+            Fail(UnterminatedString, TextSpan.FromBounds(start, text.Length), new ErrorMessage.UnterminatedString());
 
         private Token? RejectLoneSurrogate(TextSpan escape) =>
-            Fail(LoneSurrogate, escape, ErrorMessages.LoneSurrogate(escape.Of(text)));
+            Fail(LoneSurrogate, escape, new ErrorMessage.LoneSurrogate(new Code(escape.Of(text))));
 
         // ------------------------------------------------------------------------------------------
         // Numbers, bytecounts and durations
@@ -413,7 +414,7 @@ public static class Lexer
             else if (At(integerEnd) == '.' && At(integerEnd + 1) != '.')
             {
                 var span = TextSpan.FromBounds(start, integerEnd + 1);
-                return Fail(TrailingPeriod, span, ErrorMessages.TrailingPeriod(span.Of(text), text[start..integerEnd]));
+                return Fail(TrailingPeriod, span, new ErrorMessage.TrailingPeriod(new Code(span.Of(text)), new Code(text[start..integerEnd])));
             }
 
             if (signed)
@@ -541,7 +542,7 @@ public static class Lexer
                 if (field > 59)
                 {
                     var span = new TextSpan(colon + 1, 2);
-                    return Fail(ClockFieldOutOfRange, span, ErrorMessages.ClockFieldOutOfRange(span.Of(text)));
+                    return Fail(ClockFieldOutOfRange, span, new ErrorMessage.ClockFieldOutOfRange(new Code(span.Of(text))));
                 }
 
                 seconds = seconds * 60 + field;
@@ -556,7 +557,7 @@ public static class Lexer
                 : RejectUnrepresentable(span);
 
         private Token? RejectUnrepresentable(TextSpan span) =>
-            Fail(UnrepresentableLiteral, span, ErrorMessages.UnrepresentableLiteral(span.Of(text)));
+            Fail(UnrepresentableLiteral, span, new ErrorMessage.UnrepresentableLiteral(new Code(span.Of(text))));
 
         /// <summary>
         /// A colon that is not half of <c>::</c>. Straight after a number it is a clock-form
@@ -579,17 +580,17 @@ public static class Lexer
             var span = TextSpan.FromBounds(previous.Span.Start, end);
             if (text[previous.Span.Start] is '+' or '-' && IsClockField(position))
             {
-                return Fail(SignedUnitLiteral, span, ErrorMessages.SignedClockDuration(span.Of(text)));
+                return Fail(SignedUnitLiteral, span, new ErrorMessage.SignedClockDuration(new Code(span.Of(text))));
             }
 
-            return Fail(MalformedLiteral, span, ErrorMessages.MalformedClockDuration(span.Of(text)));
+            return Fail(MalformedLiteral, span, new ErrorMessage.MalformedClockDuration(new Code(span.Of(text))));
         }
 
         private Token? RejectUnexpectedCharacter()
         {
             var length = char.IsHighSurrogate(text[position]) && char.IsLowSurrogate(At(position + 1)) ? 2 : 1;
             var span = new TextSpan(position, length);
-            return Fail(UnexpectedCharacter, span, ErrorMessages.UnexpectedCharacter(span.Of(text)));
+            return Fail(UnexpectedCharacter, span, new ErrorMessage.UnexpectedCharacter(new Code(span.Of(text))));
         }
 
         // ------------------------------------------------------------------------------------------
@@ -623,7 +624,7 @@ public static class Lexer
                 : 0;
         }
 
-        private Token? Fail(string code, TextSpan span, string message)
+        private Token? Fail(string code, TextSpan span, ErrorMessage message)
         {
             error = new Diagnostic(code, span, message);
             return null;

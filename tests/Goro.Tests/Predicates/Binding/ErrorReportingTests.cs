@@ -1,5 +1,7 @@
+using Goro.Messages;
 using Goro.Predicates.Binding;
 using Goro.Predicates.Syntax;
+using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Binding.Support;
 using static Goro.Tests.Predicates.Binding.Support.BindAssert;
 using Codes = Goro.Predicates.Binding.BinderDiagnosticCodes;
@@ -45,9 +47,10 @@ public class ErrorReportingTests
     }
 
     [Test]
-    public void Messages_QuoteThePredicateInBackticks()
+    public void AMessage_CarriesThePredicatesOwnText_AsWritten()
     {
-        Assert.That(Error("artist == 1").Message, Does.Contain("`artist`").And.Contain("`1`"));
+        Assert.That(Error("artist  ==  1.50").Message, Is.EqualTo(
+            new ErrorMessage.TypeMismatch(new Code("artist"), GoroType.String, new Code("1.50"), GoroType.Number, new Code("=="))));
     }
 
     [Test]

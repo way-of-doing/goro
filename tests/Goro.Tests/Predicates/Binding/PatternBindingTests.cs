@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Goro.Messages;
 using Goro.Predicates.Binding;
 using Goro.Predicates.Text;
 using static Goro.Tests.Predicates.Binding.Support.BindAssert;
@@ -41,24 +42,24 @@ public class PatternBindingTests
 
     // Canaries: each family the engine rejects today. If a later .NET supports one, the
     // specification's promise that it is rejected lapses, and one of these fails.
-    [TestCase(@"(?=a)", "lookaround")]
-    [TestCase(@"(?!a)", "lookaround")]
-    [TestCase(@"(?<=a)b", "lookaround")]
-    [TestCase(@"(?<!a)b", "lookaround")]
-    [TestCase(@"(a)\1", "backreference")]
-    [TestCase(@"(?<n>a)\k<n>", "backreference")]
-    [TestCase(@"(?>a)", "atomic group")]
-    [TestCase(@"(a)?(?(1)b|c)", "conditional or a balancing group")]
-    [TestCase(@"(?(a)b|c)", "conditional or a balancing group")]
-    [TestCase(@"(?<x>a)(?<-x>b)", "conditional or a balancing group")]
-    public void UnsupportedConstruct_IsRejected_NamingItsFamily(string pattern, string family)
+    [TestCase(@"(?=a)", PatternFamily.Lookaround)]
+    [TestCase(@"(?!a)", PatternFamily.Lookaround)]
+    [TestCase(@"(?<=a)b", PatternFamily.Lookaround)]
+    [TestCase(@"(?<!a)b", PatternFamily.Lookaround)]
+    [TestCase(@"(a)\1", PatternFamily.Backreference)]
+    [TestCase(@"(?<n>a)\k<n>", PatternFamily.Backreference)]
+    [TestCase(@"(?>a)", PatternFamily.AtomicGroup)]
+    [TestCase(@"(a)?(?(1)b|c)", PatternFamily.ConditionalOrBalancingGroup)]
+    [TestCase(@"(?(a)b|c)", PatternFamily.ConditionalOrBalancingGroup)]
+    [TestCase(@"(?<x>a)(?<-x>b)", PatternFamily.ConditionalOrBalancingGroup)]
+    public void UnsupportedConstruct_IsRejected_NamingItsFamily(string pattern, PatternFamily family)
     {
         var text = $"artist =~ r\"{pattern}\"";
 
         var error = Error(text);
 
         Assert.That(error.Code, Is.EqualTo(Codes.UnsupportedPatternConstruct));
-        Assert.That(error.Message, Does.Contain(family));
+        Assert.That(error.Message, Is.EqualTo(new ErrorMessage.UnsupportedPatternConstruct(family)));
         Assert.That(Marked(text, error), Is.EqualTo($"r\"{pattern}\""));
     }
 
@@ -79,7 +80,11 @@ public class PatternBindingTests
     [Test]
     public void MalformedPattern_SaysWhy()
     {
-        Assert.That(Error("artist =~ r\"a(\"").Message, Does.Contain("Not enough )'s"));
+        var message = Error("artist =~ r\"a(\"").Message;
+
+        Assert.That(message, Is.TypeOf<ErrorMessage.InvalidPattern>());
+        Assert.That(((ErrorMessage.InvalidPattern)message).Pattern, Is.EqualTo(new Code("r\"a(\"")));
+        Assert.That(((ErrorMessage.InvalidPattern)message).Reason.Text, Does.Contain("Not enough )'s"));
     }
 
     [TestCase("year =~ r\"1\"", "STRING(year) =~ r\"1\"")]

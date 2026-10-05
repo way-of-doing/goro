@@ -1,3 +1,4 @@
+using Goro.Messages;
 using Goro.Predicates.Binding;
 using static Goro.Tests.Predicates.Binding.Support.BindAssert;
 
@@ -62,7 +63,7 @@ public class IdentifierBindingTests
         var error = Error("id3v1::bpm == 1");
 
         Assert.That(error.Code, Is.EqualTo(BinderDiagnosticCodes.UnknownIdentifier));
-        Assert.That(error.Message, Does.Contain("`id3v1`").And.Contain("`bpm`"));
+        Assert.That(error.Message, Is.EqualTo(new ErrorMessage.UnknownIdentifierInNamespace(new Code("id3v1"), new Code("bpm"))));
         Assert.That(Marked("id3v1::bpm == 1", error), Is.EqualTo("id3v1::bpm"));
     }
 
@@ -93,7 +94,7 @@ public class IdentifierBindingTests
         var error = Error("musicbrainz::id == \"x\"");
 
         Assert.That(error.Code, Is.EqualTo(BinderDiagnosticCodes.UnknownNamespace));
-        Assert.That(error.Message, Does.Contain("`musicbrainz`"));
+        Assert.That(error.Message, Is.EqualTo(new ErrorMessage.UnknownNamespace(new Code("musicbrainz"))));
         Assert.That(error.Suggestions, Is.Empty);
     }
 

@@ -1,4 +1,5 @@
 using Goro.Discovery;
+using Goro.Messages;
 using Goro.Tests.TestSupport;
 using Goro.Warnings;
 
@@ -101,6 +102,7 @@ public class FileDiscoveryServiceTests
 
         var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([missing]));
         Assert.That(ex.PathSpec, Is.EqualTo(missing));
+        Assert.That(ex.Error, Is.EqualTo(new ErrorMessage.PathSpecNotFound(new Code(missing))));
     }
 
     [Test]
@@ -122,7 +124,8 @@ public class FileDiscoveryServiceTests
             Assume.That(() => Directory.EnumerateFileSystemEntries(locked.FullName).Any(), Throws.Exception,
                 "permissions are not enforced for this user");
 
-            Assert.Throws<PathSpecException>(() => _service.Resolve([locked.FullName]));
+            var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([locked.FullName]));
+            Assert.That(ex.Error, Is.EqualTo(new ErrorMessage.PathSpecNotListable(new Code(locked.FullName))));
         }
         finally
         {
@@ -207,6 +210,7 @@ public class FileDiscoveryServiceTests
 
         var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([pattern]));
         Assert.That(ex.PathSpec, Is.EqualTo(pattern));
+        Assert.That(ex.Error, Is.EqualTo(new ErrorMessage.GlobWithSeveralStars(new Code(pattern))));
     }
 
     [TestCase("*", "c.mp3")]
@@ -216,7 +220,10 @@ public class FileDiscoveryServiceTests
     {
         WriteFile("album", "c.mp3");
 
-        Assert.Throws<PathSpecException>(() => _service.Resolve([InTemp(directory, name)]));
+        var pathSpec = InTemp(directory, name);
+
+        var ex = Assert.Throws<PathSpecException>(() => _service.Resolve([pathSpec]));
+        Assert.That(ex.Error, Is.EqualTo(new ErrorMessage.GlobWildcardBeforeLastComponent(new Code(pathSpec))));
     }
 
     [Test]

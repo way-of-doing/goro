@@ -261,3 +261,35 @@ crosses each seam, a code skeleton with tests realises it, and `architecture.md`
 
   Next step: PJ rewrites the error messages in `ErrorMessages.cs`, starting from the coordinator's
   drafts, which are left unstaged; then a review of the whole line and its merge into main.
+
+- 2026-10-05 -- Error messages are data. While rewriting the messages, PJ ruled out composing
+  them from fragments: "it works fine initially, but as soon as you try something even a little bit
+  foreign, it all comes crashing down because the concatenation at specific points assumes English
+  grammatical structure". Every message the engine can report is spelled out on its own; a
+  provider for another language may compose if it likes, which is its own business.
+  - The engine reports an `ErrorMessage`, one of a closed set of records, and never builds text.
+    A record's fields can hold only data:
+    - `Code`, which is the user's text or a name Goro spells;
+    - `GoroType`, which is shown by its Goro name;
+    - an enum of situations, or an `int`;
+    - a list of `Code`;
+    - `ForeignText`, which is the regex engine's reason.
+
+    A reflection test refuses a `string` field.
+  - `EnglishErrorMessages`, behind `IErrorMessages`, renders every record through one switch, as a
+    whole sentence for each case. A record that varies by an enum has one sentence per value, and
+    CS8509 is an error project-wide, so a value with no sentence fails the build. The prefix and
+    the `try:` label are the provider's too.
+  - The Words section (articles, plurals, roles, places, capitalisation) is gone. Roles and places
+    shown by the marker were dropped, and types appear by their Goro names.
+  - Tests assert records rather than English, so rewording breaks none of them. One test renders
+    every case of every record and requires each sentence to end with ", goro!". A few
+    command-line tests still check the rendered text end to end.
+  - PJ's own Lexical and Syntax sentences moved over verbatim. Where one of them took a fragment,
+    it was split into one sentence per case in PJ's pattern: `UnexpectedEnd`, `UnexpectedToken`
+    and `RunOnLiteral`. architecture.md says that diagnostics carry messages as data.
+
+  `dotnet test`: 1932 passed.
+
+  Next step: PJ finishes the wording in `src/Goro/Messages/EnglishErrorMessages.cs`, then a review
+  of the whole line and its merge into main.

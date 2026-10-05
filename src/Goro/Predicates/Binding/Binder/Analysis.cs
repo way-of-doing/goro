@@ -45,7 +45,7 @@ internal sealed class Analysis
     public static StageResult<CompiledPredicate> Run(SyntaxTree tree, IIdentifierCatalog catalog)
     {
         var analysis = new Analysis(tree.Text, catalog);
-        var root = analysis.Condition(tree.Root, ErrorMessages.ThePredicate());
+        var root = analysis.Condition(tree.Root);
         if (analysis.diagnostics.Count > 0)
         {
             // Sorting is stable, so errors that start together stay in the order they were found.
@@ -61,10 +61,9 @@ internal sealed class Analysis
     // The three kinds of place
 
     /// <summary>Somewhere a definite boolean is required.</summary>
-    /// <param name="role">What the place is, for messages: "the predicate", "an operand of `AND`".</param>
-    private Bound Condition(ExpressionSyntax syntax, string role)
+    private Bound Condition(ExpressionSyntax syntax)
     {
-        var bound = Unmodified(syntax, role);
+        var bound = Unmodified(syntax);
         if (bound.IsError)
         {
             return bound;
@@ -72,13 +71,13 @@ internal sealed class Analysis
 
         if (bound.Type != GoroType.Boolean)
         {
-            Report(report.NotACondition(syntax, bound.Type!.Value, role));
+            Report(report.NotACondition(syntax, bound.Type!.Value));
             return bound with { Node = null };
         }
 
         if (!bound.IsDefinite)
         {
-            Report(report.IndefiniteCondition(syntax, role));
+            Report(report.IndefiniteCondition(syntax));
             return bound with { Node = null };
         }
 
@@ -140,7 +139,7 @@ internal sealed class Analysis
         NotSyntax not => Not(not),
         LogicalSyntax logical => Logical(logical),
         // Every caller takes modifiers off first; this is only a safety net.
-        ModifierSyntax modifier => Unmodified(modifier, ErrorMessages.ThisExpression()),
+        ModifierSyntax modifier => Unmodified(modifier),
         _ => throw new UnreachableException($"{syntax.GetType().Name} is not an expression the binder knows."),
     };
 
@@ -148,7 +147,8 @@ internal sealed class Analysis
     /// A value where a modifier would be misplaced. One error covers a whole stack of them, and what
     /// they were applied to is still analysed, so that mistakes inside it are found too.
     /// </summary>
-    private Bound Unmodified(ExpressionSyntax syntax, string place)
+    /// <param name="function">The function this is an argument of, if it is one, for the message.</param>
+    private Bound Unmodified(ExpressionSyntax syntax, NameToken? function = null)
     {
         if (ModifierWithin(syntax) is not { } modifier)
         {
@@ -156,7 +156,7 @@ internal sealed class Analysis
         }
 
         var unmodified = WithoutModifiers(syntax);
-        Report(report.MisplacedModifier(modifier, syntax, unmodified, place));
+        Report(report.MisplacedModifier(modifier, syntax, unmodified, function));
         return Value(unmodified);
     }
 
@@ -206,7 +206,7 @@ internal sealed class Analysis
     {
         // Every argument is analysed whatever is wrong with the call, for the mistakes inside it.
         var arguments = call.Arguments
-            .Select(argument => Unmodified(argument, ErrorMessages.ArgumentOf(call.Name.Text)))
+            .Select(argument => Unmodified(argument, call.Name))
             .ToList();
 
         var function = call.Name.Text.ToUpperInvariant();
@@ -511,16 +511,15 @@ internal sealed class Analysis
 
     private Bound Not(NotSyntax not)
     {
-        var operand = Condition(not.Operand, ErrorMessages.OperandOfNot());
+        var operand = Condition(not.Operand);
         var node = operand.Node is BoundExpression<bool> condition ? new Not(condition) : null;
         return Operator(node, Shape.Not(operand.Shape));
     }
 
     private Bound Logical(LogicalSyntax logical)
     {
-        var role = logical.Operator == LogicalOperator.And ? ErrorMessages.OperandOfAnd() : ErrorMessages.OperandOfOr();
-        var left = Condition(logical.Left, role);
-        var right = Condition(logical.Right, role);
+        var left = Condition(logical.Left);
+        var right = Condition(logical.Right);
         BoundCondition? node = (left.Node, right.Node) switch
         {
             (BoundExpression<bool> l, BoundExpression<bool> r) => logical.Operator == LogicalOperator.And ? new And(l, r) : new Or(l, r),

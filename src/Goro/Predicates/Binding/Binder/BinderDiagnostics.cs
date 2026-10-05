@@ -1,6 +1,7 @@
 // Owned by the binder group (G4) of the predicate-runtime-architecture line.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
+using Goro.Messages;
 using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Syntax;
@@ -32,7 +33,7 @@ internal sealed partial class BinderDiagnostics(string text)
                 Text(TextSpan.FromBounds(identifier.Span.Start, namespaceParts[0].Span.Start))
                 + closest
                 + Text(TextSpan.FromBounds(namespaceParts[^1].Span.End, identifier.Span.End)))];
-        return new Diagnostic(Codes.UnknownNamespace, identifier.Span, ErrorMessages.UnknownNamespace(written), suggestions);
+        return new Diagnostic(Codes.UnknownNamespace, identifier.Span, new ErrorMessage.UnknownNamespace(new Code(written)), suggestions);
     }
 
     public Diagnostic UnknownIdentifier(IdentifierSyntax identifier, IEnumerable<IdentifierName> candidates)
@@ -44,8 +45,8 @@ internal sealed partial class BinderDiagnostics(string text)
             : [new Suggestion(identifier.Span,
                 Text(TextSpan.FromBounds(identifier.Span.Start, name.Span.Start)) + IdentifierName.Global(closest))];
         var message = identifier.Parts.Length == 1
-            ? ErrorMessages.UnknownIdentifier(name.Text)
-            : ErrorMessages.UnknownIdentifierInNamespace(Text(TextSpan.FromBounds(identifier.Parts[0].Span.Start, identifier.Parts[^2].Span.End)), name.Text);
+            ? (ErrorMessage)new ErrorMessage.UnknownIdentifier(new Code(name.Text))
+            : new ErrorMessage.UnknownIdentifierInNamespace(Code(TextSpan.FromBounds(identifier.Parts[0].Span.Start, identifier.Parts[^2].Span.End)), new Code(name.Text));
         return new Diagnostic(Codes.UnknownIdentifier, identifier.Span, message, suggestions);
     }
 
@@ -58,17 +59,17 @@ internal sealed partial class BinderDiagnostics(string text)
         }
 
         ImmutableArray<Suggestion> suggestions = closest is null ? [] : [new Suggestion(name.Span, closest)];
-        return new Diagnostic(Codes.UnknownFunction, name.Span, ErrorMessages.UnknownFunction(name.Text), suggestions);
+        return new Diagnostic(Codes.UnknownFunction, name.Span, new ErrorMessage.UnknownFunction(new Code(name.Text)), suggestions);
     }
 
     public Diagnostic NullValue(TextSpan span) =>
-        new(Codes.NullValue, span, ErrorMessages.NullValue());
+        new(Codes.NullValue, span, new ErrorMessage.NullValue());
 
     /// <summary><c>x == NULL</c> or <c>x != NULL</c>, which is a state test written the way SQL writes it.</summary>
     public Diagnostic NullComparison(ComparisonSyntax comparison, NullSyntax @null, ExpressionSyntax other)
     {
         var negation = comparison.Operator == ComparisonOperator.NotEqual ? "NOT " : "";
-        return new Diagnostic(Codes.NullValue, @null.Span, ErrorMessages.NullComparison(),
+        return new Diagnostic(Codes.NullValue, @null.Span, new ErrorMessage.NullComparison(),
             [new Suggestion(comparison.Span, $"{negation}{Text(other)} IS ABSENT")]);
     }
 
@@ -77,10 +78,10 @@ internal sealed partial class BinderDiagnostics(string text)
 
     public Diagnostic TypeMismatch(ComparisonSyntax comparison, ExpressionSyntax leftCore, Bound left, ExpressionSyntax rightCore, Bound right)
     {
-        var op = Text(comparison.OperatorSpan);
+        var op = Code(comparison.OperatorSpan);
         var message = OnlyALiteralStandsIn(left, right) || OnlyALiteralStandsIn(right, left)
-            ? ErrorMessages.TypeMismatchNumberVariable(Text(leftCore), left.Type, Text(rightCore), right.Type, op)
-            : ErrorMessages.TypeMismatch(Text(leftCore), left.Type, Text(rightCore), right.Type, op);
+            ? (ErrorMessage)new ErrorMessage.TypeMismatchNumberVariable(Code(leftCore), left.Type!.Value, Code(rightCore), right.Type!.Value, op)
+            : new ErrorMessage.TypeMismatch(Code(leftCore), left.Type!.Value, Code(rightCore), right.Type!.Value, op);
 
         var suggestions = ImmutableArray.CreateBuilder<Suggestion>();
         foreach (var (side, sideCore, other) in new[] { (left, leftCore, right), (right, rightCore, left) })
@@ -104,47 +105,47 @@ internal sealed partial class BinderDiagnostics(string text)
         var defaultSyntax = call.Arguments[1];
         ImmutableArray<Suggestion> suggestions = Unquoted(@default, argument.Type) is { } unquoted ? [unquoted] : [];
         return new Diagnostic(Codes.TypeMismatch, defaultSyntax.Span,
-            ErrorMessages.FallbackTypeMismatch(call.Name.Text, Text(argumentSyntax), argument.Type, Text(defaultSyntax), @default.Type),
+            new ErrorMessage.FallbackTypeMismatch(new Code(call.Name.Text), Code(argumentSyntax), argument.Type!.Value, Code(defaultSyntax), @default.Type!.Value),
             suggestions);
     }
 
     public Diagnostic RangeTypeMismatch(BetweenSyntax between, ExpressionSyntax subjectCore, GoroType subject, GoroType range) =>
-        new(Codes.TypeMismatch, between.Span, ErrorMessages.RangeTypeMismatch(Text(subjectCore), subject, Text(RangeSpan(between)), range));
+        new(Codes.TypeMismatch, between.Span, new ErrorMessage.RangeTypeMismatch(Code(subjectCore), subject, Code(RangeSpan(between)), range));
 
     public Diagnostic NegativeUnitLiteral(LiteralSyntax literal, GoroType unit) =>
-        new(Codes.NegativeUnitLiteral, literal.Span, ErrorMessages.NegativeUnitLiteral(Text(literal), unit));
+        new(Codes.NegativeUnitLiteral, literal.Span, new ErrorMessage.NegativeUnitLiteral(Code(literal), UnitOf(unit)));
 
     public Diagnostic FractionalDurationLiteral(LiteralSyntax literal) =>
-        new(Codes.FractionalDurationLiteral, literal.Span, ErrorMessages.FractionalDurationLiteral(Text(literal)));
+        new(Codes.FractionalDurationLiteral, literal.Span, new ErrorMessage.FractionalDurationLiteral(Code(literal)));
 
     public Diagnostic BooleanCompared(ComparisonSyntax comparison) =>
-        new(Codes.BooleanNotOrdered, comparison.Span, ErrorMessages.BooleanCompared(Text(comparison.OperatorSpan)));
+        new(Codes.BooleanNotOrdered, comparison.Span, new ErrorMessage.BooleanCompared(Code(comparison.OperatorSpan)));
 
     public Diagnostic BooleanBetween(ExpressionSyntax subjectCore) =>
-        new(Codes.BooleanNotOrdered, subjectCore.Span, ErrorMessages.BooleanBetween(Text(subjectCore)));
+        new(Codes.BooleanNotOrdered, subjectCore.Span, new ErrorMessage.BooleanBetween(Code(subjectCore)));
 
     public Diagnostic BooleanRange(BetweenSyntax between) =>
-        new(Codes.BooleanNotOrdered, RangeSpan(between), ErrorMessages.BooleanRange());
+        new(Codes.BooleanNotOrdered, RangeSpan(between), new ErrorMessage.BooleanRange());
 
     public Diagnostic BooleanNotConvertible(FunctionCallSyntax call) =>
-        new(Codes.BooleanNotConvertible, call.Arguments[0].Span, ErrorMessages.BooleanNotConvertible(call.Name.Text, Text(call.Arguments[0])));
+        new(Codes.BooleanNotConvertible, call.Arguments[0].Span, new ErrorMessage.BooleanNotConvertible(new Code(call.Name.Text), Code(call.Arguments[0])));
 
     public Diagnostic MatchSubjectNotString(ExpressionSyntax subjectCore, GoroType type)
     {
         ImmutableArray<Suggestion> suggestions = type is GoroType.Number or GoroType.ByteCount or GoroType.Duration
             ? [new Suggestion(subjectCore.Span, $"STRING({Text(subjectCore)})")]
             : [];
-        return new Diagnostic(Codes.MatchSubjectNotString, subjectCore.Span, ErrorMessages.MatchSubjectNotString(Text(subjectCore), type), suggestions);
+        return new Diagnostic(Codes.MatchSubjectNotString, subjectCore.Span, new ErrorMessage.MatchSubjectNotString(Code(subjectCore), type), suggestions);
     }
 
     // ---------------------------------------------------------------------------------------------
     // Definiteness
 
-    public Diagnostic NotACondition(ExpressionSyntax syntax, GoroType type, string role) =>
-        new(Codes.NotACondition, syntax.Span, ErrorMessages.NotACondition(role, Text(syntax), type));
+    public Diagnostic NotACondition(ExpressionSyntax syntax, GoroType type) =>
+        new(Codes.NotACondition, syntax.Span, new ErrorMessage.NotACondition(Code(syntax), type));
 
-    public Diagnostic IndefiniteCondition(ExpressionSyntax syntax, string role) =>
-        new(Codes.IndefiniteCondition, syntax.Span, ErrorMessages.IndefiniteCondition(Text(syntax), role),
+    public Diagnostic IndefiniteCondition(ExpressionSyntax syntax) =>
+        new(Codes.IndefiniteCondition, syntax.Span, new ErrorMessage.IndefiniteCondition(Code(syntax)),
             [new Suggestion(syntax.Span, $"{Text(syntax)} == TRUE"), new Suggestion(syntax.Span, $"{Text(syntax)} == FALSE")]);
 
     /// <summary>
@@ -161,11 +162,11 @@ internal sealed partial class BinderDiagnostics(string text)
         var universal = Universal(left, leftCore is not null)
             + Text(TextSpan.FromBounds(left.Span.End, right.Span.Start))
             + Universal(right, rightCore is not null);
-        var message = (leftCore, rightCore) switch
+        ErrorMessage message = (leftCore, rightCore) switch
         {
-            ({ } l, { } r) => ErrorMessages.AmbiguousNotEqualBoth(Text(l), Text(r)),
-            ({ } l, null) => ErrorMessages.AmbiguousNotEqual(Text(l)),
-            (null, { } r) => ErrorMessages.AmbiguousNotEqual(Text(r)),
+            ({ } l, { } r) => new ErrorMessage.AmbiguousNotEqualBoth(Code(l), Code(r)),
+            ({ } l, null) => new ErrorMessage.AmbiguousNotEqual(Code(l)),
+            (null, { } r) => new ErrorMessage.AmbiguousNotEqual(Code(r)),
             _ => throw new ArgumentException("Some operand must need a quantifier."),
         };
         return new Diagnostic(Codes.AmbiguousNotEqual, comparison.OperatorSpan, message,
@@ -177,36 +178,39 @@ internal sealed partial class BinderDiagnostics(string text)
 
     /// <param name="outer">The expression the modifier was found in, parentheses and all.</param>
     /// <param name="unmodified">What is left of it with the modifiers taken off.</param>
-    /// <param name="place">Where it was written, such as "an argument of `COUNT()`".</param>
-    public Diagnostic MisplacedModifier(ModifierSyntax modifier, ExpressionSyntax outer, ExpressionSyntax unmodified, string place) =>
-        new(Codes.MisplacedModifier, modifier.Span, ErrorMessages.MisplacedModifier(Keyword(modifier), place),
+    /// <param name="function">The function it was written in an argument of, if it was.</param>
+    public Diagnostic MisplacedModifier(ModifierSyntax modifier, ExpressionSyntax outer, ExpressionSyntax unmodified, NameToken? function) =>
+        new(Codes.MisplacedModifier, modifier.Span,
+            function is null
+                ? new ErrorMessage.MisplacedModifier(Keyword(modifier))
+                : new ErrorMessage.MisplacedModifierInCall(Keyword(modifier), new Code(function.Text)),
             [new Suggestion(outer.Span, Text(unmodified))]);
 
     public Diagnostic ContradictoryQuantifiers(ModifierSyntax inner, ModifierSyntax outer) =>
-        new(Codes.ContradictoryQuantifiers, inner.Span, ErrorMessages.ContradictoryQuantifiers(Keyword(inner), Keyword(outer)));
+        new(Codes.ContradictoryQuantifiers, inner.Span, new ErrorMessage.ContradictoryQuantifiers(Keyword(inner), Keyword(outer)));
 
     public Diagnostic LiterallyNotString(ModifierSyntax literally, ExpressionSyntax core, GoroType type) =>
-        new(Codes.LiterallyNotString, literally.Span, ErrorMessages.LiterallyNotString(Keyword(literally), Text(core), type));
+        new(Codes.LiterallyNotString, literally.Span, new ErrorMessage.LiterallyNotString(Keyword(literally), Code(core), type));
 
     public Diagnostic LiterallyOnStateTest(ModifierSyntax literally) =>
-        new(Codes.LiterallyOnStateTest, literally.Span, ErrorMessages.LiterallyOnStateTest(Keyword(literally)),
+        new(Codes.LiterallyOnStateTest, literally.Span, new ErrorMessage.LiterallyOnStateTest(Keyword(literally)),
             [new Suggestion(literally.Span, Text(literally.Operand))]);
 
     public Diagnostic QuantifierOnAbsentTest(ModifierSyntax quantifier) =>
-        new(Codes.QuantifierOnAbsentTest, quantifier.Span, ErrorMessages.QuantifierOnAbsentTest(),
+        new(Codes.QuantifierOnAbsentTest, quantifier.Span, new ErrorMessage.QuantifierOnAbsentTest(),
             [new Suggestion(quantifier.Span, Text(quantifier.Operand))]);
 
     // ---------------------------------------------------------------------------------------------
     // Functions
 
     public Diagnostic WrongArgumentCount(FunctionCallSyntax call, int expected) =>
-        new(Codes.WrongArgumentCount, call.Span, ErrorMessages.WrongArgumentCount(call.Name.Text, expected, call.Arguments.Length));
+        new(Codes.WrongArgumentCount, call.Span, new ErrorMessage.WrongArgumentCount(new Code(call.Name.Text), expected, call.Arguments.Length));
 
     public Diagnostic FallbackDefaultNotLiteral(FunctionCallSyntax call) =>
-        new(Codes.FallbackDefaultNotLiteral, call.Arguments[1].Span, ErrorMessages.FallbackDefaultNotLiteral(call.Name.Text, Text(call.Arguments[1])));
+        new(Codes.FallbackDefaultNotLiteral, call.Arguments[1].Span, new ErrorMessage.FallbackDefaultNotLiteral(new Code(call.Name.Text), Code(call.Arguments[1])));
 
     public Diagnostic InvalidNumberLiteral(FunctionCallSyntax call, LiteralSyntax literal) =>
-        new(Codes.InvalidNumberLiteral, literal.Span, ErrorMessages.InvalidNumberLiteral(Text(literal), call.Name.Text));
+        new(Codes.InvalidNumberLiteral, literal.Span, new ErrorMessage.InvalidNumberLiteral(Code(literal), new Code(call.Name.Text)));
 
     // ---------------------------------------------------------------------------------------------
     // Ranges
@@ -226,20 +230,20 @@ internal sealed partial class BinderDiagnostics(string text)
             ? [new Suggestion(number.Span, candidate)]
             : [];
         var message = suffix is null
-            ? ErrorMessages.RangeUnitMissing(written)
-            : ErrorMessages.RangeUnitAmbiguous(written, TypedNodes.TypeOf(unit.Token), candidate);
+            ? (ErrorMessage)new ErrorMessage.RangeUnitMissing(new Code(written))
+            : new ErrorMessage.RangeUnitAmbiguous(new Code(written), UnitOf(TypedNodes.TypeOf(unit.Token)), new Code(candidate));
         return new Diagnostic(Codes.RangeUnitMissing, number.Span, message, suggestions);
     }
 
     public Diagnostic RangeEndpointTypes(BetweenSyntax between, GoroType minimum, GoroType maximum) =>
-        new(Codes.RangeEndpointTypes, RangeSpan(between), ErrorMessages.RangeEndpointTypes(Text(between.Minimum), minimum, Text(between.Maximum), maximum));
+        new(Codes.RangeEndpointTypes, RangeSpan(between), new ErrorMessage.RangeEndpointTypes(Code(between.Minimum), minimum, Code(between.Maximum), maximum));
 
     public Diagnostic RangeReversed(BetweenSyntax between, GoroType type, ComparisonMode mode)
     {
-        var (range, minimum, maximum) = (Text(RangeSpan(between)), Text(between.Minimum), Text(between.Maximum));
-        var message = type != GoroType.String ? ErrorMessages.RangeReversed(range, minimum, maximum)
-            : mode == ComparisonMode.Literal ? ErrorMessages.RangeReversedLiteral(range, minimum, maximum)
-            : ErrorMessages.RangeReversedNormalized(range, minimum, maximum);
+        var order = type != GoroType.String ? RangeOrder.Plain
+            : mode == ComparisonMode.Literal ? RangeOrder.Literal
+            : RangeOrder.Normalized;
+        var message = new ErrorMessage.RangeReversed(Code(RangeSpan(between)), Code(between.Minimum), Code(between.Maximum), order);
         var swapped = Text(between.Maximum) + Text(TextSpan.FromBounds(between.Minimum.Span.End, between.Maximum.Span.Start)) + Text(between.Minimum);
         return new Diagnostic(Codes.RangeReversed, RangeSpan(between), message,
             [new Suggestion(RangeSpan(between), swapped)]);
@@ -251,9 +255,9 @@ internal sealed partial class BinderDiagnostics(string text)
     public Diagnostic Pattern(StringToken pattern, PatternFailure failure) => failure switch
     {
         PatternFailure.Malformed malformed => new Diagnostic(Codes.InvalidPattern, PatternSpan(pattern, malformed.Offset),
-            ErrorMessages.InvalidPattern(Text(pattern.Span), malformed.Reason)),
+            new ErrorMessage.InvalidPattern(Code(pattern.Span), new ForeignText(malformed.Reason))),
         PatternFailure.Unsupported unsupported => new Diagnostic(Codes.UnsupportedPatternConstruct, pattern.Span,
-            ErrorMessages.UnsupportedPatternConstruct(unsupported.Family)),
+            new ErrorMessage.UnsupportedPatternConstruct(unsupported.Family)),
         _ => throw new ArgumentOutOfRangeException(nameof(failure)),
     };
 
@@ -321,9 +325,21 @@ internal sealed partial class BinderDiagnostics(string text)
 
     private static TextSpan RangeSpan(BetweenSyntax between) => TextSpan.Covering(between.Minimum.Span, between.Maximum.Span);
 
-    private static string Keyword(ModifierSyntax modifier) => modifier.Modifier.ToString().ToUpperInvariant();
+    private static Code Keyword(ModifierSyntax modifier) => new(modifier.Modifier.ToString().ToUpperInvariant());
+
+    /// <summary>Bytecount or duration: the only types whose literals carry a unit.</summary>
+    private static UnitType UnitOf(GoroType type) => type switch
+    {
+        GoroType.ByteCount => UnitType.ByteCount,
+        GoroType.Duration => UnitType.Duration,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Only a bytecount or a duration has a unit."),
+    };
 
     private string Text(SyntaxNode node) => Text(node.Span);
 
     private string Text(TextSpan span) => span.Of(text);
+
+    private Code Code(SyntaxNode node) => new(Text(node));
+
+    private Code Code(TextSpan span) => new(Text(span));
 }

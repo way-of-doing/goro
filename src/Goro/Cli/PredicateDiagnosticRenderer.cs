@@ -1,4 +1,5 @@
 using System.Globalization;
+using Goro.Messages;
 using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Syntax;
 
@@ -11,7 +12,7 @@ namespace Goro.Cli;
 /// </summary>
 /// <example>
 /// <code>
-/// goro: error: Equality is written `==`.
+/// goro: error: We compare with `==`, goro!
 ///   file::name = "a.mp3"
 ///              ^
 ///   try: file::name == "a.mp3"
@@ -36,14 +37,14 @@ public static class PredicateDiagnosticRenderer
 {
     private const string Indent = "  ";
 
-    public static void Write(TextWriter writer, string text, IEnumerable<Diagnostic> diagnostics)
+    public static void Write(TextWriter writer, IErrorMessages messages, string text, IEnumerable<Diagnostic> diagnostics)
     {
         var echo = OneLine(text);
         var columns = StringInfo.ParseCombiningCharacters(echo);
 
         foreach (var diagnostic in diagnostics)
         {
-            writer.WriteLine($"{ErrorMessages.ErrorPrefix()}{diagnostic.Message}");
+            writer.WriteLine($"{messages.ErrorPrefix}{messages.Render(diagnostic.Message)}");
 
             // An empty predicate has nothing to echo, and nothing in it to point at.
             if (echo.Length > 0)
@@ -54,7 +55,7 @@ public static class PredicateDiagnosticRenderer
 
             foreach (var suggestion in diagnostic.Suggestions)
             {
-                writer.WriteLine($"{Indent}{ErrorMessages.SuggestionLabel()}{OneLine(suggestion.ApplyTo(text))}");
+                writer.WriteLine($"{Indent}{messages.SuggestionLabel}{OneLine(suggestion.ApplyTo(text))}");
             }
         }
     }

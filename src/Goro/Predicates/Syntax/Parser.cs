@@ -1,5 +1,6 @@
 // Owned by the syntax group (G2 + G3) of the predicate-runtime-architecture line.
 using System.Collections.Immutable;
+using Goro.Messages;
 using Goro.Predicates.Diagnostics;
 using static Goro.Predicates.Syntax.SyntaxDiagnosticCodes;
 
@@ -30,7 +31,7 @@ public static class Parser
 
     // Parsing stops at the first error, so an exception unwinds every rule at once rather than each
     // rule checking what the ones it called returned. It never leaves Parse.
-    private sealed class SyntaxError(Diagnostic diagnostic) : Exception(diagnostic.Message)
+    private sealed class SyntaxError(Diagnostic diagnostic) : Exception(diagnostic.Code)
     {
         public Diagnostic Diagnostic { get; } = diagnostic;
     }
@@ -46,11 +47,11 @@ public static class Parser
         {
             if (Current.Kind == TokenKind.EndOfText)
             {
-                throw Error(new Diagnostic(EmptyPredicate, new TextSpan(0, text.Length), ErrorMessages.EmptyPredicate()));
+                throw Error(new Diagnostic(EmptyPredicate, new TextSpan(0, text.Length), new ErrorMessage.EmptyPredicate()));
             }
 
             var expression = Expression();
-            Expect(TokenKind.EndOfText, ErrorMessages.ExpectedOperatorOrEnd());
+            Expect(TokenKind.EndOfText, Expectation.OperatorOrEnd);
             return expression;
         }
 
@@ -127,7 +128,7 @@ public static class Parser
                 case TokenKind.Between:
                     Advance();
                     var minimum = RangeEndpoint();
-                    Expect(TokenKind.DotDot, ErrorMessages.ExpectedRangeSeparator());
+                    Expect(TokenKind.DotDot, Expectation.RangeSeparator);
                     var maximum = RangeEndpoint();
                     return new BetweenSyntax(TextSpan.Covering(left.Span, maximum.Span), left, minimum, maximum);
 
@@ -182,7 +183,7 @@ public static class Parser
             {
                 TokenKind.Not => Error(diagnostics.IsNot(operand, @is, Advance(), Current)),
                 TokenKind.Null => Error(diagnostics.IsNull(Current)),
-                _ => Error(diagnostics.Unexpected(index, ErrorMessages.ExpectedState())),
+                _ => Error(diagnostics.Unexpected(index, Expectation.State)),
             };
         }
 
@@ -198,7 +199,7 @@ public static class Parser
                 || TokenFacts.IsModifier(Current.Kind);
             throw Error(startsOperand
                 ? diagnostics.RangeEndpointNotLiteral(index)
-                : diagnostics.Unexpected(index, ErrorMessages.ExpectedLiteral()));
+                : diagnostics.Unexpected(index, Expectation.Literal));
         }
 
         // operand = modifier "(" operand ")" | primary ;
@@ -219,7 +220,7 @@ public static class Parser
 
             Advance();
             var operand = Operand();
-            var close = Expect(TokenKind.CloseParen, ErrorMessages.ExpectedCloseParen());
+            var close = Expect(TokenKind.CloseParen, Expectation.CloseParen);
             return new ModifierSyntax(TextSpan.Covering(modifier.Span, close.Span), ModifierKindOf(modifier.Kind), operand);
         }
 
@@ -247,7 +248,7 @@ public static class Parser
                 case TokenKind.OpenParen:
                     var open = Advance();
                     var expression = Expression();
-                    var close = Expect(TokenKind.CloseParen, ErrorMessages.ExpectedCloseParen());
+                    var close = Expect(TokenKind.CloseParen, Expectation.CloseParen);
                     return new ParenthesizedSyntax(TextSpan.Covering(open.Span, close.Span), expression);
 
                 case var kind when TokenFacts.IsLiteral(kind) || kind == TokenKind.Null:
@@ -261,7 +262,7 @@ public static class Parser
                     throw Error(diagnostics.ReservedWord(word));
 
                 default:
-                    throw Error(diagnostics.Unexpected(index, ErrorMessages.ExpectedOperand()));
+                    throw Error(diagnostics.Unexpected(index, Expectation.Operand));
             }
         }
 
@@ -331,7 +332,7 @@ public static class Parser
                 return new NamePartSyntax(quoted.Span, quoted.Value, IsQuoted: true);
             }
 
-            throw Error(diagnostics.Unexpected(index, allowQuoted ? ErrorMessages.ExpectedNameOrQuotedName() : ErrorMessages.ExpectedName()));
+            throw Error(diagnostics.Unexpected(index, allowQuoted ? Expectation.NameOrQuotedName : Expectation.Name));
         }
 
         private FunctionCallSyntax FunctionCall(NameToken name)
@@ -348,7 +349,7 @@ public static class Parser
                 }
             }
 
-            var close = Expect(TokenKind.CloseParen, arguments.Count == 0 ? ErrorMessages.ExpectedCloseParen() : ErrorMessages.ExpectedCommaOrCloseParen());
+            var close = Expect(TokenKind.CloseParen, arguments.Count == 0 ? Expectation.CloseParen : Expectation.CommaOrCloseParen);
             return new FunctionCallSyntax(TextSpan.Covering(name.Span, close.Span), name, arguments.ToImmutable());
         }
 
@@ -365,7 +366,7 @@ public static class Parser
             return token;
         }
 
-        private Token Expect(TokenKind kind, string expected) =>
+        private Token Expect(TokenKind kind, Expectation expected) =>
             Current.Kind == kind ? Advance() : throw Error(diagnostics.Unexpected(index, expected));
 
         private static SyntaxError Error(Diagnostic diagnostic) => new(diagnostic);

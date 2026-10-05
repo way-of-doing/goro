@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Goro.Messages;
 using Goro.Warnings;
 
 namespace Goro.Discovery;
@@ -47,20 +48,20 @@ public sealed class FileDiscoveryService : IFileDiscoveryService
             return new LiteralFile(Path.GetFullPath(pathSpec));
         }
 
-        throw new PathSpecException(pathSpec, ErrorMessages.PathSpecNotFound(pathSpec));
+        throw new PathSpecException(pathSpec, new ErrorMessage.PathSpecNotFound(new Code(pathSpec)));
     }
 
     private static Glob ResolveGlob(string pathSpec)
     {
         if (pathSpec.Count(c => c == '*') > 1)
         {
-            throw new PathSpecException(pathSpec, ErrorMessages.GlobWithSeveralStars(pathSpec));
+            throw new PathSpecException(pathSpec, new ErrorMessage.GlobWithSeveralStars(new Code(pathSpec)));
         }
 
         var directoryPart = Path.GetDirectoryName(pathSpec);
         if (directoryPart is not null && IsGlob(directoryPart))
         {
-            throw new PathSpecException(pathSpec, ErrorMessages.GlobWildcardBeforeLastComponent(pathSpec));
+            throw new PathSpecException(pathSpec, new ErrorMessage.GlobWildcardBeforeLastComponent(new Code(pathSpec)));
         }
 
         var directory = string.IsNullOrEmpty(directoryPart) ? "." : directoryPart;
@@ -85,7 +86,7 @@ public sealed class FileDiscoveryService : IFileDiscoveryService
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
-            throw new PathSpecException(pathSpec, ErrorMessages.PathSpecNotListable(pathSpec), ex);
+            throw new PathSpecException(pathSpec, new ErrorMessage.PathSpecNotListable(new Code(pathSpec)), ex);
         }
     }
 

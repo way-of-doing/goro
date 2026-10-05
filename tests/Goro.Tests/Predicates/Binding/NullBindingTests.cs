@@ -1,3 +1,4 @@
+using Goro.Messages;
 using static Goro.Tests.Predicates.Binding.Support.BindAssert;
 using Codes = Goro.Predicates.Binding.BinderDiagnosticCodes;
 
@@ -34,7 +35,7 @@ public class NullBindingTests
         var error = Error(text);
 
         Assert.That(error.Code, Is.EqualTo(Codes.NullValue));
-        Assert.That(error.Message, Does.Contain("no null value"));
+        Assert.That(error.Message, Is.EqualTo(new ErrorMessage.NullValue()));
         Assert.That(error.Suggestions, Is.Empty);
     }
 

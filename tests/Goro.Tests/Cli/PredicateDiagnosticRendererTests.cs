@@ -1,4 +1,5 @@
 using Goro.Cli;
+using Goro.Messages;
 using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Syntax;
 
@@ -10,15 +11,18 @@ public class PredicateDiagnosticRendererTests
     private static readonly string CombiningAcute = char.ConvertFromUtf32(0x0301);
     private static readonly string GClef = char.ConvertFromUtf32(0x1D11E);
 
-    private static string[] Render(string text, params Diagnostic[] diagnostics)
+    private static string[] Render(string text, params Diagnostic[] diagnostics) =>
+        Render(EnglishErrorMessages.Instance, text, diagnostics);
+
+    private static string[] Render(IErrorMessages messages, string text, params Diagnostic[] diagnostics)
     {
         var writer = new StringWriter { NewLine = "\n" };
-        PredicateDiagnosticRenderer.Write(writer, text, diagnostics);
+        PredicateDiagnosticRenderer.Write(writer, messages, text, diagnostics);
         return writer.ToString().Split('\n')[..^1];
     }
 
     private static Diagnostic Error(int start, int length, params Suggestion[] suggestions) =>
-        new("test", new TextSpan(start, length), "Something is wrong here.", [.. suggestions]);
+        new("test", new TextSpan(start, length), new ErrorMessage.ChainedComparison(), [.. suggestions]);
 
     [Test]
     public void ADiagnostic_IsItsMessage_ThePredicateEchoed_TheSpanMarked_AndEachSuggestionAsTheWholePredicateRewritten()
@@ -26,11 +30,11 @@ public class PredicateDiagnosticRendererTests
         const string text = "file::name = \"a.mp3\"";
         var equals = new TextSpan(11, 1);
 
-        var lines = Render(text, new Diagnostic("borrowed-operator", equals, "Equality is written `==`.", [new Suggestion(equals, "==")]));
+        var lines = Render(text, new Diagnostic("borrowed-operator", equals, new ErrorMessage.BorrowedEqual(), [new Suggestion(equals, "==")]));
 
         Assert.That(lines, Is.EqualTo(new[]
         {
-            "goro: error: Equality is written `==`.",
+            "goro: error: We compare with `==`, goro!",
             "  file::name = \"a.mp3\"",
             "             ^",
             "  try: file::name == \"a.mp3\"",
@@ -79,14 +83,14 @@ public class PredicateDiagnosticRendererTests
     [Test]
     public void SeveralDiagnostics_AreEachWrittenInFull_InOrder()
     {
-        var lines = Render("a == b", Error(0, 1), new Diagnostic("test", new TextSpan(5, 1), "And here."));
+        var lines = Render("a == b", Error(0, 1), new Diagnostic("test", new TextSpan(5, 1), new ErrorMessage.BooleanRange()));
 
         Assert.That(lines, Is.EqualTo(new[]
         {
-            "goro: error: Something is wrong here.",
+            "goro: error: One comparison at a time, goro!",
             "  a == b",
             "  ^",
-            "goro: error: And here.",
+            "goro: error: A range can't run between booleans, goro!",
             "  a == b",
             "       ^",
         }));
@@ -95,8 +99,33 @@ public class PredicateDiagnosticRendererTests
     [Test]
     public void AnEmptyPredicate_IsReportedWithoutAnEcho()
     {
-        Assert.That(Render("", new Diagnostic("empty-predicate", new TextSpan(0, 0), "The predicate is empty.")),
-            Is.EqualTo(new[] { "goro: error: The predicate is empty." }));
+        Assert.That(Render("", new Diagnostic("empty-predicate", new TextSpan(0, 0), new ErrorMessage.EmptyPredicate())),
+            Is.EqualTo(new[] { "goro: error: Give the filter something to check, goro!" }));
+    }
+
+    [Test]
+    public void TheWords_AreAllTheProvidersOwn_ItsPrefix_ItsMessage_AndItsSuggestionLabel()
+    {
+        var lines = Render(new NamingMessages(), "a = b",
+            new Diagnostic("borrowed-operator", new TextSpan(2, 1), new ErrorMessage.BorrowedEqual(), [new Suggestion(new TextSpan(2, 1), "==")]));
+
+        Assert.That(lines, Is.EqualTo(new[]
+        {
+            "E> BorrowedEqual",
+            "  a = b",
+            "    ^",
+            "  => a == b",
+        }));
+    }
+
+    /// <summary>A provider in no language at all, which names each message by its case.</summary>
+    private sealed class NamingMessages : IErrorMessages
+    {
+        public string Render(ErrorMessage message) => message.GetType().Name;
+
+        public string ErrorPrefix => "E> ";
+
+        public string SuggestionLabel => "=> ";
     }
 
     // --- alignment ---
@@ -142,7 +171,7 @@ public class PredicateDiagnosticRendererTests
 
         Assert.That(lines, Is.EqualTo(new[]
         {
-            "goro: error: Something is wrong here.",
+            "goro: error: One comparison at a time, goro!",
             "  a ==   b = c",
             "           ^",
             "  try: a ==   b == c",

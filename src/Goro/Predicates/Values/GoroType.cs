@@ -18,6 +18,17 @@ public static class GoroTypes
 {
     public static GoroType Of<T>() where T : notnull => Cache<T>.Type;
 
+    /// <summary>The type's name in the language, as the specification spells it: <c>string</c>, <c>bytecount</c>.</summary>
+    public static string Name(GoroType type) => type switch
+    {
+        GoroType.String => "string",
+        GoroType.Number => "number",
+        GoroType.ByteCount => "bytecount",
+        GoroType.Duration => "duration",
+        GoroType.Boolean => "boolean",
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
+    };
+
     private static class Cache<T> where T : notnull
     {
         public static readonly GoroType Type = typeof(T) switch

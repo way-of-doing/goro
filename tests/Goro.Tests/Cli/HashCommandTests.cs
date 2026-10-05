@@ -51,9 +51,10 @@ public class HashCommandTests
     {
         var app = GoroAppFactory.Create();
 
-        var (exitCode, _, _) = await app.RunCapturedAsync("hash", "-a", "md6", _mp3File);
+        var (exitCode, _, stdErr) = await app.RunCapturedAsync("hash", "-a", "md6", _mp3File);
 
         Assert.That(exitCode, Is.EqualTo(2));
+        Assert.That(stdErr, Does.Contain("No algorithm `md6` — pick from "));
     }
 
     [TestCase("plain")]
