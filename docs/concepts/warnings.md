@@ -52,6 +52,10 @@ A file that warned this way has not been processed. What a command's output show
 specified by each command: `goro list` with a predicate leaves it out, and `goro hash` includes it
 with its hash reported as absent.
 
+That one warning is all such a file produces. Evaluating a predicate can meet data it cannot
+interpret before it finds that the file cannot be read, and a data warning met that way is not
+emitted.
+
 Unlike a data warning, this one is not deduplicated: it is one warning for one file, so a run that
 could read none of a thousand files emits a thousand warnings.
 

@@ -433,6 +433,7 @@ single-condition test exercises.
 | A predicate mentioning only `file::path`, `file::name` or `file::extension`, against a file that cannot be opened at all | Must **not** warn, and must evaluate: nothing was read |
 | A predicate mentioning only `file::size`, against a file whose tags cannot be read | Must **not** warn: nothing needed the tags, so nothing failed |
 | The same file under a predicate mentioning a tag identifier | Must warn, and the file must not be listed |
+| A predicate that meets uninterpretable data in a file and then finds the file cannot be read, such as `NUMBER(file::name) > 1 OR artist == "x"` | One file warning and no data warning: a file that was not processed has nothing to say about its data |
 | `goro list` with no filter, over a file that cannot be opened | Must list it and must not warn, the command having needed nothing but the path |
 | `goro hash` over an unreadable file, in both output formats | The row must appear, with `-` in plain and `null` in JSON. Omitting the row is precisely the failure this scenario exists to catch |
 | `goro list --filter` over an unreadable file | The file must not be listed |
