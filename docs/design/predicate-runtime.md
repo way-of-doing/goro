@@ -5,6 +5,11 @@ line. It is exploration rather than specification: once its decisions are settle
 moves into [architecture](../architecture.md) and [implementation notes](../implementation.md) in
 their own terms, and whatever is left here is the record of how the design was reached.
 
+**Status:** settled and built. [Architecture](../architecture.md) and
+[implementation notes](../implementation.md) now describe the runtime as it is. What follows is
+kept as the record of how it was reached -- the seams, the concerns on each side, and the options
+weighed for each decision -- and is not updated as the code moves on.
+
 Nothing here changes what a predicate means. Where a seam turned up a question the specification
 does not answer, the question is asked rather than answered in passing.
 

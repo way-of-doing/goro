@@ -237,3 +237,27 @@ crosses each seam, a code skeleton with tests realises it, and `architecture.md`
 
   Next step: describe the architecture in architecture.md and implementation.md, correct the
   line-worker note on worktrees, and remove the collected worktrees.
+
+- 2026-10-05 -- The architecture written down, and the error wording collected.
+  - architecture.md now describes the runtime component by component: the input interface (and
+    its two pre-parse rewrites), the predicate compiler's three stages and what each hands the
+    next, the identifier catalog and lazily loaded file data, the evaluator, the pipeline's per-file
+    outcome, the executor's tally, the warning sink, and the output renderer, with a diagram of a
+    run. implementation.md gains the symlink cycle guard and how a file's reported sources are
+    stored. The design document is marked as the settled record of how the design was reached.
+  - Every error's wording is now in `src/Goro/ErrorMessages.cs`, so that PJ can rewrite it in one
+    place. Each sentence appears there whole, with one member per variant. Some 1,800 predicates
+    gave byte-identical diagnostics before and after the move. The only change a user sees is that
+    a suggestion now begins `try:` instead of `did you mean:`. Warnings keep their wording where
+    they are raised. The tag identifiers' temporary "not implemented yet" message stays in
+    `TagBindings`, since the tag line will remove it.
+  - The line-worker agent's note on worktrees is corrected. The harness keeps a worker inside its
+    own worktree, and removes that worktree if the worker stops with nothing changed, so a worker
+    asked to stop at a checkpoint first writes its plan into `.line-worker/plan.md`.
+
+  The brief's "Done when" is met: the architecture is written down at the level of stages,
+  responsibilities and the data crossing each seam, the code realises it with tests (1668
+  passing), and architecture.md and implementation.md describe it.
+
+  Next step: PJ rewrites the error messages in `ErrorMessages.cs`, starting from the coordinator's
+  drafts, which are left unstaged; then a review of the whole line and its merge into main.

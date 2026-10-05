@@ -62,3 +62,21 @@ parses them too, and a strict tag parser would make a file unreadable for a pred
 asked about its tags. TagLibSharp 2.3.0 tolerates every shape of damaged Id3v2 tag tried, and a
 test asserts that a file with such a tag still has a duration, so that a stricter release is noticed
 rather than shipped.
+
+### Symbolic links in a directory walk
+
+A directory walk follows symbolic links to directories, and must not follow one whose target is the
+directory being listed or one above it on the walk. A single such link makes an unguarded walk
+descend until the operating system refuses the path, which ends a run over an ordinary collection
+with a spurious file warning; two make the number of directories double at every level. Each
+directory is therefore queued with its canonical path, with every symbolic link along it resolved
+as `realpath(3)` would, and a link leading back onto its own walk is not followed. Links elsewhere
+are followed as before, including to a directory the walk also reaches another way.
+
+### The sources a file has reported
+
+The evaluation context keeps, for each warning source the predicate can produce, the first origin
+reported for it in the file, in an array indexed by source. The array is the deduplication set as
+well, an empty slot meaning that the source has not been reported yet, so no separate bitset is
+kept, and it is allocated on the first report, so that a file which warns about nothing allocates
+nothing.
