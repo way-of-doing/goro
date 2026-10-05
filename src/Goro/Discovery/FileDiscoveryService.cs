@@ -47,20 +47,20 @@ public sealed class FileDiscoveryService : IFileDiscoveryService
             return new LiteralFile(Path.GetFullPath(pathSpec));
         }
 
-        throw new PathSpecException(pathSpec, $"Pathspec not found: {pathSpec}");
+        throw new PathSpecException(pathSpec, ErrorMessages.PathSpecNotFound(pathSpec));
     }
 
     private static Glob ResolveGlob(string pathSpec)
     {
         if (pathSpec.Count(c => c == '*') > 1)
         {
-            throw new PathSpecException(pathSpec, $"A glob may contain at most one '*': {pathSpec}");
+            throw new PathSpecException(pathSpec, ErrorMessages.GlobWithSeveralStars(pathSpec));
         }
 
         var directoryPart = Path.GetDirectoryName(pathSpec);
         if (directoryPart is not null && IsGlob(directoryPart))
         {
-            throw new PathSpecException(pathSpec, $"Wildcards may appear only in the last component of a glob: {pathSpec}");
+            throw new PathSpecException(pathSpec, ErrorMessages.GlobWildcardBeforeLastComponent(pathSpec));
         }
 
         var directory = string.IsNullOrEmpty(directoryPart) ? "." : directoryPart;
@@ -85,7 +85,7 @@ public sealed class FileDiscoveryService : IFileDiscoveryService
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
-            throw new PathSpecException(pathSpec, $"Pathspec cannot be listed: {pathSpec}", ex);
+            throw new PathSpecException(pathSpec, ErrorMessages.PathSpecNotListable(pathSpec), ex);
         }
     }
 

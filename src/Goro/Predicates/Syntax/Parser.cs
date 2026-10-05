@@ -46,11 +46,11 @@ public static class Parser
         {
             if (Current.Kind == TokenKind.EndOfText)
             {
-                throw Error(new Diagnostic(EmptyPredicate, new TextSpan(0, text.Length), "The predicate is empty."));
+                throw Error(new Diagnostic(EmptyPredicate, new TextSpan(0, text.Length), ErrorMessages.EmptyPredicate()));
             }
 
             var expression = Expression();
-            Expect(TokenKind.EndOfText, "an operator, or the end of the predicate");
+            Expect(TokenKind.EndOfText, ErrorMessages.ExpectedOperatorOrEnd());
             return expression;
         }
 
@@ -127,7 +127,7 @@ public static class Parser
                 case TokenKind.Between:
                     Advance();
                     var minimum = RangeEndpoint();
-                    Expect(TokenKind.DotDot, "`..` between the two ends of the range");
+                    Expect(TokenKind.DotDot, ErrorMessages.ExpectedRangeSeparator());
                     var maximum = RangeEndpoint();
                     return new BetweenSyntax(TextSpan.Covering(left.Span, maximum.Span), left, minimum, maximum);
 
@@ -182,7 +182,7 @@ public static class Parser
             {
                 TokenKind.Not => Error(diagnostics.IsNot(operand, @is, Advance(), Current)),
                 TokenKind.Null => Error(diagnostics.IsNull(Current)),
-                _ => Error(diagnostics.Unexpected(index, "`USABLE`, `UNUSABLE` or `ABSENT`")),
+                _ => Error(diagnostics.Unexpected(index, ErrorMessages.ExpectedState())),
             };
         }
 
@@ -198,7 +198,7 @@ public static class Parser
                 || TokenFacts.IsModifier(Current.Kind);
             throw Error(startsOperand
                 ? diagnostics.RangeEndpointNotLiteral(index)
-                : diagnostics.Unexpected(index, "a literal"));
+                : diagnostics.Unexpected(index, ErrorMessages.ExpectedLiteral()));
         }
 
         // operand = modifier "(" operand ")" | primary ;
@@ -219,7 +219,7 @@ public static class Parser
 
             Advance();
             var operand = Operand();
-            var close = Expect(TokenKind.CloseParen, "`)`");
+            var close = Expect(TokenKind.CloseParen, ErrorMessages.ExpectedCloseParen());
             return new ModifierSyntax(TextSpan.Covering(modifier.Span, close.Span), ModifierKindOf(modifier.Kind), operand);
         }
 
@@ -247,7 +247,7 @@ public static class Parser
                 case TokenKind.OpenParen:
                     var open = Advance();
                     var expression = Expression();
-                    var close = Expect(TokenKind.CloseParen, "`)`");
+                    var close = Expect(TokenKind.CloseParen, ErrorMessages.ExpectedCloseParen());
                     return new ParenthesizedSyntax(TextSpan.Covering(open.Span, close.Span), expression);
 
                 case var kind when TokenFacts.IsLiteral(kind) || kind == TokenKind.Null:
@@ -261,7 +261,7 @@ public static class Parser
                     throw Error(diagnostics.ReservedWord(word));
 
                 default:
-                    throw Error(diagnostics.Unexpected(index, "an operand"));
+                    throw Error(diagnostics.Unexpected(index, ErrorMessages.ExpectedOperand()));
             }
         }
 
@@ -331,7 +331,7 @@ public static class Parser
                 return new NamePartSyntax(quoted.Span, quoted.Value, IsQuoted: true);
             }
 
-            throw Error(diagnostics.Unexpected(index, allowQuoted ? "a name, or a quoted name, after `::`" : "a name after `::`"));
+            throw Error(diagnostics.Unexpected(index, allowQuoted ? ErrorMessages.ExpectedNameOrQuotedName() : ErrorMessages.ExpectedName()));
         }
 
         private FunctionCallSyntax FunctionCall(NameToken name)
@@ -348,7 +348,7 @@ public static class Parser
                 }
             }
 
-            var close = Expect(TokenKind.CloseParen, arguments.Count == 0 ? "`)`" : "`,` or `)`");
+            var close = Expect(TokenKind.CloseParen, arguments.Count == 0 ? ErrorMessages.ExpectedCloseParen() : ErrorMessages.ExpectedCommaOrCloseParen());
             return new FunctionCallSyntax(TextSpan.Covering(name.Span, close.Span), name, arguments.ToImmutable());
         }
 

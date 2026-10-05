@@ -50,19 +50,19 @@ public class ListFilterTests
     {
         yield return new TestCaseData(
             @"file::name = ""a.mp3""",
-            new[] { "goro: error: Equality is written `==`.", @"  file::name = ""a.mp3""", "             ^", @"  did you mean: file::name == ""a.mp3""" })
+            new[] { "goro: error: Equality is written `==`.", @"  file::name = ""a.mp3""", "             ^", @"  try: file::name == ""a.mp3""" })
             .SetName("A borrowed operator is answered with the one meant");
         yield return new TestCaseData(
             @"file::name =~ ""^a""",
-            new[] { @"  file::name =~ ""^a""", @"  did you mean: file::name =~ r""^a""" })
+            new[] { @"  file::name =~ ""^a""", @"  try: file::name =~ r""^a""" })
             .SetName("A quoted pattern is answered with its raw form");
         yield return new TestCaseData(
             @"file::name ~= ""a""",
-            new[] { @"  did you mean: file::name =~ r""a""", @"  did you mean: file::name != ""a""" })
+            new[] { @"  try: file::name =~ r""a""", @"  try: file::name != ""a""" })
             .SetName("~= is answered with both operators it may have meant");
         yield return new TestCaseData(
             "file::size > 1 > 0",
-            new[] { "  file::size > 1 > 0", "                 ^", "  did you mean: file::size > 1 AND 1 > 0" })
+            new[] { "  file::size > 1 > 0", "                 ^", "  try: file::size > 1 AND 1 > 0" })
             .SetName("A chained comparison is answered with AND");
     }
 
@@ -130,7 +130,7 @@ public class ListFilterTests
 
         AssertRejectedBeforeAnythingWasProcessed(exitCode, stdOut, discovery);
         Assert.That(Lines(stdErr), Does.Contain(@"  file::nmae == ""a.mp3""").And.Contain("  ^^^^^^^^^^"));
-        Assert.That(Lines(stdErr), Does.Contain(@"  did you mean: file::name == ""a.mp3"""));
+        Assert.That(Lines(stdErr), Does.Contain(@"  try: file::name == ""a.mp3"""));
     }
 
     [Test]
@@ -141,7 +141,7 @@ public class ListFilterTests
         var (exitCode, stdOut, stdErr, discovery) = await RunObservedAsync("list", @"--filter=genre != ""metal""", _collection.Root);
 
         AssertRejectedBeforeAnythingWasProcessed(exitCode, stdOut, discovery);
-        Assert.That(Lines(stdErr), Does.Contain(@"  did you mean: NOT genre == ""metal""").And.Contain(@"  did you mean: ALL(genre) != ""metal"""));
+        Assert.That(Lines(stdErr), Does.Contain(@"  try: NOT genre == ""metal""").And.Contain(@"  try: ALL(genre) != ""metal"""));
     }
 
     [TestCase(@"file::size == ""big""", TestName = "A type mismatch is rejected")]

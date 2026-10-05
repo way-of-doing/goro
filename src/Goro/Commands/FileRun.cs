@@ -31,7 +31,7 @@ internal sealed class FileRun(IFileDiscoveryService fileDiscovery, IExecutor exe
         }
         catch (PathSpecException ex)
         {
-            await Console.Error.WriteLineAsync($"goro: error: {ex.Message}");
+            await Console.Error.WriteLineAsync($"{ErrorMessages.ErrorPrefix()}{ex.Message}");
             return ExitCodes.Rejected;
         }
 

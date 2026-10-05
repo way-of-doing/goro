@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Goro.Predicates.Diagnostics;
+using Goro.Predicates.Values;
 using Codes = Goro.Predicates.Syntax.SyntaxDiagnosticCodes;
 
 namespace Goro.Predicates.Syntax;
@@ -39,8 +40,8 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
         }
 
         return token.Kind == TokenKind.EndOfText
-            ? new Diagnostic(Codes.UnexpectedEnd, token.Span, $"The predicate ends where {expected} should follow.")
-            : new Diagnostic(Codes.UnexpectedToken, token.Span, $"Expected {expected}, but found `{Text(token)}`.");
+            ? new Diagnostic(Codes.UnexpectedEnd, token.Span, ErrorMessages.UnexpectedEnd(expected))
+            : new Diagnostic(Codes.UnexpectedToken, token.Span, ErrorMessages.UnexpectedToken(expected, Text(token)));
     }
 
     public Diagnostic ChainedComparison(ExpressionSyntax comparison, Token second)
@@ -49,9 +50,7 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
         ImmutableArray<Suggestion> suggestions = comparison is ComparisonSyntax { Right: var middle }
             ? [new Suggestion(new TextSpan(middle.Span.End, 0), $" AND {Text(middle)}")]
             : [];
-        return new Diagnostic(Codes.ChainedComparison, second.Span,
-            "Comparisons cannot be chained. Join two of them with `AND`, or parenthesize one to compare its outcome.",
-            suggestions);
+        return new Diagnostic(Codes.ChainedComparison, second.Span, ErrorMessages.ChainedComparison(), suggestions);
     }
 
     /// <summary><c>~=</c> or <c>!~</c> in place of a comparison operator, with the operand after it if one could be read.</summary>
@@ -68,14 +67,14 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
             }
 
             suggestions.Add(new Suggestion(borrowed.Span, "!="));
-            return new Diagnostic(Codes.BorrowedOperator, borrowed.Span, TildeEqualMessage, suggestions.ToImmutable());
+            return new Diagnostic(Codes.BorrowedOperator, borrowed.Span, ErrorMessages.BorrowedTildeEqual(), suggestions.ToImmutable());
         }
 
         ImmutableArray<Suggestion> negated = pattern is null
             ? []
             : [new Suggestion(TextSpan.Covering(subject.Span, pattern.Span),
                 $"NOT {Text(TextSpan.FromBounds(subject.Span.Start, borrowed.Span.Start))}=~{Between(borrowed.Span, pattern.Span)}{RawForm(pattern)}")];
-        return new Diagnostic(Codes.BorrowedOperator, borrowed.Span, BangTildeMessage, negated);
+        return new Diagnostic(Codes.BorrowedOperator, borrowed.Span, ErrorMessages.BorrowedBangTilde(), negated);
     }
 
     /// <summary>What followed <c>=~</c> was read as an operand, and was not a bare raw string.</summary>
@@ -104,8 +103,7 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
 
         if (core is not LiteralSyntax { Token: StringToken literal })
         {
-            return new Diagnostic(Codes.PatternNotRawString, pattern.Span,
-                $"The pattern of `{Text(match)}` must be a raw string literal, such as `r\"^the \"`.");
+            return new Diagnostic(Codes.PatternNotRawString, pattern.Span, ErrorMessages.PatternNotRawString(Text(match)));
         }
 
         if (modifiers.Count > 0)
@@ -114,19 +112,16 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
             ImmutableArray<Suggestion> moved = modifiers.TrueForAll(m => m.Modifier == ModifierKind.Literally)
                 ? [new Suggestion(TextSpan.Covering(subject.Span, pattern.Span), LiterallyOnSubject(subject, modifiers[0], pattern, literal))]
                 : [];
-            return new Diagnostic(Codes.ModifiedPattern, pattern.Span,
-                "The pattern is part of the match operator and takes no modifier; a modifier goes on the subject.", moved);
+            return new Diagnostic(Codes.ModifiedPattern, pattern.Span, ErrorMessages.ModifiedPattern(), moved);
         }
 
         if (parenthesized)
         {
-            return new Diagnostic(Codes.ParenthesizedPattern, pattern.Span,
-                "The pattern is part of the match operator, and is written without parentheses.",
+            return new Diagnostic(Codes.ParenthesizedPattern, pattern.Span, ErrorMessages.ParenthesizedPattern(),
                 [new Suggestion(pattern.Span, RawForm(literal))]);
         }
 
-        return new Diagnostic(Codes.QuotedPattern, literal.Span,
-            "A pattern is written as a raw string, so that its backslashes reach the regex engine as written.",
+        return new Diagnostic(Codes.QuotedPattern, literal.Span, ErrorMessages.QuotedPattern(),
             [new Suggestion(literal.Span, RawForm(literal))]);
     }
 
@@ -136,18 +131,16 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
             ? [new Suggestion(TextSpan.Covering(operand.Span, next.Span),
                 $"NOT ({Text(operand)} {Text(@is)} {(next.Kind == TokenKind.Null ? "ABSENT" : Text(next))})")]
             : [];
-        return new Diagnostic(Codes.IsNot, TextSpan.Covering(@is.Span, not.Span),
-            "There is no `IS NOT`: negate the state test with `NOT` instead.", negated);
+        return new Diagnostic(Codes.IsNot, TextSpan.Covering(@is.Span, not.Span), ErrorMessages.IsNot(), negated);
     }
 
     public Diagnostic IsNull(Token @null) =>
-        new(Codes.IsNull, @null.Span, "Goro has no null: a value the file does not record is `ABSENT`.",
-            [new Suggestion(@null.Span, "ABSENT")]);
+        new(Codes.IsNull, @null.Span, ErrorMessages.IsNull(), [new Suggestion(@null.Span, "ABSENT")]);
 
     public Diagnostic RangeEndpointNotLiteral(int index)
     {
         var token = tokens[index];
-        const string message = "The ends of a range are literals, written as they are, without parentheses.";
+        var message = ErrorMessages.RangeEndpointNotLiteral();
         if (token.Kind == TokenKind.OpenParen && index + 2 < tokens.Length
             && TokenFacts.IsLiteral(tokens[index + 1].Kind) && tokens[index + 2].Kind == TokenKind.CloseParen)
         {
@@ -162,43 +155,37 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
     {
         var spelling = Text(word);
         return new Diagnostic(Codes.ReservedWord, word.Span, TokenFacts.IsModifier(word.Kind)
-            ? $"`{spelling}` is a modifier, and is written around the operand it applies to: `{spelling}(...)`."
-            : $"`{spelling}` is a reserved word, so it cannot be used as an identifier.");
+            ? ErrorMessages.ModifierAsWord(spelling)
+            : ErrorMessages.ReservedWord(spelling));
     }
 
     public Diagnostic ReservedWordInIdentifier(Token word) =>
-        new(Codes.ReservedWordInIdentifier, word.Span,
-            $"`{Text(word)}` is a reserved word, so it can begin an identifier only after a leading `::`.");
+        new(Codes.ReservedWordInIdentifier, word.Span, ErrorMessages.ReservedWordInIdentifier(Text(word)));
 
     public Diagnostic WhitespaceInIdentifier(IdentifierSyntax identifier, IEnumerable<TextSpan> tokens) =>
-        new(Codes.WhitespaceInIdentifier, identifier.Span,
-            "An identifier is written without whitespace around its `::`.",
+        new(Codes.WhitespaceInIdentifier, identifier.Span, ErrorMessages.WhitespaceInIdentifier(),
             [new Suggestion(identifier.Span, string.Concat(tokens.Select(token => token.Of(text))))]);
 
     public Diagnostic QualifiedFunctionCall(IdentifierSyntax identifier)
     {
         var name = identifier.Parts[^1];
         ImmutableArray<Suggestion> unqualified = name.IsQuoted ? [] : [new Suggestion(identifier.Span, name.Text)];
-        return new Diagnostic(Codes.QualifiedFunctionCall, identifier.Span,
-            $"`{Text(identifier)}` is qualified, and functions do not live in namespaces.", unqualified);
+        return new Diagnostic(Codes.QualifiedFunctionCall, identifier.Span, ErrorMessages.QualifiedFunctionCall(Text(identifier)), unqualified);
     }
 
     // ----------------------------------------------------------------------------------------------
-
-    private const string TildeEqualMessage = "`~=` is not an operator: a regex match is written `=~`, and inequality `!=`.";
-    private const string BangTildeMessage = "There is no negated match operator: negate the match with `NOT` instead.";
 
     private Diagnostic BorrowedOperator(Token token)
     {
         var (message, suggestions) = token.Kind switch
         {
-            TokenKind.Equal => ("Equality is written `==`.", [new Suggestion(token.Span, "==")]),
-            TokenKind.LessGreater => ("Inequality is written `!=`.", [new Suggestion(token.Span, "!=")]),
-            TokenKind.AmpersandAmpersand => ("`&&` is written `AND` in a predicate.", [Word(token.Span, "AND")]),
-            TokenKind.BarBar => ("`||` is written `OR` in a predicate.", [Word(token.Span, "OR")]),
-            TokenKind.Bang => ("Negation is written `NOT`.", [Word(token.Span, "NOT")]),
-            TokenKind.TildeEqual => (TildeEqualMessage, ImmutableArray<Suggestion>.Empty),
-            _ => (BangTildeMessage, ImmutableArray<Suggestion>.Empty),
+            TokenKind.Equal => (ErrorMessages.BorrowedEqual(), [new Suggestion(token.Span, "==")]),
+            TokenKind.LessGreater => (ErrorMessages.BorrowedLessGreater(), [new Suggestion(token.Span, "!=")]),
+            TokenKind.AmpersandAmpersand => (ErrorMessages.BorrowedAnd(), [Word(token.Span, "AND")]),
+            TokenKind.BarBar => (ErrorMessages.BorrowedOr(), [Word(token.Span, "OR")]),
+            TokenKind.Bang => (ErrorMessages.BorrowedBang(), [Word(token.Span, "NOT")]),
+            TokenKind.TildeEqual => (ErrorMessages.BorrowedTildeEqual(), ImmutableArray<Suggestion>.Empty),
+            _ => (ErrorMessages.BorrowedBangTilde(), ImmutableArray<Suggestion>.Empty),
         };
         return new Diagnostic(Codes.BorrowedOperator, token.Span, message, suggestions);
     }
@@ -229,24 +216,21 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
         if (literal.Kind == TokenKind.Number && written[0] is '+' or '-'
             && Lexer.Lex(run[1..]) is { Succeeded: true, Value: var unsigned } && unsigned[0].Kind is TokenKind.ByteCount or TokenKind.Duration)
         {
-            return new Diagnostic(Codes.SignedUnitLiteral, span,
-                $"`{run}` has a sign, but bytecounts and durations cannot be negative.");
+            return new Diagnostic(Codes.SignedUnitLiteral, span, ErrorMessages.SignedUnitLiteral(run));
         }
 
         if (literal.Kind == TokenKind.Number && written.Contains('.') && char.ToLowerInvariant(Text(next)[0]) is 'h' or 'm' or 's')
         {
-            return new Diagnostic(Codes.MalformedLiteral, span,
-                $"`{run}` is not a duration: its fields are whole numbers, as in `1h30m`.");
+            return new Diagnostic(Codes.MalformedLiteral, span, ErrorMessages.FractionalDurationFields(run));
         }
 
-        var kind = literal.Kind switch
+        var type = literal.Kind switch
         {
-            TokenKind.ByteCount => "a bytecount",
-            TokenKind.Duration => "a duration",
-            _ => "a number",
+            TokenKind.ByteCount => GoroType.ByteCount,
+            TokenKind.Duration => GoroType.Duration,
+            _ => GoroType.Number,
         };
-        return new Diagnostic(Codes.MalformedLiteral, span,
-            $"`{run}` is not a literal: `{written}` reads as {kind}, which runs straight into `{Text(next)}`.");
+        return new Diagnostic(Codes.MalformedLiteral, span, ErrorMessages.RunOnLiteral(run, written, type, Text(next)));
     }
 
     /// <summary><c>10 kb</c> or <c>1h 10m</c>: two tokens that would be one literal without the whitespace between them.</summary>
@@ -265,8 +249,7 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
         }
 
         var span = TextSpan.Covering(literal.Span, next.Span);
-        return new Diagnostic(Codes.WhitespaceInLiteral, span,
-            $"A literal cannot contain whitespace, so `{Text(span)}` is not one.", [new Suggestion(span, joined)]);
+        return new Diagnostic(Codes.WhitespaceInLiteral, span, ErrorMessages.WhitespaceInLiteral(Text(span)), [new Suggestion(span, joined)]);
     }
 
     private string LiterallyOnSubject(ExpressionSyntax subject, ModifierSyntax literally, ExpressionSyntax pattern, StringToken literal)

@@ -50,12 +50,12 @@ internal static class Patterns
     private static string Family(string message) => message switch
     {
         _ when message.Contains("lookahead", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("lookbehind", StringComparison.OrdinalIgnoreCase) => "lookaround",
-        _ when message.Contains("backreference", StringComparison.OrdinalIgnoreCase) => "a backreference",
-        _ when message.Contains("atomic", StringComparison.OrdinalIgnoreCase) => "an atomic group",
+            || message.Contains("lookbehind", StringComparison.OrdinalIgnoreCase) => ErrorMessages.Lookaround(),
+        _ when message.Contains("backreference", StringComparison.OrdinalIgnoreCase) => ErrorMessages.Backreference(),
+        _ when message.Contains("atomic", StringComparison.OrdinalIgnoreCase) => ErrorMessages.AtomicGroup(),
         _ when message.Contains("conditional", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("balancing", StringComparison.OrdinalIgnoreCase) => "a conditional or a balancing group",
-        _ => "a construct",
+            || message.Contains("balancing", StringComparison.OrdinalIgnoreCase) => ErrorMessages.ConditionalOrBalancingGroup(),
+        _ => ErrorMessages.UnknownConstruct(),
     };
 }
 

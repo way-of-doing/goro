@@ -186,9 +186,7 @@ public static class Lexer
             }
 
             var word = text[start..end];
-            return Fail(NonAsciiName, TextSpan.FromBounds(start, end),
-                $"`{word}` is not a name: names are made of ASCII letters, digits and underscores. "
-                + "A part after `::` may be quoted to hold any other characters.");
+            return Fail(NonAsciiName, TextSpan.FromBounds(start, end), ErrorMessages.NonAsciiName(word));
         }
 
         // ------------------------------------------------------------------------------------------
@@ -285,15 +283,15 @@ public static class Lexer
                 case 'r': decoded = "\r"; return true;
                 case 't': decoded = "\t"; return true;
                 case 'x':
-                    return TryScanFixedHex(start, 2, "`\\x` takes exactly two hexadecimal digits.", out decoded);
+                    return TryScanFixedHex(start, 2, ErrorMessages.HexEscapeDigits(), out decoded);
                 case 'u' when At(position) == '{':
                     return TryScanBracedEscape(start, out decoded);
                 case 'u':
-                    return TryScanFixedHex(start, 4, "`\\u` takes exactly four hexadecimal digits, or one to six in braces.", out decoded);
+                    return TryScanFixedHex(start, 4, ErrorMessages.UnicodeEscapeDigits(), out decoded);
                 default:
                     var length = char.IsHighSurrogate(letter) && char.IsLowSurrogate(At(position)) ? 2 : 1;
                     var span = new TextSpan(start, 1 + length);
-                    Fail(UnknownEscape, span, $"`{span.Of(text)}` is not an escape. To write a backslash, double it: `\\\\`.");
+                    Fail(UnknownEscape, span, ErrorMessages.UnknownEscape(span.Of(text)));
                     return false;
             }
         }
@@ -334,8 +332,7 @@ public static class Lexer
                     position++;
                 }
 
-                Fail(MalformedEscape, TextSpan.FromBounds(start, position),
-                    "`\\u{...}` takes one to six hexadecimal digits and a closing brace.");
+                Fail(MalformedEscape, TextSpan.FromBounds(start, position), ErrorMessages.BracedEscapeDigits());
                 return false;
             }
 
@@ -344,15 +341,13 @@ public static class Lexer
             var span = TextSpan.FromBounds(start, position);
             if (codePoint > 0x10FFFF)
             {
-                Fail(CodePointOutOfRange, span, $"`{span.Of(text)}` is beyond U+10FFFF, the last code point.");
+                Fail(CodePointOutOfRange, span, ErrorMessages.CodePointOutOfRange(span.Of(text)));
                 return false;
             }
 
             if (codePoint is >= 0xD800 and <= 0xDFFF)
             {
-                Fail(SurrogateCodePoint, span,
-                    $"`{span.Of(text)}` names a surrogate, which is not a character. "
-                    + "Write the character itself in braces, or both halves of the pair with `\\uNNNN`.");
+                Fail(SurrogateCodePoint, span, ErrorMessages.SurrogateCodePoint(span.Of(text)));
                 return false;
             }
 
@@ -390,11 +385,10 @@ public static class Lexer
         }
 
         private Token? RejectUnterminatedString(int start) =>
-            Fail(UnterminatedString, TextSpan.FromBounds(start, text.Length), "This string has no closing quote.");
+            Fail(UnterminatedString, TextSpan.FromBounds(start, text.Length), ErrorMessages.UnterminatedString());
 
         private Token? RejectLoneSurrogate(TextSpan escape) =>
-            Fail(LoneSurrogate, escape,
-                $"`{escape.Of(text)}` is half of a surrogate pair, and the other half does not stand next to it.");
+            Fail(LoneSurrogate, escape, ErrorMessages.LoneSurrogate(escape.Of(text)));
 
         // ------------------------------------------------------------------------------------------
         // Numbers, bytecounts and durations
@@ -419,8 +413,7 @@ public static class Lexer
             else if (At(integerEnd) == '.' && At(integerEnd + 1) != '.')
             {
                 var span = TextSpan.FromBounds(start, integerEnd + 1);
-                return Fail(TrailingPeriod, span,
-                    $"`{span.Of(text)}` ends in a period, which must be followed by a digit. Write `{text[start..integerEnd]}`.");
+                return Fail(TrailingPeriod, span, ErrorMessages.TrailingPeriod(span.Of(text), text[start..integerEnd]));
             }
 
             if (signed)
@@ -548,8 +541,7 @@ public static class Lexer
                 if (field > 59)
                 {
                     var span = new TextSpan(colon + 1, 2);
-                    return Fail(ClockFieldOutOfRange, span,
-                        $"`{span.Of(text)}` is out of range: every field after the first runs from 00 to 59.");
+                    return Fail(ClockFieldOutOfRange, span, ErrorMessages.ClockFieldOutOfRange(span.Of(text)));
                 }
 
                 seconds = seconds * 60 + field;
@@ -564,8 +556,7 @@ public static class Lexer
                 : RejectUnrepresentable(span);
 
         private Token? RejectUnrepresentable(TextSpan span) =>
-            Fail(UnrepresentableLiteral, span,
-                $"`{span.Of(text)}` cannot be held exactly: it is too large or has too many significant digits.");
+            Fail(UnrepresentableLiteral, span, ErrorMessages.UnrepresentableLiteral(span.Of(text)));
 
         /// <summary>
         /// A colon that is not half of <c>::</c>. Straight after a number it is a clock-form
@@ -588,19 +579,17 @@ public static class Lexer
             var span = TextSpan.FromBounds(previous.Span.Start, end);
             if (text[previous.Span.Start] is '+' or '-' && IsClockField(position))
             {
-                return Fail(SignedUnitLiteral, span, $"`{span.Of(text)}` has a sign, but a duration cannot be negative.");
+                return Fail(SignedUnitLiteral, span, ErrorMessages.SignedClockDuration(span.Of(text)));
             }
 
-            return Fail(MalformedLiteral, span,
-                $"`{span.Of(text)}` is not a duration: a clock-form duration has two digits after each colon, "
-                + "and at most two colons.");
+            return Fail(MalformedLiteral, span, ErrorMessages.MalformedClockDuration(span.Of(text)));
         }
 
         private Token? RejectUnexpectedCharacter()
         {
             var length = char.IsHighSurrogate(text[position]) && char.IsLowSurrogate(At(position + 1)) ? 2 : 1;
             var span = new TextSpan(position, length);
-            return Fail(UnexpectedCharacter, span, $"`{span.Of(text)}` cannot appear here, outside a string.");
+            return Fail(UnexpectedCharacter, span, ErrorMessages.UnexpectedCharacter(span.Of(text)));
         }
 
         // ------------------------------------------------------------------------------------------

@@ -33,7 +33,7 @@ public class PredicateDiagnosticRendererTests
             "goro: error: Equality is written `==`.",
             "  file::name = \"a.mp3\"",
             "             ^",
-            "  did you mean: file::name == \"a.mp3\"",
+            "  try: file::name == \"a.mp3\"",
         }));
     }
 
@@ -71,8 +71,8 @@ public class PredicateDiagnosticRendererTests
 
         Assert.That(lines[3..], Is.EqualTo(new[]
         {
-            "  did you mean: artist =~ r\"a\"",
-            "  did you mean: artist != \"a\"",
+            "  try: artist =~ r\"a\"",
+            "  try: artist != \"a\"",
         }));
     }
 
@@ -145,7 +145,7 @@ public class PredicateDiagnosticRendererTests
             "goro: error: Something is wrong here.",
             "  a ==   b = c",
             "           ^",
-            "  did you mean: a ==   b == c",
+            "  try: a ==   b == c",
         }));
     }
 }

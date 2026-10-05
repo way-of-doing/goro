@@ -33,7 +33,7 @@ public sealed class ListCommand(
         {
             if (!OutputFormatExtensions.TryParse(Output, out _))
             {
-                return ValidationResult.Error($"Invalid output format '{Output}'. Valid values: {string.Join(", ", OutputFormatExtensions.ValidNames)}.");
+                return ValidationResult.Error(ErrorMessages.InvalidOutputFormat(Output, OutputFormatExtensions.ValidNames));
             }
 
             return base.Validate();

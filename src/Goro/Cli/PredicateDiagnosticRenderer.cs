@@ -14,7 +14,7 @@ namespace Goro.Cli;
 /// goro: error: Equality is written `==`.
 ///   file::name = "a.mp3"
 ///              ^
-///   did you mean: file::name == "a.mp3"
+///   try: file::name == "a.mp3"
 /// </code>
 /// </example>
 /// <remarks>
@@ -43,7 +43,7 @@ public static class PredicateDiagnosticRenderer
 
         foreach (var diagnostic in diagnostics)
         {
-            writer.WriteLine($"goro: error: {diagnostic.Message}");
+            writer.WriteLine($"{ErrorMessages.ErrorPrefix()}{diagnostic.Message}");
 
             // An empty predicate has nothing to echo, and nothing in it to point at.
             if (echo.Length > 0)
@@ -54,7 +54,7 @@ public static class PredicateDiagnosticRenderer
 
             foreach (var suggestion in diagnostic.Suggestions)
             {
-                writer.WriteLine($"{Indent}did you mean: {OneLine(suggestion.ApplyTo(text))}");
+                writer.WriteLine($"{Indent}{ErrorMessages.SuggestionLabel()}{OneLine(suggestion.ApplyTo(text))}");
             }
         }
     }

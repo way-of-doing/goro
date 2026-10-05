@@ -32,7 +32,7 @@ internal sealed partial class BinderDiagnostics(string text)
                 Text(TextSpan.FromBounds(identifier.Span.Start, namespaceParts[0].Span.Start))
                 + closest
                 + Text(TextSpan.FromBounds(namespaceParts[^1].Span.End, identifier.Span.End)))];
-        return new Diagnostic(Codes.UnknownNamespace, identifier.Span, $"Goro has no namespace `{written}`.", suggestions);
+        return new Diagnostic(Codes.UnknownNamespace, identifier.Span, ErrorMessages.UnknownNamespace(written), suggestions);
     }
 
     public Diagnostic UnknownIdentifier(IdentifierSyntax identifier, IEnumerable<IdentifierName> candidates)
@@ -43,10 +43,10 @@ internal sealed partial class BinderDiagnostics(string text)
             ? []
             : [new Suggestion(identifier.Span,
                 Text(TextSpan.FromBounds(identifier.Span.Start, name.Span.Start)) + IdentifierName.Global(closest))];
-        var where = identifier.Parts.Length == 1
-            ? "Goro has no identifier"
-            : $"The namespace `{Text(TextSpan.FromBounds(identifier.Parts[0].Span.Start, identifier.Parts[^2].Span.End))}` has no identifier";
-        return new Diagnostic(Codes.UnknownIdentifier, identifier.Span, $"{where} `{name.Text}`.", suggestions);
+        var message = identifier.Parts.Length == 1
+            ? ErrorMessages.UnknownIdentifier(name.Text)
+            : ErrorMessages.UnknownIdentifierInNamespace(Text(TextSpan.FromBounds(identifier.Parts[0].Span.Start, identifier.Parts[^2].Span.End)), name.Text);
+        return new Diagnostic(Codes.UnknownIdentifier, identifier.Span, message, suggestions);
     }
 
     public Diagnostic UnknownFunction(NameToken name)
@@ -58,19 +58,17 @@ internal sealed partial class BinderDiagnostics(string text)
         }
 
         ImmutableArray<Suggestion> suggestions = closest is null ? [] : [new Suggestion(name.Span, closest)];
-        return new Diagnostic(Codes.UnknownFunction, name.Span,
-            $"Goro has no function `{name.Text}`; its functions are `COUNT`, `FALLBACK`, `NUMBER` and `STRING`.", suggestions);
+        return new Diagnostic(Codes.UnknownFunction, name.Span, ErrorMessages.UnknownFunction(name.Text), suggestions);
     }
 
     public Diagnostic NullValue(TextSpan span) =>
-        new(Codes.NullValue, span, "Goro has no null value: a value the file does not record is absent.");
+        new(Codes.NullValue, span, ErrorMessages.NullValue());
 
     /// <summary><c>x == NULL</c> or <c>x != NULL</c>, which is a state test written the way SQL writes it.</summary>
     public Diagnostic NullComparison(ComparisonSyntax comparison, NullSyntax @null, ExpressionSyntax other)
     {
         var negation = comparison.Operator == ComparisonOperator.NotEqual ? "NOT " : "";
-        return new Diagnostic(Codes.NullValue, @null.Span,
-            "Goro has no null value: a value the file does not record is absent, and `IS ABSENT` tests for that.",
+        return new Diagnostic(Codes.NullValue, @null.Span, ErrorMessages.NullComparison(),
             [new Suggestion(comparison.Span, $"{negation}{Text(other)} IS ABSENT")]);
     }
 
@@ -80,11 +78,9 @@ internal sealed partial class BinderDiagnostics(string text)
     public Diagnostic TypeMismatch(ComparisonSyntax comparison, ExpressionSyntax leftCore, Bound left, ExpressionSyntax rightCore, Bound right)
     {
         var op = Text(comparison.OperatorSpan);
-        var message = $"`{Text(leftCore)}` is {A(left.Type)} and `{Text(rightCore)}` is {A(right.Type)}, so `{op}` cannot compare them.";
-        if (OnlyALiteralStandsIn(left, right) || OnlyALiteralStandsIn(right, left))
-        {
-            message += " Only a number literal stands for a bytecount or a duration.";
-        }
+        var message = OnlyALiteralStandsIn(left, right) || OnlyALiteralStandsIn(right, left)
+            ? ErrorMessages.TypeMismatchNumberVariable(Text(leftCore), left.Type, Text(rightCore), right.Type, op)
+            : ErrorMessages.TypeMismatch(Text(leftCore), left.Type, Text(rightCore), right.Type, op);
 
         var suggestions = ImmutableArray.CreateBuilder<Suggestion>();
         foreach (var (side, sideCore, other) in new[] { (left, leftCore, right), (right, rightCore, left) })
@@ -108,55 +104,47 @@ internal sealed partial class BinderDiagnostics(string text)
         var defaultSyntax = call.Arguments[1];
         ImmutableArray<Suggestion> suggestions = Unquoted(@default, argument.Type) is { } unquoted ? [unquoted] : [];
         return new Diagnostic(Codes.TypeMismatch, defaultSyntax.Span,
-            $"The default of `{call.Name.Text}()` must have the type of `{Text(argumentSyntax)}`, which is {A(argument.Type)}, and `{Text(defaultSyntax)}` is {A(@default.Type)}.",
+            ErrorMessages.FallbackTypeMismatch(call.Name.Text, Text(argumentSyntax), argument.Type, Text(defaultSyntax), @default.Type),
             suggestions);
     }
 
     public Diagnostic RangeTypeMismatch(BetweenSyntax between, ExpressionSyntax subjectCore, GoroType subject, GoroType range) =>
-        new(Codes.TypeMismatch, between.Span,
-            $"`{Text(subjectCore)}` is {A(subject)}, and the range `{Text(RangeSpan(between))}` holds {Plural(range)}.");
+        new(Codes.TypeMismatch, between.Span, ErrorMessages.RangeTypeMismatch(Text(subjectCore), subject, Text(RangeSpan(between)), range));
 
     public Diagnostic NegativeUnitLiteral(LiteralSyntax literal, GoroType unit) =>
-        new(Codes.NegativeUnitLiteral, literal.Span,
-            $"`{Text(literal)}` stands for {A(unit)} here, and {A(unit)} cannot be negative.");
+        new(Codes.NegativeUnitLiteral, literal.Span, ErrorMessages.NegativeUnitLiteral(Text(literal), unit));
 
     public Diagnostic FractionalDurationLiteral(LiteralSyntax literal) =>
-        new(Codes.FractionalDurationLiteral, literal.Span,
-            $"`{Text(literal)}` stands for a duration here, and a duration is a whole number of seconds.");
+        new(Codes.FractionalDurationLiteral, literal.Span, ErrorMessages.FractionalDurationLiteral(Text(literal)));
 
     public Diagnostic BooleanCompared(ComparisonSyntax comparison) =>
-        new(Codes.BooleanNotOrdered, comparison.Span,
-            $"Booleans are unordered, so `{Text(comparison.OperatorSpan)}` cannot compare them; only `==` and `!=` can.");
+        new(Codes.BooleanNotOrdered, comparison.Span, ErrorMessages.BooleanCompared(Text(comparison.OperatorSpan)));
 
     public Diagnostic BooleanBetween(ExpressionSyntax subjectCore) =>
-        new(Codes.BooleanNotOrdered, subjectCore.Span,
-            $"Booleans are unordered, so `{Text(subjectCore)}` cannot be the subject of `BETWEEN`.");
+        new(Codes.BooleanNotOrdered, subjectCore.Span, ErrorMessages.BooleanBetween(Text(subjectCore)));
 
     public Diagnostic BooleanRange(BetweenSyntax between) =>
-        new(Codes.BooleanNotOrdered, RangeSpan(between), "Booleans are unordered, so a range cannot run between two of them.");
+        new(Codes.BooleanNotOrdered, RangeSpan(between), ErrorMessages.BooleanRange());
 
     public Diagnostic BooleanNotConvertible(FunctionCallSyntax call) =>
-        new(Codes.BooleanNotConvertible, call.Arguments[0].Span,
-            $"`{call.Name.Text}()` does not accept a boolean, and `{Text(call.Arguments[0])}` is one.");
+        new(Codes.BooleanNotConvertible, call.Arguments[0].Span, ErrorMessages.BooleanNotConvertible(call.Name.Text, Text(call.Arguments[0])));
 
     public Diagnostic MatchSubjectNotString(ExpressionSyntax subjectCore, GoroType type)
     {
         ImmutableArray<Suggestion> suggestions = type is GoroType.Number or GoroType.ByteCount or GoroType.Duration
             ? [new Suggestion(subjectCore.Span, $"STRING({Text(subjectCore)})")]
             : [];
-        return new Diagnostic(Codes.MatchSubjectNotString, subjectCore.Span,
-            $"The subject of `=~` must be a string, and `{Text(subjectCore)}` is {A(type)}.", suggestions);
+        return new Diagnostic(Codes.MatchSubjectNotString, subjectCore.Span, ErrorMessages.MatchSubjectNotString(Text(subjectCore), type), suggestions);
     }
 
     // ---------------------------------------------------------------------------------------------
     // Definiteness
 
     public Diagnostic NotACondition(ExpressionSyntax syntax, GoroType type, string role) =>
-        new(Codes.NotACondition, syntax.Span, $"{Capitalized(role)} must be a condition, and `{Text(syntax)}` is {A(type)}.");
+        new(Codes.NotACondition, syntax.Span, ErrorMessages.NotACondition(role, Text(syntax), type));
 
     public Diagnostic IndefiniteCondition(ExpressionSyntax syntax, string role) =>
-        new(Codes.IndefiniteCondition, syntax.Span,
-            $"`{Text(syntax)}` may be absent or hold several values, so it cannot be {role} as it stands: compare it with `TRUE` or `FALSE` to say which reading is meant.",
+        new(Codes.IndefiniteCondition, syntax.Span, ErrorMessages.IndefiniteCondition(Text(syntax), role),
             [new Suggestion(syntax.Span, $"{Text(syntax)} == TRUE"), new Suggestion(syntax.Span, $"{Text(syntax)} == FALSE")]);
 
     /// <summary>
@@ -173,15 +161,14 @@ internal sealed partial class BinderDiagnostics(string text)
         var universal = Universal(left, leftCore is not null)
             + Text(TextSpan.FromBounds(left.Span.End, right.Span.Start))
             + Universal(right, rightCore is not null);
-        var subjects = (leftCore, rightCore) switch
+        var message = (leftCore, rightCore) switch
         {
-            ({ } l, { } r) => $"`{Text(l)}` and `{Text(r)}` may each",
-            ({ } l, null) => $"`{Text(l)}` may",
-            (null, { } r) => $"`{Text(r)}` may",
+            ({ } l, { } r) => ErrorMessages.AmbiguousNotEqualBoth(Text(l), Text(r)),
+            ({ } l, null) => ErrorMessages.AmbiguousNotEqual(Text(l)),
+            (null, { } r) => ErrorMessages.AmbiguousNotEqual(Text(r)),
             _ => throw new ArgumentException("Some operand must need a quantifier."),
         };
-        return new Diagnostic(Codes.AmbiguousNotEqual, comparison.OperatorSpan,
-            $"{subjects} be absent or hold several values, so `!=` must be told which reading is meant.",
+        return new Diagnostic(Codes.AmbiguousNotEqual, comparison.OperatorSpan, message,
             [new Suggestion(comparison.Span, negated), new Suggestion(comparison.Span, universal)]);
     }
 
@@ -192,42 +179,34 @@ internal sealed partial class BinderDiagnostics(string text)
     /// <param name="unmodified">What is left of it with the modifiers taken off.</param>
     /// <param name="place">Where it was written, such as "an argument of `COUNT()`".</param>
     public Diagnostic MisplacedModifier(ModifierSyntax modifier, ExpressionSyntax outer, ExpressionSyntax unmodified, string place) =>
-        new(Codes.MisplacedModifier, modifier.Span,
-            $"`{Keyword(modifier)}` cannot be applied to {place}: a modifier belongs on an operand of a comparison, `BETWEEN`, `=~` or `IS`.",
+        new(Codes.MisplacedModifier, modifier.Span, ErrorMessages.MisplacedModifier(Keyword(modifier), place),
             [new Suggestion(outer.Span, Text(unmodified))]);
 
     public Diagnostic ContradictoryQuantifiers(ModifierSyntax inner, ModifierSyntax outer) =>
-        new(Codes.ContradictoryQuantifiers, inner.Span,
-            $"`{Keyword(inner)}` contradicts the `{Keyword(outer)}` around it: an operand is quantified one way or the other.");
+        new(Codes.ContradictoryQuantifiers, inner.Span, ErrorMessages.ContradictoryQuantifiers(Keyword(inner), Keyword(outer)));
 
     public Diagnostic LiterallyNotString(ModifierSyntax literally, ExpressionSyntax core, GoroType type) =>
-        new(Codes.LiterallyNotString, literally.Span,
-            $"`{Keyword(literally)}` chooses how strings are compared, and `{Text(core)}` is {A(type)}.");
+        new(Codes.LiterallyNotString, literally.Span, ErrorMessages.LiterallyNotString(Keyword(literally), Text(core), type));
 
     public Diagnostic LiterallyOnStateTest(ModifierSyntax literally) =>
-        new(Codes.LiterallyOnStateTest, literally.Span,
-            $"A state test compares nothing, so `{Keyword(literally)}` has nothing to change in it.",
+        new(Codes.LiterallyOnStateTest, literally.Span, ErrorMessages.LiterallyOnStateTest(Keyword(literally)),
             [new Suggestion(literally.Span, Text(literally.Operand))]);
 
     public Diagnostic QuantifierOnAbsentTest(ModifierSyntax quantifier) =>
-        new(Codes.QuantifierOnAbsentTest, quantifier.Span,
-            "`IS ABSENT` asks about the whole value, so its operand takes no quantifier.",
+        new(Codes.QuantifierOnAbsentTest, quantifier.Span, ErrorMessages.QuantifierOnAbsentTest(),
             [new Suggestion(quantifier.Span, Text(quantifier.Operand))]);
 
     // ---------------------------------------------------------------------------------------------
     // Functions
 
     public Diagnostic WrongArgumentCount(FunctionCallSyntax call, int expected) =>
-        new(Codes.WrongArgumentCount, call.Span,
-            $"`{call.Name.Text}()` takes {Arguments(expected)}, not {(call.Arguments.Length == 0 ? "none" : call.Arguments.Length.ToString())}.");
+        new(Codes.WrongArgumentCount, call.Span, ErrorMessages.WrongArgumentCount(call.Name.Text, expected, call.Arguments.Length));
 
     public Diagnostic FallbackDefaultNotLiteral(FunctionCallSyntax call) =>
-        new(Codes.FallbackDefaultNotLiteral, call.Arguments[1].Span,
-            $"The default of `{call.Name.Text}()` must be a literal, such as `0` or `\"unknown\"`, and `{Text(call.Arguments[1])}` is not one.");
+        new(Codes.FallbackDefaultNotLiteral, call.Arguments[1].Span, ErrorMessages.FallbackDefaultNotLiteral(call.Name.Text, Text(call.Arguments[1])));
 
     public Diagnostic InvalidNumberLiteral(FunctionCallSyntax call, LiteralSyntax literal) =>
-        new(Codes.InvalidNumberLiteral, literal.Span,
-            $"`{Text(literal)}` is not a number literal, so `{call.Name.Text}()` could never convert it.");
+        new(Codes.InvalidNumberLiteral, literal.Span, ErrorMessages.InvalidNumberLiteral(Text(literal), call.Name.Text));
 
     // ---------------------------------------------------------------------------------------------
     // Ranges
@@ -246,23 +225,23 @@ internal sealed partial class BinderDiagnostics(string text)
             && token.Kind == unit.Token.Kind
             ? [new Suggestion(number.Span, candidate)]
             : [];
-        var meaning = suffix is null
-            ? $"It is unclear what unit `{written}` is in"
-            : $"It is unclear whether `{written}` means {written} {(unit.Token.Kind == TokenKind.ByteCount ? "bytes" : "seconds")} or {candidate}";
-        return new Diagnostic(Codes.RangeUnitMissing, number.Span, $"{meaning}: give both ends of the range a unit.", suggestions);
+        var message = suffix is null
+            ? ErrorMessages.RangeUnitMissing(written)
+            : ErrorMessages.RangeUnitAmbiguous(written, TypedNodes.TypeOf(unit.Token), candidate);
+        return new Diagnostic(Codes.RangeUnitMissing, number.Span, message, suggestions);
     }
 
     public Diagnostic RangeEndpointTypes(BetweenSyntax between, GoroType minimum, GoroType maximum) =>
-        new(Codes.RangeEndpointTypes, RangeSpan(between),
-            $"The ends of a range must be of one type, and `{Text(between.Minimum)}` is {A(minimum)} while `{Text(between.Maximum)}` is {A(maximum)}.");
+        new(Codes.RangeEndpointTypes, RangeSpan(between), ErrorMessages.RangeEndpointTypes(Text(between.Minimum), minimum, Text(between.Maximum), maximum));
 
     public Diagnostic RangeReversed(BetweenSyntax between, GoroType type, ComparisonMode mode)
     {
-        var note = type != GoroType.String ? ""
-            : mode == ComparisonMode.Literal ? " in a literal comparison" : " in a normalized comparison";
+        var (range, minimum, maximum) = (Text(RangeSpan(between)), Text(between.Minimum), Text(between.Maximum));
+        var message = type != GoroType.String ? ErrorMessages.RangeReversed(range, minimum, maximum)
+            : mode == ComparisonMode.Literal ? ErrorMessages.RangeReversedLiteral(range, minimum, maximum)
+            : ErrorMessages.RangeReversedNormalized(range, minimum, maximum);
         var swapped = Text(between.Maximum) + Text(TextSpan.FromBounds(between.Minimum.Span.End, between.Maximum.Span.Start)) + Text(between.Minimum);
-        return new Diagnostic(Codes.RangeReversed, RangeSpan(between),
-            $"The range `{Text(RangeSpan(between))}` holds nothing: `{Text(between.Minimum)}` sorts after `{Text(between.Maximum)}`{note}.",
+        return new Diagnostic(Codes.RangeReversed, RangeSpan(between), message,
             [new Suggestion(RangeSpan(between), swapped)]);
     }
 
@@ -272,9 +251,9 @@ internal sealed partial class BinderDiagnostics(string text)
     public Diagnostic Pattern(StringToken pattern, PatternFailure failure) => failure switch
     {
         PatternFailure.Malformed malformed => new Diagnostic(Codes.InvalidPattern, PatternSpan(pattern, malformed.Offset),
-            $"`{Text(pattern.Span)}` is not a valid regular expression: {malformed.Reason}"),
+            ErrorMessages.InvalidPattern(Text(pattern.Span), malformed.Reason)),
         PatternFailure.Unsupported unsupported => new Diagnostic(Codes.UnsupportedPatternConstruct, pattern.Span,
-            $"The pattern uses {unsupported.Family}, which Goro's non-backtracking regex engine does not support."),
+            ErrorMessages.UnsupportedPatternConstruct(unsupported.Family)),
         _ => throw new ArgumentOutOfRangeException(nameof(failure)),
     };
 
@@ -343,29 +322,6 @@ internal sealed partial class BinderDiagnostics(string text)
     private static TextSpan RangeSpan(BetweenSyntax between) => TextSpan.Covering(between.Minimum.Span, between.Maximum.Span);
 
     private static string Keyword(ModifierSyntax modifier) => modifier.Modifier.ToString().ToUpperInvariant();
-
-    private static string Arguments(int count) => count == 1 ? "one argument" : "two arguments";
-
-    private static string Capitalized(string text) => char.ToUpperInvariant(text[0]) + text[1..];
-
-    public static string A(GoroType? type) => type switch
-    {
-        GoroType.String => "a string",
-        GoroType.Number => "a number",
-        GoroType.ByteCount => "a bytecount",
-        GoroType.Duration => "a duration",
-        GoroType.Boolean => "a boolean",
-        _ => "of no known type",
-    };
-
-    private static string Plural(GoroType type) => type switch
-    {
-        GoroType.String => "strings",
-        GoroType.Number => "numbers",
-        GoroType.ByteCount => "bytecounts",
-        GoroType.Duration => "durations",
-        _ => "booleans",
-    };
 
     private string Text(SyntaxNode node) => Text(node.Span);
 

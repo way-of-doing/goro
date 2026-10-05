@@ -31,8 +31,7 @@ public abstract class GlobalSettings : CommandSettings
     {
         if (NoWarn is { IsSet: true } && !WarningCategories.TryParse(NoWarn.Value, out _, out var unknown))
         {
-            return ValidationResult.Error(
-                $"Unknown warning category '{unknown}'. Valid values: {string.Join(", ", WarningCategories.ValidNames)}.");
+            return ValidationResult.Error(ErrorMessages.UnknownWarningCategory(unknown, WarningCategories.ValidNames));
         }
 
         return ValidationResult.Success();

@@ -75,7 +75,7 @@ public sealed class GoroApp
             return ExitCodes.Rejected;
         }
 
-        error.WriteLine($"goro: error: {exception.Message}", Style.Plain);
+        error.WriteLine($"{ErrorMessages.ErrorPrefix()}{exception.Message}", Style.Plain);
         return ExitCodes.Failed;
     }
 }

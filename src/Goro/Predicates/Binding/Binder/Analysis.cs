@@ -45,7 +45,7 @@ internal sealed class Analysis
     public static StageResult<CompiledPredicate> Run(SyntaxTree tree, IIdentifierCatalog catalog)
     {
         var analysis = new Analysis(tree.Text, catalog);
-        var root = analysis.Condition(tree.Root, "the predicate");
+        var root = analysis.Condition(tree.Root, ErrorMessages.ThePredicate());
         if (analysis.diagnostics.Count > 0)
         {
             // Sorting is stable, so errors that start together stay in the order they were found.
@@ -140,7 +140,7 @@ internal sealed class Analysis
         NotSyntax not => Not(not),
         LogicalSyntax logical => Logical(logical),
         // Every caller takes modifiers off first; this is only a safety net.
-        ModifierSyntax modifier => Unmodified(modifier, "this expression"),
+        ModifierSyntax modifier => Unmodified(modifier, ErrorMessages.ThisExpression()),
         _ => throw new UnreachableException($"{syntax.GetType().Name} is not an expression the binder knows."),
     };
 
@@ -206,7 +206,7 @@ internal sealed class Analysis
     {
         // Every argument is analysed whatever is wrong with the call, for the mistakes inside it.
         var arguments = call.Arguments
-            .Select(argument => Unmodified(argument, $"an argument of `{call.Name.Text}()`"))
+            .Select(argument => Unmodified(argument, ErrorMessages.ArgumentOf(call.Name.Text)))
             .ToList();
 
         var function = call.Name.Text.ToUpperInvariant();
@@ -511,14 +511,14 @@ internal sealed class Analysis
 
     private Bound Not(NotSyntax not)
     {
-        var operand = Condition(not.Operand, "the operand of `NOT`");
+        var operand = Condition(not.Operand, ErrorMessages.OperandOfNot());
         var node = operand.Node is BoundExpression<bool> condition ? new Not(condition) : null;
         return Operator(node, Shape.Not(operand.Shape));
     }
 
     private Bound Logical(LogicalSyntax logical)
     {
-        var role = logical.Operator == LogicalOperator.And ? "an operand of `AND`" : "an operand of `OR`";
+        var role = logical.Operator == LogicalOperator.And ? ErrorMessages.OperandOfAnd() : ErrorMessages.OperandOfOr();
         var left = Condition(logical.Left, role);
         var right = Condition(logical.Right, role);
         BoundCondition? node = (left.Node, right.Node) switch
