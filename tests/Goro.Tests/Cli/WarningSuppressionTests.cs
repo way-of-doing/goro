@@ -74,21 +74,23 @@ public class WarningSuppressionTests
     }
 
     [Test]
-    public async Task NoWarn_BareAllAndDataFile_AreIdenticalInEveryChannel()
+    public async Task NoWarn_AllAndDataFile_AttachedOrSeparate_AreIdenticalInEveryChannel()
     {
         _collection.NotAudio("bad.mp3");
         _collection.Mp3("good.mp3");
 
-        var bare = await RunAsync("hash", "--strict-exit-code", "--no-warn", _collection.Root);
-        var trailing = await RunAsync("hash", "--strict-exit-code", _collection.Root, "--no-warn");
         var all = await RunAsync("hash", "--strict-exit-code", "--no-warn=all", _collection.Root);
+        var separate = await RunAsync("hash", "--strict-exit-code", "--no-warn", "all", _collection.Root);
+        var trailing = await RunAsync("hash", "--strict-exit-code", _collection.Root, "--no-warn", "all");
         var both = await RunAsync("hash", "--strict-exit-code", "--no-warn=data,file", _collection.Root);
+        var bothSeparate = await RunAsync("hash", "--strict-exit-code", "--no-warn", "data,file", _collection.Root);
 
-        Assert.That(bare.ExitCode, Is.EqualTo(0));
-        Assert.That(bare.StdErr, Is.Empty);
-        AssertIndistinguishable(trailing, bare);
-        AssertIndistinguishable(all, bare);
-        AssertIndistinguishable(both, bare);
+        Assert.That(all.ExitCode, Is.EqualTo(0));
+        Assert.That(all.StdErr, Is.Empty);
+        AssertIndistinguishable(separate, all);
+        AssertIndistinguishable(trailing, all);
+        AssertIndistinguishable(both, all);
+        AssertIndistinguishable(bothSeparate, all);
     }
 
     [Test]
@@ -186,19 +188,19 @@ public class WarningSuppressionTests
     }
 
     [Test]
-    public async Task NoWarn_BareAllAndDataFile_WithAFilterThatWarnsBothWays_AreIdenticalInEveryChannel()
+    public async Task NoWarn_AllAndDataFile_WithAFilterThatWarnsBothWays_AreIdenticalInEveryChannel()
     {
         _collection.Mp3("good.mp3");
         _collection.NotAudio("bad.mp3");
 
-        var bare = await RunAsync("list", "--strict-exit-code", "--no-warn", WarnsBothWays, _collection.Root);
         var all = await RunAsync("list", "--strict-exit-code", "--no-warn=all", WarnsBothWays, _collection.Root);
+        var separate = await RunAsync("list", "--strict-exit-code", "--no-warn", "all", WarnsBothWays, _collection.Root);
         var both = await RunAsync("list", "--strict-exit-code", "--no-warn=data,file", WarnsBothWays, _collection.Root);
 
-        Assert.That(bare.ExitCode, Is.EqualTo(0));
-        Assert.That(bare.StdErr, Is.Empty);
-        AssertIndistinguishable(all, bare);
-        AssertIndistinguishable(both, bare);
+        Assert.That(all.ExitCode, Is.EqualTo(0));
+        Assert.That(all.StdErr, Is.Empty);
+        AssertIndistinguishable(separate, all);
+        AssertIndistinguishable(both, all);
     }
 
     [Test]
@@ -231,6 +233,31 @@ public class WarningSuppressionTests
         Assert.That(stdErr, Does.Contain("tags"));
     }
 
+    // A bare --no-warn would suppress every category, the warnings about unreadable files among
+    // them, so it needs its category said: at the end of the line it has none, and before a
+    // pathspec or another option it takes that for its category and rejects it.
+    [TestCase("list", "end")]
+    [TestCase("list", "pathspec")]
+    [TestCase("hash", "end")]
+    [TestCase("hash", "pathspec")]
+    [TestCase("hash", "option")]
+    public async Task NoWarn_WithoutACategory_IsRejectedWith2BeforeAnythingIsProcessed(string command, string followedBy)
+    {
+        _collection.NotAudio("bad.mp3");
+        string[] args = followedBy switch
+        {
+            "end" => [command, _collection.Root, "--no-warn"],
+            "pathspec" => [command, "--no-warn", _collection.Root],
+            _ => [command, "--no-warn", "--strict-exit-code", _collection.Root],
+        };
+
+        var (exitCode, stdOut, stdErr) = await RunAsync(args);
+
+        Assert.That(exitCode, Is.EqualTo(2));
+        Assert.That(stdOut, Is.Empty);
+        Assert.That(stdErr, Does.Contain(followedBy == "pathspec" ? "No warning category" : "needs its categories"));
+    }
+
     [Test]
     public async Task NoWarn_CategoryInAnotherCase_IsAccepted()
     {
@@ -245,14 +272,14 @@ public class WarningSuppressionTests
 
     // --- how the global options are read ---
 
-    // The synopsis is --no-warn[=<category>,...]: a value is only ever attached with '=', so the
-    // argument after a bare --no-warn is a pathspec, not a category list.
+    // --no-warn takes its categories as any option takes its value, attached or separate, so the
+    // argument after it is the category list and the pathspec comes after that.
     [Test]
-    public async Task NoWarn_Bare_FollowedByAPathspec_TakesThePathspecAsAPathspec()
+    public async Task NoWarn_WithSeparateValue_FollowedByAPathspec()
     {
         var file = _collection.Mp3("a.mp3");
 
-        var (exitCode, stdOut, _) = await RunAsync("list", "--no-warn", _collection.Root);
+        var (exitCode, stdOut, _) = await RunAsync("list", "--no-warn", "data", _collection.Root);
 
         Assert.That(exitCode, Is.EqualTo(0));
         Assert.That(stdOut.Trim(), Is.EqualTo(file));

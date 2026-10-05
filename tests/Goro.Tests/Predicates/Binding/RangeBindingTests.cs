@@ -97,6 +97,18 @@ public class RangeBindingTests
         Assert.That(Error("LITERALLY(artist) BETWEEN \"a\"..\"B\"").Code, Is.EqualTo(Codes.RangeReversed));
     }
 
+    // A string minimum is reversed only when, cut to the maximum's length, it lies above it: every
+    // string beginning with "mi" lies in "mi".."m".
+    [Test]
+    public void Range_OfStrings_IsReversedOnlyWhenNothingCouldLieWithinIt()
+    {
+        Compiles("artist BETWEEN \"mi\"..\"m\"");
+        Compiles("artist BETWEEN \"the\"..\"the\"");
+        Assert.That(Error("artist BETWEEN \"n\"..\"mz\"").Code, Is.EqualTo(Codes.RangeReversed));
+        Compiles("artist BETWEEN \"mo\"..\"m\"");
+        Assert.That(Error("artist BETWEEN \"mz\"..\"ma\"").Code, Is.EqualTo(Codes.RangeReversed));
+    }
+
     [Test]
     public void Range_WithEqualEnds_IsValid()
     {

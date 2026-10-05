@@ -6,7 +6,7 @@ exit code - the status a Goro command returns to its caller
 
 ## SYNOPSIS
 
-*command* [--strict-exit-code] [--no-warn[=*category*,...]]
+*command* [--strict-exit-code] [--no-warn=*category*,...]
 
 ## DESCRIPTION
 

@@ -130,4 +130,5 @@ public abstract record ErrorMessage
     public sealed record InvalidAlgorithm(Code Algorithm, ImmutableArray<Code> Valid) : ErrorMessage;
     public sealed record InvalidOutputFormat(Code Format, ImmutableArray<Code> Valid) : ErrorMessage;
     public sealed record UnknownWarningCategory(Code Category, ImmutableArray<Code> Valid) : ErrorMessage;
+    public sealed record MissingWarningCategory(ImmutableArray<Code> Valid) : ErrorMessage;
 }

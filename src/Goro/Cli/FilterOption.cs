@@ -7,7 +7,7 @@ namespace Goro.Cli;
 /// given <c>--filter "-1 &lt; x"</c> it binds <c>-1</c> alone, so a predicate would silently
 /// become a different one. The attached form, <c>--filter=&lt;predicate&gt;</c>, is passed through
 /// intact, so the separate form is rewritten to it before Spectre sees the command line, as
-/// <see cref="NoWarnOption"/> rewrites <c>--no-warn</c>. Nothing
+/// <see cref="NoWarnOption"/> rewrites a <c>--no-warn</c> with no value. Nothing
 /// after a <c>--</c> separator is touched, since there a <c>--filter</c> is a pathspec.
 /// </summary>
 public static class FilterOption

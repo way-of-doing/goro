@@ -12,14 +12,14 @@ namespace Goro.Predicates.Evaluation;
 /// <remarks>
 /// Sources are small integers interned when the predicate was read, so the set of sources already
 /// reported can be indexed by them directly. The rationale describes that set as a bitset; since
-/// the first origin of each source has to be kept as well, for the warning to quote, it is an array
-/// of origins indexed by source instead, an empty slot being a source not yet reported. Most files
+/// an origin of each source has to be kept as well, for the warning to quote, it is an array of
+/// origins indexed by source instead, an empty slot being a source not yet reported. Most files
 /// report nothing, so the array is not allocated until something is.
 /// </remarks>
 public sealed class EvaluationContext
 {
     private readonly int sourceCount;
-    private Origin?[]? firstOrigins;
+    private Origin?[]? origins;
 
     /// <param name="sourceCount">The number of distinct sources the predicate can report.</param>
     public EvaluationContext(FileData file, int sourceCount)
@@ -33,8 +33,9 @@ public sealed class EvaluationContext
     public FileData File { get; }
 
     /// <summary>
-    /// Records that an unusable occurrence born at <paramref name="origin"/> was consumed. Only the
-    /// first report of each source is kept.
+    /// Records that an unusable occurrence born at <paramref name="origin"/> was consumed. Of the
+    /// origins reported for one source, the one written earliest in the predicate is kept: the
+    /// order of the reports depends on the order of the occurrences in a bag, which has none.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The source is not one the predicate can report.</exception>
     public void Report(Origin origin)
@@ -46,16 +47,19 @@ public sealed class EvaluationContext
                 nameof(origin), source, $"The predicate can report {sourceCount} sources, numbered from 0.");
         }
 
-        firstOrigins ??= new Origin?[sourceCount];
-        firstOrigins[source] ??= origin;
+        origins ??= new Origin?[sourceCount];
+        if (origins[source] is not { } kept || origin.Start < kept.Start)
+        {
+            origins[source] = origin;
+        }
     }
 
     /// <summary>
     /// The origins reported for this file, one per source, in ascending order of source. The origin
-    /// kept for a source is the first one reported, whose text is what a warning quotes. Ordering by
+    /// kept for a source is the one written earliest, whose text is what a warning quotes. Ordering by
     /// source rather than by time keeps a file's warnings independent of the order of the
     /// occurrences in a bag, which the specification declares to have none.
     /// </summary>
     public IReadOnlyList<Origin> Reported =>
-        firstOrigins is null ? [] : [.. firstOrigins.OfType<Origin>()];
+        origins is null ? [] : [.. origins.OfType<Origin>()];
 }

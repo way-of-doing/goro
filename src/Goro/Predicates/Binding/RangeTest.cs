@@ -7,8 +7,9 @@ namespace Goro.Predicates.Binding;
 
 /// <summary>
 /// <c>subject BETWEEN min..max</c>, tested once per occurrence. The binder hands over the endpoints
-/// already prepared by <see cref="Order"/>, having checked that <see cref="Minimum"/> is not greater
-/// than <see cref="Maximum"/>.
+/// already prepared by <see cref="Order"/>, having checked that the range is not reversed. Each
+/// endpoint is compared with a datum by <see cref="DatumOrder{T}.CompareWithEndpoint"/>, which for
+/// strings makes the bounds prefixes.
 /// </summary>
 public sealed class RangeTest<T>(BoundOperand<T> subject, T minimum, T maximum, DatumOrder<T> order)
     : BoundCondition where T : notnull
@@ -35,6 +36,6 @@ public sealed class RangeTest<T>(BoundOperand<T> subject, T minimum, T maximum, 
         public T Prepare(T datum) => order.Prepare(datum);
 
         public bool HoldsOf(ReadOnlySpan<T> data) =>
-            order.Compare(minimum, data[0]) <= 0 && order.Compare(data[0], maximum) <= 0;
+            order.CompareWithEndpoint(data[0], minimum) >= 0 && order.CompareWithEndpoint(data[0], maximum) <= 0;
     }
 }

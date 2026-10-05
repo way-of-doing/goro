@@ -152,12 +152,12 @@ Includes identifiers to access basic file properties. This namespace is **closed
 | Identifier        | Type       | Description  |
 |-------------------|------------|--------------|
 | `file::duration`  | duration   | The playtime duration of the audio file, truncated to whole seconds
-| `file::extension` | string     | The part of the file name after its last dot, without the dot, such as `flac`
-| `file::name`      | string     | The file name, extension included, such as `01 Intro.flac`
+| `file::extension` | string     | The part of the file name after its last dot, without the dot, such as `mp3`
+| `file::name`      | string     | The file name, extension included, such as `01 Intro.mp3`
 | `file::path`      | string     | The absolute path of the file
-| `file::size`      | bytecount  | The size of the audio file on disk
+| `file::size`      | bytecount  | The size of the file on disk
 
-A path is the one the file was discovered under: symbolic links are not resolved. It is written with `/` as the separator on every platform, so that a file Windows calls `C:\Music\01 Intro.flac` has the `file::path` `C:/Music/01 Intro.flac`. `file::extension` is absent when the name has no dot, when its only dot is the first character, or when nothing follows its last dot; `file::path` and `file::name` are never absent. None of the three is ever unusable, and none needs anything read from the file.
+A path is the one the file was discovered under: symbolic links are not resolved. It is written with `/` as the separator on every platform, so that a file Windows calls `C:\Music\01 Intro.mp3` has the `file::path` `C:/Music/01 Intro.mp3`. `file::extension` is absent when the name has no dot, when its only dot is the first character, or when nothing follows its last dot; `file::path` and `file::name` are never absent. None of the three is ever unusable, and none needs anything read from the file. `file::size`, by contrast, describes the file itself rather than how it was reached, so for a file reached through a symbolic link it is the size of the file the link leads to.
 
 `file::path`, `file::name` and `file::size` are [definite](../concepts/predicates.md#definite-expressions):
 each resolves to exactly one usable occurrence for every file a predicate is evaluated against, since

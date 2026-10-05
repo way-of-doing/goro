@@ -227,6 +227,8 @@ point for these tests rather than an inventory of them.
 | Each of the three two-multivalue quantifier combinations, each with its operands written in both orders | Nesting must follow the quantifiers and not the written positions |
 | An ordering operator with exactly one operand under `ALL()` | The result is an aggregate comparison; an implementation reading it as "every one of these is less than every one of those" is wrong |
 | `v BETWEEN 1..10` against a multivalue of `0` and `20` | Must be false; an implementation that desugars into two comparisons returns true |
+| `artist BETWEEN "ma".."mi"` against "Miles Davis", "Metallica" and "Motörhead", and `"the".."the"` against "The Beatles" and "Th" | True, true, false, true, false: a string endpoint is compared with only as many characters as it has. Plain string order would silently leave out every name beginning with the maximum |
+| `artist BETWEEN "mi".."m"` and `artist BETWEEN "mz".."ma"` | The first is valid, holding every name beginning with "mi"; the second is reversed, an error. Reversal is judged by the same prefix comparison |
 | `ALL(x) == v` and `ALL(x) IS USABLE` for an absent `x` | Both false; universal quantification must not be vacuous |
 | Every row of the state test truth table, including the absent row | The universally quantified tests must be false for an absent value, not the negations of the existential ones |
 | `ANY(x) != v`, `ALL(x) != v` and `NOT x == v`, for an absent `x`, an unusable `x`, and a multivalue holding one of each | The last two agree everywhere except for the absent `x`, which only `NOT x == v` selects; `ANY(x) != v` is not the complement of `x == v` for the absent and multivalue cases and must give the documented answer; for the unusable case all three must be unusable |
@@ -241,6 +243,7 @@ point for these tests rather than an inventory of them.
 | A guard whose right operand would warn, and the same guard with the operands transposed | Short-circuiting must hold, since the observable difference is a warning that is or is not emitted |
 | An operator that finds a match among the usable occurrences of a bag that also holds an unusable one | The warning must be emitted anyway, since iteration within an operator does not short-circuit; a short-circuiting implementation would emit it or not according to the order of an unordered bag |
 | The same bag with its occurrences supplied to the operator in the reverse order | The result, the warnings and the exit code must all be identical, which is the property exhaustive iteration exists to deliver |
+| A source written twice, as in `m == M`, over a bag holding a usable and an unusable occurrence, in both orders | The warning quotes `m` both times: the spelling written first, not the one an operator happened to reach first |
 | `NUMBER()` of a tag string with valid number syntax but more significant digits than a number holds | An unusable occurrence, not a rounded number |
 | `file::extension` of `a.flac`, `a.tar.gz`, `.hidden`, `README` and `trailing.` | `flac` and `gz`, then absent three times: no dot, a leading dot only, and nothing after the last dot |
 | `file::path` of a file on Windows | Written with `/` throughout, drive letter included, so that the same predicate means the same thing on every platform |
@@ -495,7 +498,8 @@ channels.
 | `--no-warn=data` where the only file's predicate evaluated to unusable | Code `20`: the file was examined and not listed, and nothing reports why, the caller having said uninterpretable data is not a problem |
 | `--no-warn=data` where a file also could not be read | Code `11` regardless: the other category is untouched |
 | `--no-warn=file` where a file could not be read and a data warning fired | Code `10`, with the file warning absent from standard error |
-| `--no-warn` bare, `--no-warn=all`, and `--no-warn=data,file` | All three identical in every channel |
+| `--no-warn=all`, `--no-warn all` and `--no-warn=data,file` | All three identical in every channel |
+| `--no-warn` given no categories, at the end of the line or followed by another option | Rejected as a command line error with code `2`, before anything is processed: a bare option must not quietly silence the warnings about files that cannot be read |
 | `--no-warn=data` on a run with no unusable data at all | Identical to the same run without the option: suppressing something that did not happen must change nothing |
 | An unrecognised category name | Rejected as a command line error with code `2`, before anything is processed |
 | A category name in a different case | Accepted: category names are case-insensitive, as the other option values Goro takes already are |

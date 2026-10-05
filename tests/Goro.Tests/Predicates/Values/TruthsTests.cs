@@ -24,7 +24,7 @@ public class TruthsTests
     [Test]
     public void ToTruth_OfUnusableOccurrenceWithOrigin_IsUnusable()
     {
-        var value = Value<bool>.Single(new Unusable<bool>(new Origin(new SourceId(3), "compilation")));
+        var value = Value<bool>.Single(new Unusable<bool>(new Origin(new SourceId(3), "compilation", 0)));
 
         Assert.That(value.ToTruth(), Is.EqualTo(Truth.Unusable));
     }

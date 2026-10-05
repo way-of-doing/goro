@@ -97,4 +97,21 @@ public class StringOrderTests
             foreach (var y in texts)
                 Assert.That(Math.Sign(StringOrder.Literal.Compare(x, y)), Is.EqualTo(-Math.Sign(StringOrder.Literal.Compare(y, x))));
     }
+
+    // A range's endpoint is compared with only as many characters of a datum as it has.
+    [TestCase("miles", "mi", 0)]
+    [TestCase("mi", "mi", 0)]
+    [TestCase("m", "mi", -1)]
+    [TestCase("mo", "mi", 1)]
+    [TestCase("macy", "ma", 0)]
+    [TestCase("lz", "ma", -1)]
+    [TestCase("x\U0001F600yz", "x\U0001F600", 0)]
+    [TestCase("x\uFFFFyz", "x\U0001F600", -1)]
+    public void ComparesWithAnEndpoint_OverTheEndpointsLength(string datum, string endpoint, int expected)
+    {
+        datum = System.Text.RegularExpressions.Regex.Unescape(datum);
+        endpoint = System.Text.RegularExpressions.Regex.Unescape(endpoint);
+
+        Assert.That(Math.Sign(StringOrder.Literal.CompareWithEndpoint(datum, endpoint)), Is.EqualTo(expected));
+    }
 }

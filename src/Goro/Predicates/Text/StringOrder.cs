@@ -27,9 +27,20 @@ public sealed class StringOrder : DatumOrder<string>
     /// encode sort above them.
     /// </summary>
     /// <remarks>Total over any strings, well-formed or not; it is code point order on the well-formed ones.</remarks>
-    public override int Compare(string x, string y)
+    public override int Compare(string x, string y) => Compare(x.AsSpan(), y.AsSpan());
+
+    /// <summary>
+    /// Compares the datum cut to the endpoint's length, so that <c>"mi"</c> as a maximum admits
+    /// "miles". Cutting by UTF-16 code units cuts by code points wherever it matters: an endpoint is
+    /// a literal, which holds no lone surrogate, so a datum that agrees with it up to the cut holds
+    /// whole code points there, and one that does not is decided where it first differs.
+    /// </summary>
+    public override int CompareWithEndpoint(string datum, string endpoint) =>
+        Compare(datum.AsSpan(0, Math.Min(datum.Length, endpoint.Length)), endpoint.AsSpan());
+
+    private static int Compare(ReadOnlySpan<char> x, ReadOnlySpan<char> y)
     {
-        int common = x.AsSpan().CommonPrefixLength(y);
+        int common = x.CommonPrefixLength(y);
         if (common == x.Length || common == y.Length) return x.Length.CompareTo(y.Length);
 
         return CodePointOrderKey(x[common]).CompareTo(CodePointOrderKey(y[common]));

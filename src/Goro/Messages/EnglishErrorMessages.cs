@@ -190,6 +190,7 @@ public sealed class EnglishErrorMessages : IErrorMessages
         InvalidAlgorithm(var algorithm, var valid) => $"No algorithm `{algorithm}` -- pick from {List(valid)}, goro!",
         InvalidOutputFormat(var format, var valid) => $"No format `{format}` -- pick from {List(valid)}, goro!",
         UnknownWarningCategory(var category, var valid) => $"No warning category `{category}` -- pick from {List(valid)}, goro!",
+        MissingWarningCategory(var valid) => $"`--no-warn` needs its categories -- pick from {List(valid)}, goro!",
 
         _ => throw new ArgumentOutOfRangeException(nameof(message), message, "This error has no English wording."),
     };

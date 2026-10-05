@@ -10,6 +10,13 @@ public abstract class DatumOrder<T> where T : notnull
     public virtual T Prepare(T datum) => datum;
 
     public abstract int Compare(T x, T y);
+
+    /// <summary>
+    /// Compares a prepared datum with a prepared endpoint of a range. For most types this is
+    /// <see cref="Compare"/>; strings compare an endpoint with only as many characters of the datum
+    /// as the endpoint has, so that a range reaches every string beginning with its maximum.
+    /// </summary>
+    public virtual int CompareWithEndpoint(T datum, T endpoint) => Compare(datum, endpoint);
 }
 
 /// <summary>The order of a type that has a natural one: numbers, bytecounts, durations, booleans.</summary>

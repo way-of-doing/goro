@@ -32,16 +32,16 @@ Neither command is silent about it: both emit a warning for the file.
 
 ## Predicates
 
-### How do I select files by type, such as every FLAC in a folder tree?
+### How do I select files by type, such as every MP3 in a folder tree?
 
 Filter on the extension:
 
 ```
-goro list --filter='file::extension == "flac"' /music
+goro list --filter='file::extension == "mp3"' /music
 ```
 
 A glob cannot do this, since it matches within one directory only. The comparison ignores case like
-any other, so `FLAC` and `flac` are both found. `file::path` works the same way for anything else
+any other, so `MP3` and `mp3` are both found. `file::path` works the same way for anything else
 about where a file lives: `file::path =~ r"/live/"` finds the files somewhere under a directory
 called `live`. Paths are written with `/` on every platform.
 
@@ -132,12 +132,6 @@ still unfixed. Suppressing file warnings is a different matter. A file that cann
 condition Goro exists to find, and silencing it in a scheduled run removes the one signal that
 would report a disc going bad. The two categories are separate so that the noisy condition you
 have accepted need not bury the quiet one you have not.
-
-### Why did `--no-warn data` silence everything, or complain about a pathspec?
-
-A category is attached to the option with `=`, as in `--no-warn=data`. Written with a space, the
-option stands alone and suppresses every category, and `data` is read as a pathspec, which is an
-error unless something of that name exists.
 
 ## Scripting
 

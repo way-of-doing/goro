@@ -30,9 +30,12 @@ internal sealed class TestPredicate
         return Register(new IdentifierReference<T>(declaration, OriginOf(name.ToLowerInvariant(), name)), name.ToLowerInvariant());
     }
 
-    /// <summary>Another mention of the same identifier, written as <paramref name="text"/>: the same source.</summary>
-    public IdentifierReference<T> Mention<T>(IdentifierReference<T> identifier, string text) where T : notnull =>
-        Register(new IdentifierReference<T>(identifier.Declaration, new Origin(identifier.Origin.Source, text)), CanonicalForm(identifier));
+    /// <summary>
+    /// Another mention of the same identifier, written as <paramref name="text"/> starting at
+    /// <paramref name="start"/>: the same source. Every other node is taken to start at 0.
+    /// </summary>
+    public IdentifierReference<T> Mention<T>(IdentifierReference<T> identifier, string text, int start) where T : notnull =>
+        Register(new IdentifierReference<T>(identifier.Declaration, new Origin(identifier.Origin.Source, text, start)), CanonicalForm(identifier));
 
     public Conversion<string, decimal> Number(BoundExpression<string> argument, string? text = null) =>
         Convert<string, decimal>(argument, Conversions.NumberFromString, "NUMBER", text);
@@ -83,7 +86,7 @@ internal sealed class TestPredicate
             sources.Add(canonicalForm, source);
         }
 
-        return new Origin(source, text);
+        return new Origin(source, text, 0);
     }
 
     private TNode Register<TNode>(TNode node, string canonicalForm) where TNode : BoundExpression

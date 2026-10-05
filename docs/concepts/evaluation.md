@@ -82,6 +82,8 @@ test(o1 … on):
     prepare each string datum, and the endpoints of a range, per normalization.md in the operator's mode;
         a pattern is not prepared
     return T if the operator's condition holds of the data, F otherwise
+        -- for BETWEEN, min ≤ x ≤ max, where a string endpoint is compared with x cut to
+        -- the endpoint's length
 
 quantify(∃, outcomes) = T if any is T, else U if any is U, else F
 quantify(∀, outcomes) = F if any is F, else U if any is U, else T

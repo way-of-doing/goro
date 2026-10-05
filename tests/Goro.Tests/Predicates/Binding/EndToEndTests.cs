@@ -34,6 +34,26 @@ public class EndToEndTests
         Assert.That(Decide(text, artist), Is.EqualTo(expected));
     }
 
+    // A string endpoint is compared with only as many characters of the subject as it has, so a
+    // range reaches every string beginning with its maximum, as the spine of an encyclopedia does.
+    [TestCase("artist BETWEEN \"ma\"..\"mi\"", "Miles Davis", Truth.True)]
+    [TestCase("artist BETWEEN \"ma\"..\"mi\"", "Metallica", Truth.True)]
+    [TestCase("artist BETWEEN \"ma\"..\"mi\"", "Motörhead", Truth.False)]
+    [TestCase("artist BETWEEN \"ma\"..\"mi\"", "M", Truth.False)]
+    [TestCase("artist BETWEEN \"a\"..\"b\"", "Blues Traveler", Truth.True)]
+    [TestCase("artist BETWEEN \"m\"..\"n\"", "Nirvana", Truth.True)]
+    [TestCase("artist BETWEEN \"the\"..\"the\"", "The Beatles", Truth.True)]
+    [TestCase("artist BETWEEN \"the\"..\"the\"", "Th", Truth.False)]
+    [TestCase("artist BETWEEN \"mi\"..\"m\"", "Miles Davis", Truth.True)]
+    [TestCase("artist BETWEEN \"mi\"..\"m\"", "Madonna", Truth.False)]
+    [TestCase("LITERALLY(artist) BETWEEN \"M\"..\"Mi\"", "Miles Davis", Truth.True)]
+    [TestCase("LITERALLY(artist) BETWEEN \"M\"..\"Mi\"", "miles davis", Truth.False)]
+    [TestCase("artist BETWEEN \"st\"..\"strasse\"", "Straße", Truth.True)]
+    public void Range_OfStrings_TreatsItsEndpointsAsPrefixes(string text, string artist, Truth expected)
+    {
+        Assert.That(Decide(text, artist), Is.EqualTo(expected));
+    }
+
     // e, an optional combining acute, end. Removing the mark from the pattern, as normalization
     // would, leaves ^cafe?$, an optional e, which matches "caf".
     [TestCase("Cafe", Truth.True)]

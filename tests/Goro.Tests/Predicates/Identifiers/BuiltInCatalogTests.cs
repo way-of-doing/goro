@@ -186,7 +186,7 @@ public class BuiltInCatalogTests
     {
         var declaration = Found(Lookup(identifier));
         var file = new FileData("/music/track.mp3");
-        var origin = new Origin(new SourceId(0), identifier);
+        var origin = new Origin(new SourceId(0), identifier, 0);
 
         TestDelegate resolve = declaration switch
         {

@@ -5,7 +5,7 @@
 # Synopsis
 
 ```
-goro hash [-a <algo>] [-o <output>] [--strict-exit-code] [--no-warn[=<category>,...]] [--] [<pathspec>...]
+goro hash [-a <algo>] [-o <output>] [--strict-exit-code] [--no-warn=<category>,...] [--] [<pathspec>...]
 ```
 
 # Description

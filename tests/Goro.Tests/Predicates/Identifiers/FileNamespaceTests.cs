@@ -32,7 +32,7 @@ public class FileNamespaceTests
     {
         var lookup = BuiltInCatalog.Instance.Lookup(new IdentifierName(["file"], identifier));
         var declaration = (IdentifierDeclaration<T>)((IdentifierLookup.Found)lookup).Declaration;
-        return declaration.Binding.Resolve(file, new Origin(new SourceId(0), $"file::{identifier}"));
+        return declaration.Binding.Resolve(file, new Origin(new SourceId(0), $"file::{identifier}", 0));
     }
 
     private static Value<T> Resolve<T>(string identifier, string path) where T : notnull =>

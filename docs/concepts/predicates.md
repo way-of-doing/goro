@@ -157,7 +157,7 @@ Two further concepts are closely related to types, but are not types themselves:
 
 A range whose endpoints are not of the same type is rejected rather than guessed at. `60..120kb` is an error, and the diagnostic says what the trouble is: it is unclear whether `60` means sixty bytes or sixty kilobytes, and the unit has to be given.
 
-Attempting to create a range such that `min > max` is an error. The two endpoints are compared the way the operator will compare them, which for strings means that a `LITERALLY` on the operator's other operand decides whether they are compared normalized -- `LITERALLY(artist) BETWEEN "B".."a"` is a valid range while `artist BETWEEN "B".."a"` is not.
+A range that could hold nothing is an error. For most types that means `min > max`; for strings it means that `min`, cut to the length of `max`, sorts after `max`, since string endpoints are prefixes (see [Range operator](#range-operator)), so `"mi".."m"` is a valid range holding everything that begins with "mi". The two endpoints are compared the way the operator will compare them, which for strings means that a `LITERALLY` on the operator's other operand decides whether they are compared normalized -- `LITERALLY(artist) BETWEEN "B".."a"` is a valid range while `artist BETWEEN "B".."a"` is not.
 
 **multivalues**
 : a _multivalue_ is the name this document gives to a bag of cardinality greater than one: the simultaneous existence of several occurrences where a single value might otherwise be expected. Multivalues cannot be specified as literals, but they arise whenever the same kind of data is recorded more than once within tags. For example, the identifier `artist` might be absent (if there is no artist tag of any kind), a simple string value (if there is exactly one artist tag), or a multivalue (e.g. if there are multiple Vorbis comments with the `Artist` key).
@@ -212,14 +212,16 @@ The comparison operators `==`, `!=`, `<`, `<=`, `>`, `>=` directly compare their
 
 #### Range operator
 
-The range operator `BETWEEN` can be used to perform a range inclusion check; it determines if its first operand is part of the (inclusive) range defined by the second operand, for example `year BETWEEN 1990..2000`. An occurrence `x` is part of the range when `min <= x` and `x <= max` both hold of that same occurrence. If the value and range are strings, comparisons follow the same rules as for the simple comparison operators.
+The range operator `BETWEEN` can be used to perform a range inclusion check; it determines if its first operand is part of the (inclusive) range defined by the second operand, for example `year BETWEEN 1990..2000`. An occurrence `x` is part of the range when `min <= x` and `x <= max` both hold of that same occurrence.
+
+Strings are compared as the comparison operators compare them, with one difference: **each endpoint is compared with only as many characters of `x` as the endpoint itself has.** A string range therefore reaches every string beginning with its maximum, the way the spine of an encyclopedia volume marked "Ma–Mi" does: `artist BETWEEN "ma".."mi"` matches "Miles Davis", which `artist <= "mi"` does not, and a range whose endpoints are equal, such as `"the".."the"`, matches every string that begins with them. Characters here are those of the strings as the operator prepares them, normalized or literal.
 
 `BETWEEN` is **a single operator**, and the two inequalities above describe _how one occurrence is tested_ rather than a rewriting of the predicate. The distinction is invisible for a simple value and decisive for a multivalue, because an operator is one quantifier scope and splitting it into two would create a second: for a value `v` with occurrences `0` and `20`, `v BETWEEN 1..10` is false, because no single occurrence lies in the range, whereas `1 <= v AND v <= 10` is *true*, each of its two comparisons finding a different occurrence to satisfy it. See [Multivalues](#multivalues).
 
 Examples:
 
 - `year BETWEEN 2000..2010` matches if the year is between 2000 and 2010, inclusive.
-- `artist BETWEEN "ma".."mi"` matches if the artist would be sorted somewhere between "ma" and "mi". It would match "Metallica", given that matching against strings is case-insensitive by default due to normalization and "me" sorts between "ma" and "mi".
+- `artist BETWEEN "ma".."mi"` matches "Metallica" and "Miles Davis", but not "Motörhead": in normalized mode case does not matter, "me" lies between "ma" and "mi", every name beginning with "mi" is within the range, and "mo" is beyond it.
 
 #### Regular expression match operator
 
@@ -373,7 +375,7 @@ Examples:
 - `genre == "metal"` matches when there are both "metal" and "rock" genre tags present, because `genre` is (by default) existentially quantified and at least one tag is equal to "metal"
 - `ANY(genre) != "metal"` _also_ matches when there are both "metal" and "rock" genre tags present, because at least one tag is _not_ equal to "metal"
 - `ALL(genre) == "metal"` does _not_ match in the same scenario, because not all of the values match "metal" once `genre` is universally quantified
-- `genre BETWEEN "a".."b"` matches when any of the genre tags present sorts between "a" and "b"
+- `genre BETWEEN "a".."b"` matches when any of the genre tags present begins with "a" or "b"
 
 The regular expression operator also works transparently with multivalues in the same way: it matches when _any_ of the multiple values match the regular expression, by default.
 
@@ -447,7 +449,7 @@ The errors reported when a predicate is read include:
 - an argument of the wrong type to a function, such as a boolean passed to `NUMBER()` or `STRING()`;
 - `LITERALLY()` applied to an operand that is not a string, or to the operand of a state test;
 - a modifier applied anywhere other than to an operand of a comparison, range, regex, or state test operator, or to another such modifier;
-- a range whose endpoints are not literals of the same type, or whose `min` is greater than its `max`;
+- a range whose endpoints are not literals of the same type, or that could hold nothing, its `min` lying above its `max`;
 - a pattern of `=~` that is not a raw string, is not a valid regular expression, or uses a construct the matching engine does not support.
 
 Only conditions that genuinely depend on the contents of a file are left to be discovered during evaluation, and neither of them ever stops a run: a value that is absent, and an occurrence that cannot be interpreted. The first is ordinary; the second is reported as a warning, as described below.
@@ -504,7 +506,7 @@ A sub-expression that is never evaluated never warns. In particular, the short-c
 
 #### What a warning quotes
 
-Each warning quotes the sub-expression responsible, exactly as it was written in the predicate. Where the same source occurs in more than one place, the quoted text is that of the occurrence which actually produced the value. A warning does not name a position within the predicate.
+Each warning quotes the sub-expression responsible, exactly as it was written in the predicate. Where the same source is written in more than one place, the warning quotes the one written first among those that produced an unusable occurrence consumed in that file. A warning does not name a position within the predicate.
 
 ### Modifiers
 
@@ -555,8 +557,8 @@ Examples:
 
 - `artist == "metallica"` matches "Metallica" because the equality operator normalizes its inputs by default.
 - `artist == LITERALLY("metallica")` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the equality operator from normalizing its inputs before comparing them.
-- `artist BETWEEN "m".."n"` matches "Metallica" because, after normalization by default, "Metallica" sorts between "m" and "n".
-- `LITERALLY(artist) BETWEEN "m".."n"` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the range operator from normalizing its inputs, and upper case "M" does not sort between lower case "m" and "n".
+- `artist BETWEEN "m".."m"` matches "Metallica" because, after normalization by default, "Metallica" begins with "m".
+- `LITERALLY(artist) BETWEEN "m".."m"` does _not_ match "Metallica" because the result of `LITERALLY()` prevents the range operator from normalizing its inputs, and upper case "M" sorts before lower case "m".
 - `artist =~ r"^met"` matches "Metallica" because the match is performed case-insensitively.
 - `LITERALLY(artist) =~ r"^met"` does _not_ match "Metallica", because `LITERALLY()` makes the match case-sensitive and "Metallica" begins with a capital "M".
 - `artist =~ r"motö"` matches nothing, because diacritics are removed from the subject and the pattern is left as written, so the `ö` in it has nothing to match.
@@ -724,7 +726,7 @@ Not every rule in this document is grammatical, and a construct that this gramma
 - a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a literal, `NUMBER()` and `STRING()` do not accept a boolean, and `NUMBER()` does not accept a string literal that is not a valid number literal;
 - the `operand` a `LITERALLY` modifier is applied to must be of type string, and must not be the operand of a state test;
 - `ALL` and `ANY` may not both be applied to the same operand, and neither may be applied to the operand of `IS ABSENT`;
-- the two endpoints of a `range` must be literals of the same type, and `min` must not be greater than `max`, compared the way the operator will compare them, so that a `LITERALLY` on the operator's other operand decides whether string endpoints are compared normalized;
+- the two endpoints of a `range` must be literals of the same type, and the range must be able to hold something: `min` must not lie above `max` when compared with it as an occurrence would be, which for strings means cut to the length of `max`, and compared the way the operator will compare them, so that a `LITERALLY` on the operator's other operand decides whether string endpoints are compared normalized;
 - a `number` that stands for a `bytecount` or a `duration` must not be negative, and one that stands for a `duration` must be a whole number;
 - at least one of the three unit groups of a `duration_units` must be present, so the empty string does not satisfy that production;
 - each `two_digits` of a `duration_clock` must denote a value between 0 and 59 inclusive, while its leading `digits` is unbounded;

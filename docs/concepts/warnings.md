@@ -68,18 +68,21 @@ written in the predicate.
 
 ### Suppressing warnings
 
-The global option `--no-warn` stops warnings being produced. It takes an optional list of
-categories, and with none given it means all of them:
+The global option `--no-warn` stops warnings being produced. It takes a list of the categories to
+suppress, attached with `=` or as the next argument, like any other option value:
 
 ```
---no-warn                suppress every warning
 --no-warn=data           suppress data warnings only
 --no-warn=file           suppress file warnings only
---no-warn=data,file      both, which is the same as the bare form
---no-warn=all            an explicit spelling of the bare form
+--no-warn=data,file      both, which is every category there is
+--no-warn=all            every category, however many there are
 ```
 
-Category names are case-insensitive, as are the other option values Goro takes. A name it does not recognise is a command line error, rejected before any file is processed, on the same terms as any other mistake in the invocation.
+The list cannot be left out. Suppressing every category also silences the warnings about files that
+cannot be read, which is too much for a slip of the keyboard to do, so `--no-warn` given no
+categories is a command line error. So is a name Goro does not recognise. Either is rejected before
+any file is processed, on the same terms as any other mistake in the invocation. Category names are
+case-insensitive, as are the other option values Goro takes.
 
 **A suppressed warning was not produced.** It is written nowhere, it contributes nothing to the
 exit code, and nothing reports that it was suppressed. Goro will never knowingly give a caller a

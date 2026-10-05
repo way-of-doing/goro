@@ -75,8 +75,8 @@ are followed as before, including to a directory the walk also reaches another w
 
 ### The sources a file has reported
 
-The evaluation context keeps, for each warning source the predicate can produce, the first origin
-reported for it in the file, in an array indexed by source. The array is the deduplication set as
+The evaluation context keeps, for each warning source the predicate can produce, the origin written
+earliest among those reported for it in the file, in an array indexed by source. The array is the deduplication set as
 well, an empty slot meaning that the source has not been reported yet, so no separate bitset is
 kept, and it is allocated on the first report, so that a file which warns about nothing allocates
 nothing.

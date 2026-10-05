@@ -5,7 +5,7 @@
 # Synopsis
 
 ```
-goro list [--filter=<predicate>] [--strict-exit-code] [--no-warn[=<category>,...]] [--] [<pathspec>...]
+goro list [--filter=<predicate>] [--strict-exit-code] [--no-warn=<category>,...] [--] [<pathspec>...]
 ```
 
 # Description

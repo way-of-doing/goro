@@ -44,7 +44,7 @@ internal sealed class Sources(string text)
             forms.Add(shape.Form);
         }
 
-        return new Origin(id, span.Of(text));
+        return new Origin(id, span.Of(text), span.Start);
     }
 
     public SourceTable Table() => new([.. forms]);

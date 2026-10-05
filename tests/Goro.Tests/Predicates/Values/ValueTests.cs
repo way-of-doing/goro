@@ -37,7 +37,7 @@ public class ValueTests
     [Test]
     public void Single_HoldsOneOccurrence()
     {
-        var unusable = new Unusable<decimal>(new Origin(new SourceId(0), "year"));
+        var unusable = new Unusable<decimal>(new Origin(new SourceId(0), "year", 0));
 
         Assert.That(Value<decimal>.Single(unusable).Occurrences, Is.EqualTo(new[] { unusable }));
     }

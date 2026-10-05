@@ -217,34 +217,58 @@ public class WarningTests
         Assert.That(forwards.Quoted, Is.EqualTo(new[] { "m", "NUMBER(m)" }));
     }
 
-    // A warning quotes the text of the mention that actually produced the occurrence.
+    // Of the mentions of one source that reported in a file, a warning quotes the one written first,
+    // whichever an operator happened to reach first. The second tree is built out of written order
+    // to show that evaluation order plays no part.
     [Test]
-    public void TheQuotedText_IsThatOfTheFirstMentionEvaluated()
+    public void TheQuotedText_IsThatOfTheMentionWrittenFirst()
     {
         var x = X;
-        var upper = p.Mention(x, "X");
+        var upper = p.Mention(x, "X", start: 4);
 
         Assert.That(p.Decide(Gt(x, upper)).Quoted, Is.EqualTo(new[] { "x" }));
-        Assert.That(p.Decide(Gt(upper, x)).Quoted, Is.EqualTo(new[] { "X" }));
+        Assert.That(p.Decide(Gt(upper, x)).Quoted, Is.EqualTo(new[] { "x" }));
+    }
+
+    // A mention that was never evaluated reported nothing, so it is never the one quoted.
+    [Test]
+    public void TheQuotedText_IsNeverThatOfAMentionNotEvaluated()
+    {
+        var x = X;
+        var upper = p.Mention(x, "X", start: 30);
+
         Assert.That(p.Decide(Or(And(False, Gt(x, Lit(1m))), Gt(upper, Lit(1m)))).Quoted, Is.EqualTo(new[] { "X" }));
+    }
+
+    // Within one operator, which mention reports first depends on the order of a bag, and nesting
+    // m outside M, a bag of a usable and an unusable occurrence has M report first. What is quoted
+    // must not depend on it.
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TheQuotedText_DoesNotDependOnTheOrderOfABag(bool reversed)
+    {
+        Occurrence<decimal>[] bag = [Ok(1m), BadNumber];
+        var m = p.Id("m", reversed ? [.. bag.Reverse()] : bag);
+        var upper = p.Mention(m, "M", start: 5);
+
+        Assert.That(p.Decide(Eq(m, upper)).Quoted, Is.EqualTo(new[] { "m" }));
     }
 
     [Test]
     public void TheQuotedText_OfAConversion_IsAsWritten()
     {
         var s = p.Id("s", Ok("abc"));
-        var written = p.Number(p.Mention(s, "S"), "number( S )");
+        var written = p.Number(p.Mention(s, "S", start: 0), "number( S )");
 
         Assert.That(p.Decide(Gt(written, p.Number(s))).Quoted, Is.EqualTo(new[] { "number( S )" }));
     }
 
-    // Two sources in one bag, with written order deciding which mention's text is quoted even when
-    // the universal operand is iterated first.
+    // The universal operand is iterated first, and the mention written first is still the one quoted.
     [Test]
-    public void ReportsWithinOneCombination_AreInWrittenOrder()
+    public void TheQuotedText_UnderAUniversalQuantifier_IsThatOfTheMentionWrittenFirst()
     {
         var x = X;
-        var upper = p.Mention(x, "X");
+        var upper = p.Mention(x, "X", start: 5);
 
         Assert.That(p.Decide(Eq(x, All(upper))).Quoted, Is.EqualTo(new[] { "x" }));
     }

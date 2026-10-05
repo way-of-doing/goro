@@ -19,7 +19,7 @@ command line ─► input interface ─► predicate compiler ─► pipeline pl
 
 This component owns the definition of command line input that Goro understands and the associated human-readable explanation. Its goal is to read the incoming command line and parse it into a structured object graph or, when appropriate, display usage instructions.
 
-A rejected command line returns `2` before anything else happens; unknown options are rejected rather than ignored. Two options whose syntax the command line library cannot express are rewritten before it sees them: a bare `--no-warn` takes no value from the next argument, and a separately written `--filter` value is attached to its option, so that one beginning with a dash is not cut short.
+A rejected command line returns `2` before anything else happens; unknown options are rejected rather than ignored. Two options whose syntax the command line library cannot express are rewritten before it sees them: a `--no-warn` given no categories is given an empty list, so that the mistake is reported for what it is, and a separately written `--filter` value is attached to its option, so that one beginning with a dash is not cut short.
 
 ## Predicate compiler
 

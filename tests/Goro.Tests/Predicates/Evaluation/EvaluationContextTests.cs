@@ -20,15 +20,23 @@ public class EvaluationContextTests
         Assert.That(new EvaluationContext(File, 3).Reported, Is.Empty);
     }
 
+    // Which spelling of a source a warning quotes depends on the predicate alone, not on which one
+    // an operator happened to reach first.
     [Test]
-    public void Report_SameSourceTwice_KeepsTheFirstOrigin()
+    public void Report_SameSourceTwice_KeepsTheOriginWrittenEarliest()
     {
-        var context = new EvaluationContext(File, 2);
-        var first = new Origin(new SourceId(1), "x");
-        context.Report(first);
-        context.Report(new Origin(new SourceId(1), "X"));
+        var earlier = new Origin(new SourceId(1), "x", 0);
+        var later = new Origin(new SourceId(1), "X", 4);
 
-        Assert.That(context.Reported, Is.EqualTo(new[] { first }));
+        var laterFirst = new EvaluationContext(File, 2);
+        laterFirst.Report(later);
+        laterFirst.Report(earlier);
+        var earlierFirst = new EvaluationContext(File, 2);
+        earlierFirst.Report(earlier);
+        earlierFirst.Report(later);
+
+        Assert.That(laterFirst.Reported, Is.EqualTo(new[] { earlier }));
+        Assert.That(earlierFirst.Reported, Is.EqualTo(new[] { earlier }));
     }
 
     // A file's warnings come out in an order that depends on the predicate alone, not on the
@@ -37,9 +45,9 @@ public class EvaluationContextTests
     public void Reported_IsInOrderOfSource_NotOfReport()
     {
         var context = new EvaluationContext(File, 70);
-        var late = new Origin(new SourceId(65), "late");
-        var middle = new Origin(new SourceId(2), "middle");
-        var early = new Origin(new SourceId(0), "early");
+        var late = new Origin(new SourceId(65), "late", 0);
+        var middle = new Origin(new SourceId(2), "middle", 0);
+        var early = new Origin(new SourceId(0), "early", 0);
         context.Report(late);
         context.Report(middle);
         context.Report(early);
@@ -53,7 +61,7 @@ public class EvaluationContextTests
     {
         var context = new EvaluationContext(File, 2);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => context.Report(new Origin(new SourceId(source), "x")));
+        Assert.Throws<ArgumentOutOfRangeException>(() => context.Report(new Origin(new SourceId(source), "x", 0)));
     }
 
     [Test]
@@ -61,6 +69,6 @@ public class EvaluationContextTests
     {
         var context = new EvaluationContext(File, 0);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => context.Report(new Origin(new SourceId(0), "x")));
+        Assert.Throws<ArgumentOutOfRangeException>(() => context.Report(new Origin(new SourceId(0), "x", 0)));
     }
 }

@@ -18,7 +18,10 @@ command line. A pathspec is one of the following:
 
 **directory**
 : A path to a directory. Every file contained within, at any depth, is
-processed recursively.
+processed recursively. Symbolic links to directories are followed, except a
+link leading back to a directory the walk is already inside -- the one
+being listed, or one above it -- which is passed over silently, since
+following it would never end.
 
 **glob**
 : A pattern containing wildcard characters, matched against the entries of

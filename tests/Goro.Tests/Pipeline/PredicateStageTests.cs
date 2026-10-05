@@ -262,7 +262,7 @@ public class PredicateStageTests
         private Origin Next(string form, string? written = null)
         {
             _forms.Add(form);
-            return new Origin(new SourceId(_forms.Count - 1), written ?? form);
+            return new Origin(new SourceId(_forms.Count - 1), written ?? form, 0);
         }
     }
 }

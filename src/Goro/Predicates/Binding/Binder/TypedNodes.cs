@@ -139,7 +139,11 @@ internal static class TypedNodes
 /// <summary>The ends of a range, prepared, waiting for the subject that makes them a range test.</summary>
 internal abstract class PreparedRange
 {
-    /// <summary>Whether the minimum sorts after the maximum, so that the range holds nothing.</summary>
+    /// <summary>
+    /// Whether the range holds nothing: the minimum, compared with the maximum as a datum would be,
+    /// lies above it. For strings, <c>"mi".."m"</c> is not reversed, since every string beginning
+    /// with "mi" lies within it.
+    /// </summary>
     public abstract bool IsReversed { get; }
 
     /// <param name="subject">An expression of the range's type.</param>
@@ -148,7 +152,7 @@ internal abstract class PreparedRange
 
 internal sealed class PreparedRange<T>(T minimum, T maximum, DatumOrder<T> order) : PreparedRange where T : notnull
 {
-    public override bool IsReversed => order.Compare(minimum, maximum) > 0;
+    public override bool IsReversed => order.CompareWithEndpoint(minimum, maximum) > 0;
 
     public override BoundCondition Test(BoundExpression subject, Quantifier quantifier) =>
         new RangeTest<T>(new((BoundExpression<T>)subject, quantifier), minimum, maximum, order);

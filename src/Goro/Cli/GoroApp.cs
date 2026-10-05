@@ -52,7 +52,7 @@ public sealed class GoroApp
     }
 
     public Task<int> RunAsync(IEnumerable<string> args, CancellationToken cancellationToken) =>
-        _app.RunAsync(NoWarnOption.AttachValues(FilterOption.AttachValue(args)), cancellationToken);
+        _app.RunAsync(NoWarnOption.MarkMissingValue(FilterOption.AttachValue(args)), cancellationToken);
 
     // Spectre reports a command line it cannot accept as a CommandAppException, by default with
     // exit code -1. docs/concepts/exit-codes.md gives a rejected command line 2; anything else that

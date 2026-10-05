@@ -72,6 +72,18 @@ public class SourceBindingTests
         Assert.That(outcome.Quoted, Is.EqualTo(new[] { "X" }));
     }
 
+    // With m nested outside M, the bag in its first order has M report first; the spelling written
+    // first is quoted either way.
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Origin_OfASourceWrittenTwice_IsTheSpellingWrittenFirst(bool reversed)
+    {
+        Occurrence<string>[] bag = [Ok("a"), BadString];
+        var catalog = TestCatalog.Standard().With("m", reversed ? [.. bag.Reverse()] : bag);
+
+        Assert.That(Evaluate("m == M", catalog).Quoted, Is.EqualTo(new[] { "m" }));
+    }
+
     // A leading "::" starts a name at the global namespace, where every namespace sits.
     [TestCase("lab::q > 1 OR ::lab::q > 2", "lab::q")]
     [TestCase("::lab::q > 1 OR lab::q > 2", "::lab::q")]
