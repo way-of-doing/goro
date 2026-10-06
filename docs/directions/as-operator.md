@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, design/rationale.md, design/deferred.md, testing.md, src/Goro/Predicates, tests/Goro.Tests
 after: semantic-analysis-passes, cardinality-and-constants
-branch:
+branch: line/as-operator
 ---
 # Conversions as an operator, `x AS T`
 
