@@ -197,3 +197,21 @@ account of the predicate compiler describes the binder, the analyses and lowerin
   enforcement on, finds none left.
 
   Next step: review, then merge into `main`.
+- 2026-10-06 -- Moved `Quantifier` from `Evaluation` to `Values`. It was all `Binding` used from
+  `Evaluation`, so the binder and the evaluation tree are now siblings: neither knows the other,
+  and they meet only in `Analyses` and `Lowering`. The order is now `Values`, `Text`,
+  `Diagnostics`, `Syntax`, `Identifiers`, then `Binding` and `Evaluation` side by side, then
+  `Analyses`, `Lowering` and the root.
+
+  `Binding` was considered and rejected as its home. Eight of the nine files using it are on the
+  evaluation side, and the tree the compiler produces should not depend on the compiler.
+  `Syntax` was rejected too: a quantifier is never written, `ANY` being the default.
+
+  `Values` follows the model of `ALL` and `ANY` as value modifiers: every value carries a
+  quantifier bit, and the bit says how its occurrences are read. It mirrors `ComparisonMode`,
+  the bit `LITERALLY` sets, which sits in `Text` beside the normalization it governs.
+
+  Checked: the suite passes, 2051 tests; the comparison against `main` matches exactly; IDE0005
+  finds no unnecessary usings.
+
+  Next step: review, then merge into `main`.

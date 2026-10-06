@@ -1,5 +1,4 @@
 using Goro.Predicates.Binding;
-using Goro.Predicates.Evaluation;
 using Goro.Predicates.Text;
 using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Support;

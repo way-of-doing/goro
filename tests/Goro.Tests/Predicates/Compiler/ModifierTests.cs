@@ -1,5 +1,6 @@
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Text;
+using Goro.Predicates.Values;
 using static Goro.Tests.Predicates.Support.CompileAssert;
 using Codes = Goro.Predicates.Binding.SemanticDiagnosticCodes;
 

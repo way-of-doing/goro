@@ -1,10 +1,6 @@
-namespace Goro.Predicates.Evaluation;
+using Goro.Predicates.Values;
 
-public enum Quantifier
-{
-    Existential,
-    Universal,
-}
+namespace Goro.Predicates.Evaluation;
 
 /// <summary>
 /// An operand of an operator, with the quantifier its modifiers chose. The modifiers themselves are

@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Text;
