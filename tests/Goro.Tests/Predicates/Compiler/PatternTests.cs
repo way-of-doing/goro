@@ -87,9 +87,9 @@ public class PatternTests
         Assert.That(((ErrorMessage.InvalidPattern)message).Reason.Text, Does.Contain("Not enough )'s"));
     }
 
-    [TestCase("year =~ r\"1\"", "STRING(year) =~ r\"1\"")]
-    [TestCase("ALL(year) =~ r\"1\"", "ALL(STRING(year)) =~ r\"1\"")]
-    [TestCase("file::size =~ r\"1\"", "STRING(file::size) =~ r\"1\"")]
+    [TestCase("year =~ r\"1\"", "year AS STRING =~ r\"1\"")]
+    [TestCase("ALL(year) =~ r\"1\"", "ALL(year AS STRING) =~ r\"1\"")]
+    [TestCase("file::size =~ r\"1\"", "file::size AS STRING =~ r\"1\"")]
     public void Subject_ThatIsNotAString_IsAnError(string text, string rewrite)
     {
         var error = Error(text);

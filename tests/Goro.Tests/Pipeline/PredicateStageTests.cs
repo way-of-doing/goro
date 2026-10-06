@@ -95,7 +95,7 @@ public class PredicateStageTests
 
         Assert.That(outcome.Disposition, Is.EqualTo(FileDisposition.Matched));
         Assert.That(outcome.Output, Is.EqualTo(new ListResult("/music/track.mp3")));
-        Assert.That(outcome.Warnings, Is.EqualTo(new[] { new DataWarning("/music/track.mp3", "NUMBER(file::name)") }));
+        Assert.That(outcome.Warnings, Is.EqualTo(new[] { new DataWarning("/music/track.mp3", "file::name AS NUMBER") }));
     }
 
     [Test]
@@ -111,8 +111,8 @@ public class PredicateStageTests
         Assert.That(outcome.Disposition, Is.EqualTo(FileDisposition.Unmatched));
         Assert.That(outcome.Warnings, Is.EqualTo(new Warning[]
         {
-            new DataWarning("/music/track.mp3", "NUMBER(file::name)"),
-            new DataWarning("/music/track.mp3", "NUMBER(file::extension)"),
+            new DataWarning("/music/track.mp3", "file::name AS NUMBER"),
+            new DataWarning("/music/track.mp3", "file::extension AS NUMBER"),
         }));
     }
 
@@ -139,7 +139,7 @@ public class PredicateStageTests
         var outcome = await Run(NumberOfNameGreaterThanOne(), gone);
 
         Assert.That(outcome.Disposition, Is.EqualTo(FileDisposition.Unmatched));
-        Assert.That(outcome.Warnings, Is.EqualTo(new[] { new DataWarning(gone, "NUMBER(file::name)") }));
+        Assert.That(outcome.Warnings, Is.EqualTo(new[] { new DataWarning(gone, "file::name AS NUMBER") }));
     }
 
     [Test]
@@ -235,7 +235,7 @@ public class PredicateStageTests
     private static Task<FileOutcome<ListResult>> Run(CompiledPredicate predicate, string path) =>
         new PredicateStage(predicate).ExecuteAsync(path, CancellationToken.None);
 
-    /// <summary><c>NUMBER(file::name) > 1</c>, with the conversion written as <paramref name="written"/>.</summary>
+    /// <summary><c>file::name AS NUMBER > 1</c>, with the conversion written as <paramref name="written"/>.</summary>
     private static CompiledPredicate NumberOfNameGreaterThanOne(string? written = null)
     {
         var sources = new Sources();
@@ -277,7 +277,7 @@ public class PredicateStageTests
 
         public Expression<decimal> NumberOf(Expression<string> argument, string? written = null)
         {
-            var form = $"NUMBER({_forms[^1]})";
+            var form = $"{_forms[^1]} AS NUMBER";
             return new Conversion<string, decimal>(argument, Conversions.NumberFromString, Next(form, written));
         }
 

@@ -173,12 +173,12 @@ public class FunctionTests
     }
 
     [Test]
-    public void String_OfByteCountAndDuration_IsAPlainNumber()
+    public void String_OfByteCountAndDuration_IsItsLiteralInTheBaseUnit()
     {
         var p = new TestPredicate();
 
-        Assert.That(p.Evaluate(p.String(Lit(new ByteCount(1000)))).Value.Occurrences, Is.EqualTo(new[] { Ok("1000") }));
-        Assert.That(p.Evaluate(p.String(Lit(new Duration(120)))).Value.Occurrences, Is.EqualTo(new[] { Ok("120") }));
+        Assert.That(p.Evaluate(p.String(Lit(new ByteCount(1000)))).Value.Occurrences, Is.EqualTo(new[] { Ok("1000b") }));
+        Assert.That(p.Evaluate(p.String(Lit(new Duration(120)))).Value.Occurrences, Is.EqualTo(new[] { Ok("120s") }));
     }
 
     [Test]
@@ -201,5 +201,31 @@ public class FunctionTests
             Files.Add(file);
             return Value<decimal>.Single(new Unusable<decimal>(origin));
         }
+    }
+
+    // Cardinality is kept: the one that converts converts, the one that does not becomes unusable with
+    // the conversion as its source, and the one already unusable keeps its own. Nothing is reported.
+    [Test]
+    public void Duration_ConvertsEachOccurrence_KeepingCardinality_AndReportsNothing()
+    {
+        var p = new TestPredicate();
+        var s = p.Id("s", Ok("4:05"), Ok("junk"), BadString);
+        var duration = p.Duration(s);
+
+        var (value, reported) = p.Evaluate(duration);
+
+        Assert.That(value.Occurrences, Is.EquivalentTo(new Occurrence<Duration>[]
+        {
+            Ok(new Duration(245)), new Unusable<Duration>(duration.Origin), new Unusable<Duration>(s.Origin),
+        }));
+        Assert.That(reported, Is.Empty);
+    }
+
+    [Test]
+    public void ByteCount_OfAbsent_IsAbsent()
+    {
+        var p = new TestPredicate();
+
+        Assert.That(p.Evaluate(p.ByteCount(p.Id<string>("s"))).Value.IsAbsent, Is.True);
     }
 }

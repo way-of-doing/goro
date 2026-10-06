@@ -246,7 +246,7 @@ public class UnreadableFileTests
         var notAudio = _collection.NotAudio("text.mp3");
 
         var (exitCode, stdOut, stdErr) = await RunAsync(
-            "list", "--strict-exit-code", "--filter=NUMBER(file::name) > 1 OR file::duration > 0", _collection.Root);
+            "list", "--strict-exit-code", "--filter=file::name AS NUMBER > 1 OR file::duration > 0", _collection.Root);
 
         Assert.That(exitCode, Is.EqualTo(12));
         Assert.That(stdOut, Is.Empty);
@@ -260,11 +260,11 @@ public class UnreadableFileTests
     {
         var file = _collection.Mp3("track.mp3");
 
-        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--filter=NUMBER(file::name) > 1", _collection.Root);
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--filter=file::name AS NUMBER > 1", _collection.Root);
 
         Assert.That(exitCode, Is.EqualTo(0));
         Assert.That(stdOut, Is.Empty);
-        Assert.That(Lines(stdErr), Is.EqualTo(new[] { DataWarningLine(file, "NUMBER(file::name)"), UnansweredLine("the one file examined, which was not listed") }));
+        Assert.That(Lines(stdErr), Is.EqualTo(new[] { DataWarningLine(file, "file::name AS NUMBER"), UnansweredLine("the one file examined, which was not listed") }));
     }
 
     [Test]
@@ -275,13 +275,13 @@ public class UnreadableFileTests
         string[] files = [_collection.Mp3("1.mp3"), _collection.Mp3("2.mp3"), _collection.Mp3("one.mp3"), _collection.Mp3("two.mp3")];
 
         var (exitCode, stdOut, stdErr) = await RunAsync(
-            "list", "--strict-exit-code", @"--filter=NUMBER(file::name) > 0 OR file::name =~ r""^[0-9]""", _collection.Root);
+            "list", "--strict-exit-code", @"--filter=file::name AS NUMBER > 0 OR file::name =~ r""^[0-9]""", _collection.Root);
 
         var lines = Lines(stdErr);
         Assert.That(exitCode, Is.EqualTo(11));
         Assert.That(Lines(stdOut), Is.EquivalentTo(files[..2]));
         Assert.That(lines, Has.Length.EqualTo(5), stdErr);
-        Assert.That(lines[..4], Is.EquivalentTo(files.Select(file => DataWarningLine(file, "NUMBER(file::name)"))));
+        Assert.That(lines[..4], Is.EquivalentTo(files.Select(file => DataWarningLine(file, "file::name AS NUMBER"))));
         Assert.That(lines[^1], Is.EqualTo(UnansweredLine("2 of the 4 files examined, which were not listed")));
     }
 
@@ -292,11 +292,11 @@ public class UnreadableFileTests
     {
         var file = _collection.Mp3("track.mp3");
 
-        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--filter=FALLBACK(NUMBER(file::name) > 1, TRUE)", _collection.Root);
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--filter=FALLBACK(file::name AS NUMBER > 1, TRUE)", _collection.Root);
 
         Assert.That(exitCode, Is.EqualTo(0));
         Assert.That(Lines(stdOut), Is.EqualTo(new[] { file }));
-        Assert.That(Lines(stdErr), Is.EqualTo(new[] { DataWarningLine(file, "NUMBER(file::name)") }), "the predicate answered, so nothing is unanswered");
+        Assert.That(Lines(stdErr), Is.EqualTo(new[] { DataWarningLine(file, "file::name AS NUMBER") }), "the predicate answered, so nothing is unanswered");
     }
 
     // --- goro list --filter: exit codes, which only --strict-exit-code surfaces ---
@@ -329,13 +329,13 @@ public class UnreadableFileTests
         var good = _collection.Mp3("good.mp3");
         var bad = _collection.NotAudio("bad.mp3");
 
-        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "NUMBER(file::name) > 1 OR file::duration >= 0", _collection.Root));
+        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "file::name AS NUMBER > 1 OR file::duration >= 0", _collection.Root));
 
         Assert.That(exitCode, Is.EqualTo(strict ? 12 : 0));
         Assert.That(Lines(stdOut), Is.EqualTo(new[] { good }));
         var lines = Lines(stdErr);
         Assert.That(lines, Has.Length.EqualTo(2), stdErr);
-        Assert.That(lines, Has.One.EqualTo(DataWarningLine(good, "NUMBER(file::name)")));
+        Assert.That(lines, Has.One.EqualTo(DataWarningLine(good, "file::name AS NUMBER")));
         Assert.That(lines, Has.One.StartsWith($"goro: warning: {bad}: cannot be read: "));
     }
 
@@ -360,11 +360,11 @@ public class UnreadableFileTests
     {
         var file = _collection.Mp3("track.mp3");
 
-        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "NUMBER(file::name) > 1 AND file::size < 0", _collection.Root));
+        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "file::name AS NUMBER > 1 AND file::size < 0", _collection.Root));
 
         Assert.That(exitCode, Is.EqualTo(strict ? 10 : 0));
         Assert.That(stdOut, Is.Empty);
-        Assert.That(Lines(stdErr), Is.EqualTo(new[] { DataWarningLine(file, "NUMBER(file::name)") }));
+        Assert.That(Lines(stdErr), Is.EqualTo(new[] { DataWarningLine(file, "file::name AS NUMBER") }));
     }
 
     // An unanswered predicate outranks the data warnings that caused it, and the 2x group.
@@ -373,7 +373,7 @@ public class UnreadableFileTests
     {
         _collection.Mp3("track.mp3");
 
-        var (exitCode, stdOut, _) = await RunAsync(ListArgs(strict, "NUMBER(file::name) > 1", _collection.Root));
+        var (exitCode, stdOut, _) = await RunAsync(ListArgs(strict, "file::name AS NUMBER > 1", _collection.Root));
 
         Assert.That(exitCode, Is.EqualTo(strict ? 11 : 0));
         Assert.That(stdOut, Is.Empty);
@@ -386,13 +386,13 @@ public class UnreadableFileTests
         var good = _collection.Mp3("good.mp3");
         var bad = _collection.NotAudio("bad.mp3");
 
-        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "NUMBER(file::name) > 1 AND file::duration >= 0", _collection.Root));
+        var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "file::name AS NUMBER > 1 AND file::duration >= 0", _collection.Root));
 
         Assert.That(exitCode, Is.EqualTo(strict ? 12 : 0));
         Assert.That(stdOut, Is.Empty);
         var lines = Lines(stdErr);
         Assert.That(lines, Has.Length.EqualTo(3), stdErr);
-        Assert.That(lines, Has.One.EqualTo(DataWarningLine(good, "NUMBER(file::name)")));
+        Assert.That(lines, Has.One.EqualTo(DataWarningLine(good, "file::name AS NUMBER")));
         Assert.That(lines, Has.One.StartsWith($"goro: warning: {bad}: cannot be read: "));
         Assert.That(lines[^1], Is.EqualTo(UnansweredLine("the one file examined, which was not listed")));
     }

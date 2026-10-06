@@ -14,7 +14,14 @@ namespace Goro.Predicates.Analyses;
 /// <param name="Form">The same structure for a reader, as the source table lists it.</param>
 internal readonly record struct Shape(string Key, string Form)
 {
-    /// <summary>A function applied to arguments, such as <c>NUMBER(x)</c>.</summary>
+    /// <summary>A conversion, such as <c>x AS NUMBER</c>.</summary>
+    public static Shape Conversion(Shape operand, GoroType target)
+    {
+        var name = target.ToString().ToUpperInvariant();
+        return new($"(AS {operand.Key} {name})", $"{operand.Form} AS {name}");
+    }
+
+    /// <summary>A function applied to arguments, such as <c>COUNT(x)</c>.</summary>
     public static Shape Call(string function, params Shape[] arguments) =>
         new($"{function}({string.Join(",", arguments.Select(a => a.Key))})",
             $"{function}({string.Join(", ", arguments.Select(a => a.Form))})");

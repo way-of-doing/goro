@@ -13,6 +13,7 @@ internal static class TokenFacts
             ["NOT"] = TokenKind.Not,
             ["BETWEEN"] = TokenKind.Between,
             ["IS"] = TokenKind.Is,
+            ["AS"] = TokenKind.As,
             ["USABLE"] = TokenKind.Usable,
             ["UNUSABLE"] = TokenKind.Unusable,
             ["ABSENT"] = TokenKind.Absent,

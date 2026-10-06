@@ -18,6 +18,9 @@ public static class SemanticDiagnosticCodes
     public const string FractionalDurationLiteral = "fractional-duration-literal";
     public const string BooleanNotOrdered = "boolean-not-ordered";
     public const string BooleanNotConvertible = "boolean-not-convertible";
+    public const string UnitsDoNotConvert = "units-do-not-convert";
+    public const string UnknownTarget = "unknown-target";
+    public const string ConversionCalled = "conversion-called";
     public const string MatchSubjectNotString = "match-subject-not-string";
 
     // Exactly one.
@@ -35,7 +38,7 @@ public static class SemanticDiagnosticCodes
     // Functions.
     public const string WrongArgumentCount = "wrong-argument-count";
     public const string FallbackDefaultNotConstant = "fallback-default-not-constant";
-    public const string InvalidNumberLiteral = "invalid-number-literal";
+    public const string ConstantDoesNotConvert = "constant-does-not-convert";
 
     // Ranges.
     public const string RangeUnitMissing = "range-unit-missing";

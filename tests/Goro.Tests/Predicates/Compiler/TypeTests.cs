@@ -24,8 +24,8 @@ public class TypeTests
     [TestCase("file::size > \"10kb\"", "file::size > 10kb")]
     [TestCase("file::size > \"10\"", "file::size > 10")]
     [TestCase("(x > 1) == \"TRUE\"", "(x > 1) == TRUE")]
-    [TestCase("id3v2::raw::TRCK > 9", "NUMBER(id3v2::raw::TRCK) > 9")]
-    [TestCase("year > artist", "year > NUMBER(artist)")]
+    [TestCase("id3v2::raw::TRCK > 9", "id3v2::raw::TRCK AS NUMBER > 9")]
+    [TestCase("year > artist", "year > artist AS NUMBER")]
     public void Mismatch_OffersAConversion(string text, string rewrite)
     {
         var error = Error(text);
@@ -99,14 +99,14 @@ public class TypeTests
         }
     }
 
-    // A boolean as an operand of <, BETWEEN or =~, or as an argument to NUMBER() or STRING().
+    // A boolean as an operand of <, BETWEEN or =~, or as the operand of AS.
     [TestCase("(x < 1) < (y < 1)", Codes.BooleanNotOrdered)]
     [TestCase("(x < 1) >= TRUE", Codes.BooleanNotOrdered)]
     [TestCase("(x < 1) BETWEEN 1..2", Codes.BooleanNotOrdered)]
     [TestCase("x BETWEEN TRUE..FALSE", Codes.BooleanNotOrdered)]
     [TestCase("(x < 1) =~ r\"a\"", Codes.MatchSubjectNotString)]
-    [TestCase("NUMBER(x < 1) > 1", Codes.BooleanNotConvertible)]
-    [TestCase("STRING(x < 1) == \"a\"", Codes.BooleanNotConvertible)]
+    [TestCase("(x < 1) AS NUMBER > 1", Codes.BooleanNotConvertible)]
+    [TestCase("(x < 1) AS STRING == \"a\"", Codes.BooleanNotConvertible)]
     public void Boolean_IsUnorderedAndNotConvertible(string text, string code)
     {
         Assert.That(Error(text).Code, Is.EqualTo(code));

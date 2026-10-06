@@ -30,13 +30,14 @@ The bounds of an expression are written `l..u`. Its lower bound `l` is `0` if it
 | literal                   | as written   | yes         | `1..1`
 | identifier                | as declared  | no          | as declared
 | `COUNT(e)`                | number       | no          | `1..1`
-| `NUMBER(e)`               | number       | when `e` is | those of `e`
-| `STRING(e)`               | string       | when `e` is | those of `e`
+| `e AS T`                  | `T`          | when `e` is | those of `e`
 | `FALLBACK(e, d)`          | that of `e`  | no          | `1..u`, where `e` is `l..u`
 | `PREFERRED(e1 … en)`      | that of `e1` | no          | the largest lower bound among the `ei`, and the largest upper bound
 | any operator              | boolean      | no          | `1..1`
 | `(e)`                     | that of `e`  | when `e` is | those of `e`
 | a modifier applied to `e` | that of `e`  | when `e` is | those of `e`
+
+`convert(d, T)` is `d` when `d` already has type `T`, and is otherwise as the table under [The conversion operator](predicates.md#the-conversion-operator) gives it; a duration and a bytecount do not convert into each other, and a boolean converts to nothing and from nothing, both being errors when the predicate is read.
 
 A constant is evaluated when the predicate is read rather than for each file. A conversion of a constant that does not convert is therefore an error, reported then, and a constant always has exactly one usable occurrence, the same for every file.
 
@@ -53,14 +54,12 @@ eval(modifier(e))      = eval(e)              -- the modifier is read by the ope
 eval(COUNT(e))         = bag{ usable(0) }               if eval(e) is ABSENT
                        = bag{ usable(number of occurrences of eval(e)) } otherwise
 
-eval(NUMBER(e))        = ABSENT                         if eval(e) is ABSENT
+eval(e AS T)           = ABSENT                         if eval(e) is ABSENT
                        = eval(e) with each occurrence o replaced by
                            o                            if o is unusable
-                           usable(the number o denotes) if o converts
-                           unusable(this call)          otherwise
-
-eval(STRING(e))        = ABSENT                         if eval(e) is ABSENT
-                       = eval(e) with each usable(d) replaced by usable(the canonical text of d)
+                           usable(convert(d, T))        if o is usable(d) and d converts to T
+                           unusable(this conversion)    otherwise
+                                                        -- nothing is reported
 
 eval(FALLBACK(e, d))   = bag{ usable(d) }               if eval(e) is ABSENT
                        = eval(e) with each unusable occurrence replaced by usable(d)

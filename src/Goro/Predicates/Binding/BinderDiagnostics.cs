@@ -12,7 +12,9 @@ namespace Goro.Predicates.Binding;
 /// <summary>The binder's errors, about names, types and modifiers, and the rewrites it offers for them.</summary>
 internal sealed partial class BinderDiagnostics(string text) : SemanticDiagnostics(text)
 {
-    private static readonly string[] Functions = ["COUNT", "FALLBACK", "NUMBER", "PREFERRED", "STRING"];
+    private static readonly string[] Functions = ["COUNT", "FALLBACK", "PREFERRED"];
+
+    private static readonly string[] Targets = ["NUMBER", "STRING", "DURATION", "BYTECOUNT"];
 
     // ---------------------------------------------------------------------------------------------
     // Names
@@ -88,7 +90,7 @@ internal sealed partial class BinderDiagnostics(string text) : SemanticDiagnosti
             }
             else if (side.Type == GoroType.String && side is not SemanticLiteral && other.Type == GoroType.Number)
             {
-                suggestions.Add(new Suggestion(sideCore.Span, $"NUMBER({Text(sideCore)})"));
+                suggestions.Add(new Suggestion(sideCore.Span, $"{Text(sideCore)} AS NUMBER"));
             }
         }
 
@@ -124,13 +126,59 @@ internal sealed partial class BinderDiagnostics(string text) : SemanticDiagnosti
     public Diagnostic BooleanRange(BetweenSyntax between) =>
         new(Codes.BooleanNotOrdered, RangeSpan(between), new ErrorMessage.BooleanRange());
 
-    public Diagnostic BooleanNotConvertible(FunctionCallSyntax call) =>
-        new(Codes.BooleanNotConvertible, call.Arguments[0].Span, new ErrorMessage.BooleanNotConvertible(new Code(call.Name.Text), Code(call.Arguments[0])));
+    public Diagnostic BooleanNotConvertible(ExpressionSyntax operand) =>
+        new(Codes.BooleanNotConvertible, operand.Span, new ErrorMessage.BooleanNotConvertible(Code(operand)));
+
+    public Diagnostic UnitsDoNotConvert(ExpressionSyntax operand, GoroType from) =>
+        new(Codes.UnitsDoNotConvert, operand.Span, new ErrorMessage.UnitsDoNotConvert(Code(operand), UnitOf(from)));
+
+    /// <summary>A target <c>AS</c> does not know; offers the closest, in the case the user wrote in.</summary>
+    public Diagnostic UnknownTarget(NameToken target)
+    {
+        var closest = Spelling.Closest(target.Text, Targets);
+        if (closest is not null && target.Text == target.Text.ToLowerInvariant())
+        {
+            closest = closest.ToLowerInvariant();
+        }
+
+        ImmutableArray<Suggestion> suggestions = closest is null ? [] : [new Suggestion(target.Span, closest)];
+        return new Diagnostic(Codes.UnknownTarget, target.Span, new ErrorMessage.UnknownTarget(new Code(target.Text)), suggestions);
+    }
+
+    /// <summary>
+    /// <c>ALL(x) AS NUMBER</c>: offers <c>ALL(x AS NUMBER)</c>, the conversion moved inside the
+    /// modifiers, which go on the outside of it.
+    /// </summary>
+    public Diagnostic ModifierOnConversion(ModifierSyntax modifier, AsSyntax conversion, ExpressionSyntax unmodified)
+    {
+        var operand = conversion.Operand;
+        var rewritten = Text(TextSpan.FromBounds(operand.Span.Start, unmodified.Span.Start))
+            + Text(unmodified) + " AS " + conversion.Target.Text
+            + Text(TextSpan.FromBounds(unmodified.Span.End, operand.Span.End));
+        return new Diagnostic(Codes.MisplacedModifier, modifier.Span, new ErrorMessage.MisplacedModifierInConversion(Keyword(modifier)),
+            [new Suggestion(conversion.Span, rewritten)]);
+    }
+
+    /// <summary><c>NUMBER(x)</c>: offers <c>x AS NUMBER</c>, parenthesizing an argument that binds more loosely.</summary>
+    public Diagnostic ConversionCalled(FunctionCallSyntax call)
+    {
+        var argument = call.Arguments[0];
+        var operand = argument is ComparisonSyntax or BetweenSyntax or MatchSyntax or StateTestSyntax or NotSyntax or LogicalSyntax
+            ? $"({Text(argument)})"
+            : Text(argument);
+        return new Diagnostic(Codes.ConversionCalled, call.Span, new ErrorMessage.ConversionCalled(new Code(call.Name.Text)),
+            [new Suggestion(call.Span, $"{operand} AS {call.Name.Text}")]);
+    }
+
+    /// <summary><c>CAST(x AS NUMBER)</c>: offers <c>x AS NUMBER</c>.</summary>
+    public Diagnostic CastCalled(FunctionCallSyntax call, AsSyntax conversion) =>
+        new(Codes.ConversionCalled, call.Span, new ErrorMessage.CastCalled(new Code(call.Name.Text)),
+            [new Suggestion(call.Span, Text(conversion))]);
 
     public Diagnostic MatchSubjectNotString(ExpressionSyntax subjectCore, GoroType type)
     {
         ImmutableArray<Suggestion> suggestions = type is GoroType.Number or GoroType.ByteCount or GoroType.Duration
-            ? [new Suggestion(subjectCore.Span, $"STRING({Text(subjectCore)})")]
+            ? [new Suggestion(subjectCore.Span, $"{Text(subjectCore)} AS STRING")]
             : [];
         return new Diagnostic(Codes.MatchSubjectNotString, subjectCore.Span, new ErrorMessage.MatchSubjectNotString(Code(subjectCore), type), suggestions);
     }

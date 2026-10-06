@@ -46,6 +46,12 @@ internal sealed class TestPredicate
     public Conversion<Duration, decimal> Number(Expression<Duration> argument) =>
         Convert<Duration, decimal>(argument, Conversions.NumberFromDuration, "NUMBER", null);
 
+    public Conversion<string, Duration> Duration(Expression<string> argument) =>
+        Convert<string, Duration>(argument, Conversions.DurationFromString, "DURATION", null);
+
+    public Conversion<string, ByteCount> ByteCount(Expression<string> argument) =>
+        Convert<string, ByteCount>(argument, Conversions.ByteCountFromString, "BYTECOUNT", null);
+
     public Conversion<decimal, string> String(Expression<decimal> argument) =>
         Convert<decimal, string>(argument, Conversions.StringFromNumber, "STRING", null);
 
@@ -74,7 +80,7 @@ internal sealed class TestPredicate
         Expression<TFrom> argument, DatumConversion<TFrom, TTo> convert, string function, string? text)
         where TFrom : notnull where TTo : notnull
     {
-        var canonical = $"{function}({CanonicalForm(argument)})";
+        var canonical = $"{CanonicalForm(argument)} AS {function}";
         return Register(new Conversion<TFrom, TTo>(argument, convert, OriginOf(canonical, text ?? canonical)), canonical);
     }
 

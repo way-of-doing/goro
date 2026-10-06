@@ -114,7 +114,7 @@ public class ConcurrentExecutorTests
     {
         var executor = new ConcurrentExecutor();
         var stage = new DelegateStage<string>((path, _) => Task.FromResult(FileOutcome<string>.Unmatched(
-            [new DataWarning(path, "NUMBER(x)"), new DataWarning(path, "y")])));
+            [new DataWarning(path, "x AS NUMBER"), new DataWarning(path, "y")])));
 
         var files = Enumerable.Range(0, 20).Select(i => $"file{i}.mp3").AsAsyncEnumerable();
 

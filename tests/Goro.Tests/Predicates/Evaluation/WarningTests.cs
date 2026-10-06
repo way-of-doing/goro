@@ -80,7 +80,7 @@ public class WarningTests
 
         var outcome = p.Decide(Gt(left, right));
 
-        Assert.That(outcome.Sources, Is.EqualTo(new[] { p.SourceOf("NUMBER(s)") }));
+        Assert.That(outcome.Sources, Is.EqualTo(new[] { p.SourceOf("s AS NUMBER") }));
         Assert.That(outcome.Reported, Is.EqualTo(new[] { left.Origin }));
     }
 
@@ -214,7 +214,7 @@ public class WarningTests
 
         Assert.That(backwards.Truth, Is.EqualTo(forwards.Truth));
         Assert.That(backwards.Reported, Is.EqualTo(forwards.Reported));
-        Assert.That(forwards.Quoted, Is.EqualTo(new[] { "m", "NUMBER(m)" }));
+        Assert.That(forwards.Quoted, Is.EqualTo(new[] { "m", "m AS NUMBER" }));
     }
 
     // Of the mentions of one source that reported in a file, a warning quotes the one written first,

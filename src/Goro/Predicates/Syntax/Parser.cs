@@ -202,8 +202,27 @@ public static class Parser
                 : diagnostics.Unexpected(index, Expectation.Literal));
         }
 
-        // operand = modifier "(" operand ")" | primary ;
+        // operand = conversion ;  conversion = modified { "AS" target } ;  target = name ;
         private ExpressionSyntax Operand()
+        {
+            var operand = Modified();
+            while (Current.Kind == TokenKind.As)
+            {
+                Advance();
+                if (Current is not NameToken)
+                {
+                    throw Error(diagnostics.Unexpected(index, Expectation.Target));
+                }
+
+                var target = (NameToken)Advance();
+                operand = new AsSyntax(TextSpan.Covering(operand.Span, target.Span), operand, target);
+            }
+
+            return operand;
+        }
+
+        // modified = modifier "(" operand ")" | primary ;
+        private ExpressionSyntax Modified()
         {
             if (!TokenFacts.IsModifier(Current.Kind))
             {

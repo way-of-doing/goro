@@ -69,35 +69,56 @@ public sealed class Binder
         ModifierSyntax? quantifier = null;
         ModifierSyntax? literally = null;
         var contradicted = false;
-        var core = syntax;
-        while (true)
-        {
-            if (core is ParenthesizedSyntax parentheses)
-            {
-                core = parentheses.Expression;
-            }
-            else if (core is ModifierSyntax modifier)
-            {
-                if (modifier.Modifier == ModifierKind.Literally)
-                {
-                    literally ??= modifier;
-                }
-                else if (quantifier is null)
-                {
-                    quantifier = modifier;
-                }
-                else if (quantifier.Modifier != modifier.Modifier && !contradicted)
-                {
-                    Report(report.ContradictoryQuantifiers(modifier, quantifier));
-                    contradicted = true;
-                }
 
-                core = modifier.Operand;
-            }
-            else
+        // Takes the parentheses and modifiers off the outside of an expression, folding each modifier
+        // into the operand's, and gives back what is left.
+        ExpressionSyntax Fold(ExpressionSyntax expression)
+        {
+            while (true)
             {
-                break;
+                if (expression is ParenthesizedSyntax parentheses)
+                {
+                    expression = parentheses.Expression;
+                }
+                else if (expression is ModifierSyntax modifier)
+                {
+                    if (modifier.Modifier == ModifierKind.Literally)
+                    {
+                        literally ??= modifier;
+                    }
+                    else if (quantifier is null)
+                    {
+                        quantifier = modifier;
+                    }
+                    else if (quantifier.Modifier != modifier.Modifier && !contradicted)
+                    {
+                        Report(report.ContradictoryQuantifiers(modifier, quantifier));
+                        contradicted = true;
+                    }
+
+                    expression = modifier.Operand;
+                }
+                else
+                {
+                    return expression;
+                }
             }
+        }
+
+        var core = Fold(syntax);
+
+        // Modifiers written on the operand of a conversion are misplaced, and reported where the
+        // conversion is bound. They are folded in here as well, as if written outside it, which is
+        // where the rewrite offered for them puts them: one misplaced modifier is then one error, and
+        // a second is reported only where the rewrite would itself be wrong.
+        for (var inner = core; inner is AsSyntax;)
+        {
+            while (inner is AsSyntax conversion)
+            {
+                inner = conversion.Operand;
+            }
+
+            inner = Fold(inner);
         }
 
         return new SemanticOperand(syntax, core, Value(core), quantifier, literally);
@@ -111,6 +132,7 @@ public sealed class Binder
         NullSyntax @null => Null(@null),
         IdentifierSyntax identifier => Identifier(identifier),
         FunctionCallSyntax call => Call(call),
+        AsSyntax conversion => As(conversion),
         ComparisonSyntax comparison => Comparison(comparison),
         BetweenSyntax between => Between(between),
         MatchSyntax match => Match(match),
@@ -189,9 +211,23 @@ public sealed class Binder
             return Preferred(call, arguments);
         }
 
+        // A conversion spelled as a function, or as SQL spells it: answered with the operator, and
+        // bound as the operator, so that the rest of the predicate is checked as if it were written so.
+        if (TargetNamed(function) is { } target && arguments.Length == 1)
+        {
+            Report(report.ConversionCalled(call));
+            return Conversion(call, call.Arguments[0], arguments[0], target);
+        }
+
+        if (function == "CAST" && call.Arguments is [AsSyntax cast])
+        {
+            Report(report.CastCalled(call, cast));
+            return arguments[0];
+        }
+
         int? arity = function switch
         {
-            "COUNT" or "NUMBER" or "STRING" => 1,
+            "COUNT" => 1,
             "FALLBACK" => 2,
             _ => null,
         };
@@ -207,8 +243,7 @@ public sealed class Binder
             Report(report.WrongArgumentCount(call, arity.Value));
             GoroType? type = function switch
             {
-                "COUNT" or "NUMBER" => GoroType.Number,
-                "STRING" => GoroType.String,
+                "COUNT" => GoroType.Number,
                 _ => arguments.Length > 0 ? arguments[0].Type : null,
             };
             return new SemanticMalformedCall(call, function, type, arguments);
@@ -217,21 +252,64 @@ public sealed class Binder
         return function switch
         {
             "COUNT" => new SemanticCount(call, arguments[0]),
-            "NUMBER" => Conversion(call, GoroType.Number, arguments[0]),
-            "STRING" => Conversion(call, GoroType.String, arguments[0]),
             _ => Fallback(call, arguments[0], arguments[1]),
         };
     }
 
-    private SemanticConversion Conversion(FunctionCallSyntax call, GoroType target, SemanticExpression argument)
+    // ---------------------------------------------------------------------------------------------
+    // Conversions
+
+    /// <summary><c>operand AS target</c>, whose operand takes no modifier, as an argument of a function takes none.</summary>
+    private SemanticExpression As(AsSyntax syntax)
     {
-        if (argument.Type == GoroType.Boolean)
+        var operand = syntax.Operand;
+        if (ModifierWithin(operand) is { } modifier)
         {
-            Report(report.BooleanNotConvertible(call));
+            operand = WithoutModifiers(operand);
+            Report(report.ModifierOnConversion(modifier, syntax, operand));
         }
 
-        return new SemanticConversion(call, target, argument);
+        var bound = Value(operand);
+        if (TargetNamed(syntax.Target.Text) is not { } target)
+        {
+            Report(report.UnknownTarget(syntax.Target));
+            return new SemanticInvalid(syntax, null, [bound]);
+        }
+
+        return Conversion(syntax, operand, bound, target);
     }
+
+    /// <summary>
+    /// The rules every conversion keeps, however it was written: a boolean converts to nothing, and a
+    /// duration and a bytecount do not convert into each other. A conversion that breaks one is
+    /// reported and still has its target's type, so that what is built on it is checked as usual.
+    /// </summary>
+    private SemanticExpression Conversion(ExpressionSyntax syntax, ExpressionSyntax operandSyntax, SemanticExpression operand, GoroType target)
+    {
+        if (operand.Type == GoroType.Boolean)
+        {
+            Report(report.BooleanNotConvertible(operandSyntax));
+            return new SemanticInvalid(syntax, target, [operand]);
+        }
+
+        if (operand.Type is GoroType.Duration or GoroType.ByteCount && IsUnit(target) && operand.Type != target)
+        {
+            Report(report.UnitsDoNotConvert(operandSyntax, operand.Type!.Value));
+            return new SemanticInvalid(syntax, target, [operand]);
+        }
+
+        return new SemanticConversion(syntax, target, operand);
+    }
+
+    /// <summary>The type a conversion target names, matched without regard to case; null for anything else.</summary>
+    private static GoroType? TargetNamed(string name) => name.ToUpperInvariant() switch
+    {
+        "NUMBER" => GoroType.Number,
+        "STRING" => GoroType.String,
+        "DURATION" => GoroType.Duration,
+        "BYTECOUNT" => GoroType.ByteCount,
+        _ => null,
+    };
 
     private SemanticFallback Fallback(FunctionCallSyntax call, SemanticExpression argument, SemanticExpression @default)
     {

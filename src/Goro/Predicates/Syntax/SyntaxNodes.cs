@@ -32,6 +32,12 @@ public sealed record NamePartSyntax(TextSpan Span, string Text, bool IsQuoted) :
 public sealed record FunctionCallSyntax(TextSpan Span, NameToken Name, ImmutableArray<ExpressionSyntax> Arguments)
     : ExpressionSyntax(Span);
 
+/// <summary>
+/// <c>operand AS target</c>. The target is any name: which names are targets is the binder's to
+/// say, so that a mistyped one can be answered with the closest.
+/// </summary>
+public sealed record AsSyntax(TextSpan Span, ExpressionSyntax Operand, NameToken Target) : ExpressionSyntax(Span);
+
 public sealed record ParenthesizedSyntax(TextSpan Span, ExpressionSyntax Expression) : ExpressionSyntax(Span);
 
 public sealed record ModifierSyntax(TextSpan Span, ModifierKind Modifier, ExpressionSyntax Operand)

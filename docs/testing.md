@@ -248,17 +248,28 @@ point for these tests rather than an inventory of them.
 | `FALSE AND y > 1` and `TRUE OR y > 1`, with `y` unusable | No warning: a settling first operand must short-circuit |
 | `FALLBACK(x > 1, FALSE)` against `FALLBACK(x, 0) > 1`, with `x` unusable | One warning and none respectively: substituting for a comparison's result does not undo the comparison's warning |
 | `(x > 1) == (x > 1)` and `(x > 1) IS UNUSABLE`, with `x` unusable | One warning in total for the first and none beyond the comparison's for the second; the second is true |
-| A boolean as an operand of `<`, `BETWEEN` or `=~`, or as an argument to `NUMBER()` or `STRING()` | A static error: booleans are unordered and not convertible |
+| A boolean as an operand of `<`, `BETWEEN` or `=~`, or as the operand of `AS` | A static error: booleans are unordered and not convertible |
 | `(a == b) == (c == d)` and `a == b == c` | The first is valid and compares two booleans; the second is still a syntax error |
 | A guard whose right operand would warn, and the same guard with the operands transposed | Short-circuiting must hold, since the observable difference is a warning that is or is not emitted |
 | An operator that finds a match among the usable occurrences of a bag that also holds an unusable one | The warning must be emitted anyway, since iteration within an operator does not short-circuit; a short-circuiting implementation would emit it or not according to the order of an unordered bag |
 | The same bag with its occurrences supplied to the operator in the reverse order | The result, the warnings and the exit code must all be identical, which is the property exhaustive iteration exists to deliver |
 | A source written twice, as in `m == M`, over a bag holding a usable and an unusable occurrence, in both orders | The warning quotes `m` both times: the spelling written first, not the one an operator happened to reach first |
-| `NUMBER()` of a tag string with valid number syntax but more significant digits than a number holds | An unusable occurrence, not a rounded number |
+| `AS NUMBER` of a tag string with valid number syntax but more significant digits than a number holds | An unusable occurrence, not a rounded number |
 | `file::extension` of `a.flac`, `a.tar.gz`, `.hidden`, `README` and `trailing.` | `flac` and `gz`, then absent three times: no dot, a leading dot only, and nothing after the last dot |
 | `file::path` of a file on Windows | Written with `/` throughout, drive letter included, so that the same predicate means the same thing on every platform |
 | `file::path` and `file::name` of a file reached through a symbolic link | The link's path and name, not the target's: paths are as discovered |
-| `STRING()` of `1.50`, `.5`, `+5` and `-0` | `"1.5"`, `"0.5"`, `"5"` and `"0"`: one canonical form, whatever the value was written as |
+| `AS STRING` of `1.50`, `.5`, `+5` and `-0` | `"1.5"`, `"0.5"`, `"5"` and `"0"`: one canonical form, whatever the value was written as |
+| `AS STRING` of `4m5s`, `4:05`, `1.4kib` and `0b` | `"245s"`, `"245s"`, `"1433.6b"` and `"0b"`: the canonical literal of the value's own type, always in its base unit |
+| Every value of every type converted `AS STRING` and back to its own type | The value it came from: the round trip must hold through the literal grammar alone |
+| `"4:05"`, `"4m5s"` and `"245"` as durations, and `"10kib"` and `"10240"` as bytecounts | One duration and one bytecount respectively: a literal of the target type, or a plain number of seconds or bytes |
+| `"1.5"` and `"-1"` as durations, `"-1"` as a bytecount, `" 5"` as a number, and `"245s"` as a number | Each unusable: a fraction of a second, a negative unit, whitespace around the literal, and a literal of another type |
+| `1.5 AS DURATION`, `-1 AS BYTECOUNT` and `"x" AS NUMBER` | Each a static error, a conversion of a constant that fails |
+| `file::duration AS BYTECOUNT` and `file::size AS DURATION` | Each a static error: a duration and a bytecount do not convert into each other |
+| `x AS NUMBER > 5`, `x AS NUMBER AS STRING`, and `x AS foo` | A conversion binds more tightly than a comparison and chains left to right; an unknown target is an error offering the closest one, the targets not being reserved |
+| `ALL(x) AS NUMBER > 5` | An error, the operand of `AS` taking no modifier; the diagnostic must offer `ALL(x AS NUMBER) > 5` |
+| `ANY(x) AS NUMBER != 1`, and `LITERALLY(s) AS STRING BETWEEN "B".."a"` | One error each: the rest of the predicate is checked with the misplaced modifiers where the rewrite puts them, so `!=` sees its quantifier and the range is judged in literal mode. `ALL(x) AS NUMBER IS ABSENT` is two errors, its rewrite being wrong too |
+| `NUMBER(x) > 5`, `STRING(x) == "a"`, `DURATION(x) > 1m` and `CAST(x AS NUMBER) > 5` | Each a single error offering the `AS` spelling, and nothing else reported for the same predicate |
+| `x AS NUMBER` with `x` unusable, and over a multivalue holding one occurrence that converts and one that does not | The unusable occurrence keeps its source, the failed one takes the conversion as its source, the cardinality is kept, and nothing warns until an operator consumes them |
 | A value that is absent, and one that is a single unusable occurrence, passed to `COUNT()` | Must be 0 and 1 respectively, and neither may warn |
 | Each row of the warning deduplication table | Source identity must be structural and independent of position |
 | Each condition the predicate documentation calls an error | Every one reported with nothing processed, and with the exit code that says the run never started |
@@ -338,11 +349,11 @@ string written directly after the operator.
 | `file::extension != "mp3"`, `id3v1::genre != "blues"` and `id3v1::year != 1991` | Each is an error, its operand able to be absent but never several. The diagnostic must say that the operand may be absent and offer `NOT file::extension == "mp3"` and `FALLBACK(file::extension, "") != "mp3"`, with `0` as the default for a number; offering a quantifier here is the defect this row exists to catch |
 | `ANY(genre) != "x"`, `LITERALLY(ALL(genre)) != "x"`, `COUNT(genre) != 1`, `file::size != 0`, `file::duration != 3m` and `(a == b) != (c == d)` | All valid: a quantifier anywhere in a stack of modifiers satisfies the rule, and an operand that is exactly one needs none |
 | `FALLBACK(file::extension, "") != "mp3"`, `FALLBACK(id3v1::genre, "") != "blues"`, `PREFERRED(id3v1::genre, "x") != "y"` and `ANY(id3v1::genre) != "blues"` | All valid: the first three are exactly one, `FALLBACK()` and `PREFERRED()` removing absence from an operand that never holds several, and the last carries a quantifier, which still satisfies the rule though it was not needed |
-| `FALLBACK(year, NUMBER("5"))`, `FALLBACK(artist, STRING(5))`, `FALLBACK(year, NUMBER("x"))`, `FALLBACK(year, COUNT(genre))` and `FALLBACK(file::size, NUMBER("5"))` | The first two are valid, a conversion of a constant being a constant; the third is an error when the predicate is read, the conversion failing; the fourth is an error, `COUNT()` not being a constant; the fifth is a type mismatch, only a number literal standing for a bytecount |
+| `FALLBACK(year, "5" AS NUMBER)`, `FALLBACK(artist, 5 AS STRING)`, `FALLBACK(year, "x" AS NUMBER)`, `FALLBACK(year, COUNT(genre))` and `FALLBACK(file::size, "5" AS NUMBER)` | The first two are valid, a conversion of a constant being a constant; the third is an error when the predicate is read, the conversion failing; the fourth is an error, `COUNT()` not being a constant; the fifth is a type mismatch, only a number literal standing for a bytecount |
 | `TRUE`, `true` and `False` as literals, `::true` as an identifier, and `year == NULL` | The boolean literals are case-insensitive keywords and qualifying one makes it an identifier; `NULL` names nothing and must be rejected with a diagnostic saying what to write instead |
 | `artist =~ "^a"`, `title =~ artist`, `artist =~ (r"^a")`, `artist =~ LITERALLY(r"^a")` and `artist =~ ALL(r"^a")` | Each is a syntax error, the pattern being a raw string that is part of the operator. The diagnostic for the first must offer `r"^a"`, and the one for `LITERALLY` must offer `LITERALLY(artist) =~ r"^a"` |
 | `artist ~= r"^a"`, `artist ~= "a"` and `artist !~ r"^a"` | Each is a syntax error, `~=` and `!~` being spellings borrowed from other languages. The diagnostic for each `~=` must offer both `=~` and `!=`, since either may have been meant, and the one for the second must offer `artist =~ r"a"` rather than `artist =~ "a"`; the one for `!~` must offer `NOT artist =~ r"^a"` |
-| `FALLBACK(year, (0))`, `file::duration > (90)` and `NUMBER(("x"))` | A literal in parentheses is a literal: the first is valid, the second compares with ninety seconds, and the third is the same static error as `NUMBER("x")` |
+| `FALLBACK(year, (0))`, `file::duration > (90)` and `("x") AS NUMBER` | A literal in parentheses is a literal: the first is valid, the second compares with ninety seconds, and the third is the same static error as `"x" AS NUMBER` |
 | `(1)..2` | A syntax error: a range is built from literals by the grammar, which does not admit parentheses there |
 | A pattern using each of the four unsupported construct families | Each must be a static error, reported before any file is opened, on the same terms as a malformed pattern |
 
@@ -453,7 +464,7 @@ single-condition test exercises.
 | A predicate mentioning only `file::path`, `file::name` or `file::extension`, against a file that cannot be opened at all | Must **not** warn, and must evaluate: nothing was read |
 | A predicate mentioning only `file::size`, against a file whose tags cannot be read | Must **not** warn: nothing needed the tags, so nothing failed |
 | The same file under a predicate mentioning a tag identifier | Must warn, and the file must not be listed |
-| A predicate that meets uninterpretable data in a file and then finds the file cannot be read, such as `NUMBER(file::name) > 1 OR artist == "x"` | One file warning and no data warning: a file that was not processed has nothing to say about its data |
+| A predicate that meets uninterpretable data in a file and then finds the file cannot be read, such as `file::name AS NUMBER > 1 OR artist == "x"` | One file warning and no data warning: a file that was not processed has nothing to say about its data |
 | `goro list` with no filter, over a file that cannot be opened | Must list it and must not warn, the command having needed nothing but the path |
 | `goro hash` over an unreadable file, in both output formats | The row must appear, with `-` in plain and `null` in JSON. Omitting the row is precisely the failure this scenario exists to catch |
 | `goro list --filter` over an unreadable file | The file must not be listed |

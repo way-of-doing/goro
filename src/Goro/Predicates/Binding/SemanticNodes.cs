@@ -110,14 +110,14 @@ public sealed class SemanticIdentifier(IdentifierSyntax syntax, IdentifierDeclar
 }
 
 /// <summary>
-/// <c>NUMBER(argument)</c> or <c>STRING(argument)</c>. One whose argument is already of its type is
-/// an identity, kept so that <c>NUMBER(5)</c> is still known not to be a literal.
+/// <c>argument AS target</c>, whose type is its target. One whose argument is already of its type is
+/// an identity, kept so that <c>5 AS NUMBER</c> is still known not to be a literal. Its syntax is
+/// what the user wrote, which for the old spelling <c>NUMBER(x)</c>, reported but bound all the
+/// same, is a function call.
 /// </summary>
-public sealed class SemanticConversion(FunctionCallSyntax syntax, GoroType target, SemanticExpression argument)
+public sealed class SemanticConversion(ExpressionSyntax syntax, GoroType target, SemanticExpression argument)
     : SemanticExpression(syntax, target)
 {
-    public new FunctionCallSyntax Syntax => (FunctionCallSyntax)base.Syntax;
-
     public SemanticExpression Argument { get; } = argument;
 
     public bool IsIdentity => Argument.Type == Type;

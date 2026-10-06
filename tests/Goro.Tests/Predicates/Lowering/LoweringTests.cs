@@ -18,7 +18,7 @@ public class LoweringTests
     [Test]
     public void ConversionToItsOwnType_LeavesNothingBehind()
     {
-        var comparison = (ComparisonTest<decimal>)Lower("NUMBER(x) > 1").Root;
+        var comparison = (ComparisonTest<decimal>)Lower("x AS NUMBER > 1").Root;
 
         Assert.That(comparison.Left.Expression, Is.InstanceOf<IdentifierReference<decimal>>());
     }

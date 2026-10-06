@@ -4,7 +4,7 @@ namespace Goro.Tests.Warnings;
 
 public class WarningSinkTests
 {
-    private static readonly DataWarning Data = new("/music/a.mp3", "NUMBER(file::name)");
+    private static readonly DataWarning Data = new("/music/a.mp3", "file::name AS NUMBER");
     private static readonly FileWarning File = new("/music/b.mp3", "permission denied");
 
     private static string[] Lines(StringWriter writer) =>
@@ -21,7 +21,7 @@ public class WarningSinkTests
 
         Assert.That(Lines(writer), Is.EqualTo(new[]
         {
-            "goro: warning: /music/a.mp3: cannot interpret the data of NUMBER(file::name)",
+            "goro: warning: /music/a.mp3: cannot interpret the data of file::name AS NUMBER",
             "goro: warning: /music/b.mp3: cannot be read: permission denied",
         }));
         Assert.That(sink.Produced, Is.EquivalentTo(new[] { WarningCategory.Data, WarningCategory.File }));
