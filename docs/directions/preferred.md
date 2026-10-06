@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, features/builtins/identifiers.md, design/rationale.md, design/deferred.md, testing.md, faq.md, src/Goro/Predicates, tests/Goro.Tests/Predicates
 after:
@@ -140,3 +140,12 @@ through a later argument whose data would have made the file unreadable.
     checked once the tag line lands; the structural test is what stands in for it until then.
     design/predicate-runtime.md still says "rank order", left as design history. Next step:
     PJ's review, then commit on the branch and, if PJ approves, merge to main.
+- 2026-10-06 -- Landed: PJ asked for it to be committed and completed, so it is marked `landed`
+  and merged into main. Left for later:
+  - checking a global identifier against its expansion over real tags, which waits for the
+    tag-reading line;
+  - `PREFERRED()`'s bounds: it is never absent if any argument never is, which
+    cardinality-and-constants anticipates stating;
+  - "rank order" in design/predicate-runtime.md.
+
+  Next on the recommended queue: unanswered-predicates.
