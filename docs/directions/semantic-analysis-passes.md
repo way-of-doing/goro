@@ -1,7 +1,7 @@
 ---
 status: active
 size: focused
-touches: architecture.md, implementation.md, src/Goro/Predicates/Binding, tests/Goro.Tests/Predicates/Binding
+touches: architecture.md, implementation.md, src/Goro/Predicates, tests/Goro.Tests/Predicates
 after:
 branch: line/semantic-analysis-passes
 ---
@@ -125,3 +125,38 @@ account of the predicate compiler describes the binder, the analyses and lowerin
 
   Next step: review. Then merge, so that as-operator and sources-and-fields start from this
   structure.
+- 2026-10-06 -- Gave each layer a namespace of its own, the folder matching it, so that the
+  pipeline can be read off the namespaces:
+  - `Goro.Predicates` holds `PredicateCompiler` and `CompiledPredicate`, the compiler's public face.
+  - `Binding` holds the binder and the semantic tree. The `Binder/` and `Semantics/` folders are
+    flattened into it.
+  - `Analyses` holds the four analyses.
+  - `Lowering` holds lowering. Its class is now `Lowerer`, since a class cannot share its
+    namespace's name.
+  - `Evaluation` holds the evaluation tree, which joins `EvaluationContext` and the other run-time
+    helpers that were already there.
+
+  The evaluation tree dropped its "Bound" prefix: `Expression`, `Expression<T>`, `IExpressionFunc`,
+  `Condition`, `BooleanExtensions`, `Operand<T>`, and the test helper `Nodes`. This settles the
+  first open question. "Binding" now means what it means in Roslyn: the binder and the tree it
+  produces.
+
+  The analyses' diagnostics classes are now named like everything else in each analysis, after its
+  static class: `ConstantsDiagnostics` and `PatternsDiagnostics`.
+
+  The tests mirror the same layout. `Compiler/` holds the end-to-end tests, still grouped by topic,
+  since that is how the specification is read; the `*BindingTests` became `*Tests`, and `BindAssert`
+  became `CompileAssert`. This settles the second open question. `Binding/`, `Analyses/` and
+  `Lowering/` hold the per-stage tests, and `Support/` holds the helpers they share.
+
+  `design/predicate-runtime.md` and the predicate-runtime-architecture brief keep the old names,
+  as records of what was decided then.
+
+  Checked: the suite passes unchanged, 2051 tests. The comparison harness, rerun against `main`
+  over the same 215,000 predicates, matched exactly once the renamed types were normalised.
+
+  Still open: `Identifiers` and `Evaluation` refer to each other, since `IdentifierDeclaration.Bind`
+  creates an `IdentifierReference`, which holds its declaration. Lowering could build the reference
+  instead.
+
+  Next step: review, then merge into `main`.

@@ -5,7 +5,7 @@ using Goro.Execution;
 using Goro.Messages;
 using Goro.Output;
 using Goro.Pipeline;
-using Goro.Predicates.Binding;
+using Goro.Predicates;
 using Goro.Predicates.Identifiers;
 using Spectre.Console;
 using Spectre.Console.Cli;

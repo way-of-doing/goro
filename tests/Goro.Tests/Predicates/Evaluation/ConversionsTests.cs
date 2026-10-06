@@ -1,4 +1,4 @@
-using Goro.Predicates.Binding;
+using Goro.Predicates.Evaluation;
 using Goro.Predicates.Values;
 
 namespace Goro.Tests.Predicates.Evaluation;

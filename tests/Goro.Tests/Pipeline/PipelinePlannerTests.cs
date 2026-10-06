@@ -2,7 +2,8 @@ using Goro.Domain;
 using Goro.Hashing;
 using Goro.Output;
 using Goro.Pipeline;
-using Goro.Predicates.Binding;
+using Goro.Predicates;
+using Goro.Predicates.Evaluation;
 using Goro.Warnings;
 
 namespace Goro.Tests.Pipeline;

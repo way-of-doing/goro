@@ -1,5 +1,5 @@
 using Goro.Domain;
-using Goro.Predicates.Binding;
+using Goro.Predicates;
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;

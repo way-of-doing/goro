@@ -1,7 +1,8 @@
+using Goro.Predicates.Evaluation;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Evaluation.Support;
-using static Goro.Tests.Predicates.Evaluation.Support.Bound;
+using static Goro.Tests.Predicates.Evaluation.Support.Nodes;
 
 namespace Goro.Tests.Predicates.Evaluation;
 
@@ -20,9 +21,9 @@ public class WarningTests
     [SetUp]
     public void SetUp() => p = new TestPredicate();
 
-    private Goro.Predicates.Binding.IdentifierReference<decimal> X => p.Id("x", BadNumber);
+    private Goro.Predicates.Evaluation.IdentifierReference<decimal> X => p.Id("x", BadNumber);
 
-    private Goro.Predicates.Binding.IdentifierReference<decimal> Y => p.Id("y", BadNumber);
+    private Goro.Predicates.Evaluation.IdentifierReference<decimal> Y => p.Id("y", BadNumber);
 
     [Test]
     public void Row_xGt1_One()

@@ -1,7 +1,7 @@
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Evaluation.Support;
-using static Goro.Tests.Predicates.Evaluation.Support.Bound;
+using static Goro.Tests.Predicates.Evaluation.Support.Nodes;
 
 namespace Goro.Tests.Predicates.Evaluation;
 
@@ -35,7 +35,7 @@ public class StateTestTests
             _ => new Occurrence<decimal>[] { BadNumber, BadNumber },
         });
 
-        Outcome Decide(Goro.Predicates.Binding.StateTest<decimal> test) => p.Decide(test);
+        Outcome Decide(Goro.Predicates.Evaluation.StateTest<decimal> test) => p.Decide(test);
 
         Assert.Multiple(() =>
         {
