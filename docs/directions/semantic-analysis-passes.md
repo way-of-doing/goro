@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: focused
 touches: architecture.md, implementation.md, src/Goro/Predicates, tests/Goro.Tests/Predicates
 after:
@@ -215,3 +215,8 @@ account of the predicate compiler describes the binder, the analyses and lowerin
   finds no unnecessary usings.
 
   Next step: review, then merge into `main`.
+- 2026-10-06 -- Landed: reviewed by PJ, marked `landed`, and merged into main. Left for later:
+  `Diagnostics` now holds a span alongside the diagnostics and `StageResult`, and may want
+  splitting; the semantic tree and the analyses are `public` only for the tests' sake. The lines
+  queued behind this one -- as-operator, sources-and-fields and cardinality-and-constants -- can
+  now start from this structure.
