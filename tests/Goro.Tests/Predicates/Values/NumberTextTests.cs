@@ -51,7 +51,7 @@ public class NumberTextTests
         Assert.That(number, Is.EqualTo(1.5m));
     }
 
-    // docs/concepts/predicates.md, STRING(): one canonical form, whatever the value was written as.
+    // docs/concepts/predicates.md, AS STRING: one canonical form, whatever the value was written as.
     [TestCase("1.50", "1.5")]
     [TestCase(".5", "0.5")]
     [TestCase("+5", "5")]

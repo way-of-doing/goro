@@ -35,9 +35,7 @@ public static class Lowerer
             SemanticIdentifier identifier => TypedNodes.Reference(identifier.Declaration, sources.OriginOf(identifier)),
             SemanticConversion { IsConstant: true } conversion => Analysed(constants.ValueOf(conversion)),
             SemanticConversion { IsIdentity: true } conversion => Lower(conversion.Argument),
-            SemanticConversion conversion => conversion.Type == GoroType.Number
-                ? TypedNodes.Number(Lower(conversion.Argument), sources.OriginOf(conversion))
-                : TypedNodes.String(Lower(conversion.Argument), sources.OriginOf(conversion)),
+            SemanticConversion conversion => TypedNodes.Convert(Lower(conversion.Argument), conversion.Type!.Value, sources.OriginOf(conversion)),
             SemanticCount count => TypedNodes.Count(Lower(count.Argument)),
             SemanticFallback fallback => TypedNodes.Fallback(Lower(fallback.Argument), Lower(fallback.Default)),
             SemanticPreferred preferred => TypedNodes.Preferred([.. preferred.Arguments.Select(Lower)]),

@@ -28,7 +28,7 @@ A predicate is read as a sequence of _tokens_: literals, identifiers, operators 
 
 ### Case sensitivity
 
-Predicate syntax is case-insensitive throughout, using invariant culture rules. The keyword operators (`AND`, `OR`, `NOT`, `BETWEEN`, `IS`), the state names (`USABLE`, `UNUSABLE`, `ABSENT`), the reserved words `NULL`, `TRUE` and `FALSE`, function names, identifiers, namespaces, and the unit suffixes of bytecount and duration literals are all matched without regard to case. `artist`, `Artist` and `ARTIST` are the same identifier, and similarly `id3v2::tit2` and `ID3V2::TIT2` are the same identifier.
+Predicate syntax is case-insensitive throughout, using invariant culture rules. The keyword operators (`AND`, `OR`, `NOT`, `BETWEEN`, `IS`, `AS`), the state names (`USABLE`, `UNUSABLE`, `ABSENT`), the conversion targets (`NUMBER`, `STRING`, `DURATION`, `BYTECOUNT`), the reserved words `NULL`, `TRUE` and `FALSE`, function names, identifiers, namespaces, and the unit suffixes of bytecount and duration literals are all matched without regard to case. `artist`, `Artist` and `ARTIST` are the same identifier, and similarly `id3v2::tit2` and `ID3V2::TIT2` are the same identifier.
 
 The only case-sensitive text in a predicate is the contents of a string value -- and even those are compared without regard to case unless `LITERALLY()` is used; see [Normalization](normalization.md). The letters of a string escape are a second and smaller exception: the escapes are the ones listed under [Values](#values) and no others, so `\n` is a line feed while `\N` is not an escape at all and is therefore an error. The hexadecimal digits of `\x` and `\u` may be written in either case, and the `r` prefixing a raw string may be either `r` or `R`, both being notation around a string rather than part of its contents. A quoted part of an identifier is not a string value in this sense and is matched without regard to case like any other part of an identifier, so `ape::"album artist"` and `ape::"Album Artist"` are the same identifier.
 
@@ -58,7 +58,7 @@ For a list of predefined namespaces and identifiers within them together with a 
 
 ### Reserved words
 
-The keyword operators `AND`, `OR`, `NOT`, `BETWEEN`, and `IS` (case-insensitive) are reserved and cannot be used as a bare identifier in the global namespace. For example, `and` alone is always interpreted as the logical `AND` operator, never as an identifier named "and".
+The keyword operators `AND`, `OR`, `NOT`, `BETWEEN`, `IS` and `AS` (case-insensitive) are reserved and cannot be used as a bare identifier in the global namespace. For example, `and` alone is always interpreted as the logical `AND` operator, never as an identifier named "and".
 
 The state names `USABLE`, `UNUSABLE`, and `ABSENT` (case-insensitive) are reserved on the same terms.
 
@@ -68,7 +68,7 @@ A reserved word may still appear in an identifier, but never as its first part u
 
 The modifiers `ALL`, `ANY`, and `LITERALLY` (case-insensitive) are reserved on the same terms.
 
-Function names (such as `COUNT`, `FALLBACK`, `NUMBER`, `PREFERRED` and `STRING`) are not reserved words in this sense.
+Function names (such as `COUNT`, `FALLBACK` and `PREFERRED`) are not reserved words in this sense, and neither are the targets of a conversion, which only ever follow `AS`.
 
 Although the grammar does not require it, no built-in identifier in the global namespace has the same name as a function, and no function is given the name of a built-in global identifier. This is a constraint on what Goro defines rather than on what a predicate may write.
 
@@ -93,7 +93,7 @@ Absence is a property of a whole value, while unusability is a property of a sin
 
 Operators and the boolean literals always produce exactly one boolean, never an absent one, which makes them [exactly one](#exactly-one). A boolean can be unusable: a comparison, range or regex operator whose answer depended on an occurrence it could not interpret has no answer to give, and its result is an unusable boolean (see [General operator rules](#general-operator-rules)).
 
-Booleans are **unordered**. They may be compared with `==` and `!=`, tested with a state test, and passed to `COUNT()`, `FALLBACK()` and `PREFERRED()`, but it is an error to use one as an operand of an ordering operator, of `BETWEEN`, or of `=~`, or as an argument to `NUMBER()` or `STRING()`.
+Booleans are **unordered**. They may be compared with `==` and `!=`, tested with a state test, and passed to `COUNT()`, `FALLBACK()` and `PREFERRED()`, but it is an error to use one as an operand of an ordering operator, of `BETWEEN`, or of `=~`, or to convert one with `AS`.
 
 **string**
 : a sequence of characters, written in either of two forms.
@@ -171,7 +171,7 @@ Some expressions are guaranteed by their form to produce exactly one occurrence,
 - every literal;
 - the result of every operator: comparison, range, regex, state test, and the logical operators `AND`, `OR` and `NOT`;
 - `COUNT()`, whatever its argument;
-- `NUMBER()` and `STRING()` applied to an argument that is exactly one;
+- a [conversion](#the-conversion-operator) of an expression that is exactly one;
 - `FALLBACK()` applied to an argument that never holds more than one occurrence, absence being what it replaces;
 - `PREFERRED()` when some argument is never absent and no argument ever holds more than one occurrence;
 - the identifiers `file::path`, `file::name`, `file::size` and `file::duration`, which every file a predicate is evaluated against has exactly one of;
@@ -185,7 +185,7 @@ This matters in two places. The operands of the logical operators, and a predica
 
 #### Constants
 
-A **constant** is an expression whose value is known when the predicate is read: a literal, a parenthesized constant, or `NUMBER()` or `STRING()` applied to a constant. Goro works out the value of a constant as soon as it reads the predicate, so a conversion that cannot succeed, such as `NUMBER("x")`, is an error reported then rather than an unusable occurrence met in every file. A constant is therefore never absent and never unusable, which is what the rules asking for one rely on: the default of `FALLBACK()` must be a constant. Where the grammar itself places a literal, as at the ends of a range and in the pattern of `=~`, it remains a literal, and only a number literal, not any number constant, may stand for a bytecount or a duration.
+A **constant** is an expression whose value is known when the predicate is read: a literal, a parenthesized constant, or a [conversion](#the-conversion-operator) of a constant. Goro works out the value of a constant as soon as it reads the predicate, so a conversion that cannot succeed, such as `"x" AS NUMBER`, is an error reported then rather than an unusable occurrence met in every file. A constant is therefore never absent and never unusable, which is what the rules asking for one rely on: the default of `FALLBACK()` must be a constant. Where the grammar itself places a literal, as at the ends of a range and in the pattern of `=~`, it remains a literal, and only a number literal, not any number constant, may stand for a bytecount or a duration.
 
 ### Operators
 
@@ -292,7 +292,7 @@ The state test operator `IS` asks about the cardinality and state of a value rat
 
 A state test is exempt from general operator rule 1. It also never consumes a value and therefore never warns, even for unusable occurrences.
 
-Applied to a boolean, a state test asks whether a condition could be answered: `(NUMBER(x) > 5) IS UNUSABLE` is true for a file where the comparison met data it could not interpret, and never warns on its own account, although the comparison it examines will already have warned.
+Applied to a boolean, a state test asks whether a condition could be answered: `(x AS NUMBER > 5) IS UNUSABLE` is true for a file where the comparison met data it could not interpret, and never warns on its own account, although the comparison it examines will already have warned.
 
 `ALL(x) IS USABLE` is the conservative guard: it requires both that `x` is present and that every one of its occurrences can be read. `NOT (x IS UNUSABLE)` is the same except that an absent value also satisfies it.
 
@@ -300,8 +300,8 @@ There is no `IS NOT`; a negated state test is written with the boolean negation 
 
 Examples:
 
-- `ALL(NUMBER(vorbis::bpm)) IS USABLE AND NUMBER(vorbis::bpm) > 120` is the conservative guard: it admits only files where every `BPM` field converted, so the comparison never meets one that did not and nothing warns. A file holding one good `BPM` field and one piece of junk is passed over, silently.
-- `ANY(NUMBER(vorbis::bpm)) IS USABLE AND NUMBER(vorbis::bpm) > 120` is the optimistic counterpart: it proceeds when at least one field converted, can still find a match among those, and warns about the rest.
+- `ALL(vorbis::bpm AS NUMBER) IS USABLE AND vorbis::bpm AS NUMBER > 120` is the conservative guard: it admits only files where every `BPM` field converted, so the comparison never meets one that did not and nothing warns. A file holding one good `BPM` field and one piece of junk is passed over, silently.
+- `ANY(vorbis::bpm AS NUMBER) IS USABLE AND vorbis::bpm AS NUMBER > 120` is the optimistic counterpart: it proceeds when at least one field converted, can still find a match among those, and warns about the rest.
 - `year IS ABSENT` selects the files that record no year at all, which no comparison can express, since every comparison against an absent value is false whichever operator it uses
 - `ANY(vorbis::year) IS UNUSABLE` selects the files whose Vorbis date fields need attention, and is the predicate to reach for when a run has reported warnings and the data behind them has to be found
 
@@ -345,12 +345,13 @@ When parentheses are not used to make evaluation order explicit, operators are e
 | Level        | Constructs                                                                            | Associativity   |
 |:------------:|---------------------------------------------------------------------------------------|-----------------|
 | 1 (tightest) | primary expressions: literals, identifiers, function calls, parenthesized expressions | --
-| 2            | `==` `!=` `<` `>` `<=` `>=` `=~` `BETWEEN` `IS`                                       | non-associative
-| 3            | `NOT`                                                                                 | unary, repeatable
-| 4            | `AND`                                                                                 | left
-| 5 (loosest)  | `OR`                                                                                  | left
+| 2            | `AS`                                                                                  | left, repeatable
+| 3            | `==` `!=` `<` `>` `<=` `>=` `=~` `BETWEEN` `IS`                                       | non-associative
+| 4            | `NOT`                                                                                 | unary, repeatable
+| 5            | `AND`                                                                                 | left
+| 6 (loosest)  | `OR`                                                                                  | left
 
-An operator of higher precedence binds more tightly than one of lower precedence, meaning it is evaluated first. `NOT` binds more tightly than `AND`, which in turn binds more tightly than `OR`. For example, `artist == "metallica" AND year > 2000 OR NOT genre == "jazz"` is evaluated as if it had been written `((artist == "metallica") AND (year > 2000)) OR (NOT (genre == "jazz"))`, since `AND` binds more tightly than `OR`, `NOT` binds more tightly than `AND`, and the comparisons bind more tightly than `NOT`.
+An operator of higher precedence binds more tightly than one of lower precedence, meaning it is evaluated first. `NOT` binds more tightly than `AND`, which in turn binds more tightly than `OR`. For example, `artist == "metallica" AND year > 2000 OR NOT genre == "jazz"` is evaluated as if it had been written `((artist == "metallica") AND (year > 2000)) OR (NOT (genre == "jazz"))`, since `AND` binds more tightly than `OR`, `NOT` binds more tightly than `AND`, and the comparisons bind more tightly than `NOT`. A conversion binds more tightly still, so `x AS NUMBER > 5` compares the converted `x`.
 
 When a left-associative operator appears more than once in a chain without parentheses, it is evaluated left to right. For example, `a AND b AND c` is evaluated as `(a AND b) AND c`. This does not change the result for `AND` or `OR` chains, but it does determine the order in which operands are evaluated. `NOT` is a unary prefix operator and may be applied repeatedly, so `NOT NOT a` is valid and equivalent to `a`.
 
@@ -427,19 +428,52 @@ For an ordering operator the same rule reads as a comparison of aggregates, whic
 
 ### Value conversions
 
-With the exception of numeric literals, operators that have multiple operands require the operands to have the same type and produce an error if not. This means that a comparison such as `id3v2::track > vorbis::raw::tracknumber`, which attempts to compare a number with a string, is rejected with an error. To prevent this error a conversion of one of the values to the type of the other is required. Converting `id3v2::track` to a string might result in a comparison such as `"2" > "10"` -- this comparison result is, perhaps surprisingly, true, and it would be correct to instead write `id3v2::track > NUMBER(vorbis::raw::tracknumber)` to avoid this problem and compare numerically. However, `vorbis::raw::tracknumber` might not hold a valid numeric string, and in that case `NUMBER()` yields an unusable occurrence and the comparison is unusable rather than true or false, by general operator rule 2. The warning that consuming an unusable occurrence emits is what keeps this from happening silently, and a [state test](#state-test-operator) is how a predicate can decide for itself what to do about it.
+With the exception of numeric literals, operators that have multiple operands require the operands to have the same type and produce an error if not. This means that a comparison such as `id3v2::track > vorbis::raw::tracknumber`, which attempts to compare a number with a string, is rejected with an error. To prevent this error a conversion of one of the values to the type of the other is required. Converting `id3v2::track` to a string might result in a comparison such as `"2" > "10"` -- this comparison result is, perhaps surprisingly, true, and it would be correct to instead write `id3v2::track > vorbis::raw::tracknumber AS NUMBER` to avoid this problem and compare numerically. However, `vorbis::raw::tracknumber` might not hold a valid numeric string, and in that case the conversion yields an unusable occurrence and the comparison is unusable rather than true or false, by general operator rule 2. The warning that consuming an unusable occurrence emits is what keeps this from happening silently, and a [state test](#state-test-operator) is how a predicate can decide for itself what to do about it.
+
+#### The conversion operator
+
+`expr AS target` converts each occurrence of `expr` to the target type. The targets are `NUMBER`, `STRING`, `DURATION` and `BYTECOUNT`. A conversion never changes how many occurrences there are: an absent `expr` gives an absent result, and a multivalue gives a multivalue of the same cardinality, each of its occurrences converted in turn. Converting a value to the type it already has changes nothing.
+
+What an occurrence converts to:
+
+| From      | To          | Result |
+|-----------|-------------|--------|
+| string    | `NUMBER`    | the number, when the text is a number literal
+| string    | `DURATION`  | the duration, when the text is a duration literal in either form, or a number literal taken as seconds
+| string    | `BYTECOUNT` | the bytecount, when the text is a bytecount literal, or a number literal taken as bytes
+| number    | `DURATION`  | that many seconds
+| number    | `BYTECOUNT` | that many bytes
+| duration  | `NUMBER`    | its total seconds
+| bytecount | `NUMBER`    | its bytes
+| number    | `STRING`    | its canonical number literal, described below
+| duration  | `STRING`    | its canonical duration literal, in seconds
+| bytecount | `STRING`    | its canonical bytecount literal, in bytes
+
+A number taken as seconds or bytes is subject to the same terms as the numeric literal exception: it is never negative, and a number of seconds is always whole. Text converts only when it is the literal and nothing else, so `" 5"` and `"5 "` do not convert to a number. `"4:05"`, `"4m5s"` and `"245"` all convert to the same duration.
+
+An occurrence that does not convert becomes an unusable occurrence whose source is the conversion: text that is not such a literal, a negative number of bytes, or a fraction of a second. An occurrence that was unusable already stays so and keeps its source. A conversion asks nothing of an unusable occurrence's content, so it never consumes one and never warns, and it has the [bounds](#exactly-one) of its operand. A duration and a bytecount do not convert into each other, and a boolean converts to nothing and from nothing; each of those is an error.
+
+**The canonical literal.** Converted to a string, a number, duration or bytecount becomes the literal of its own type that denotes it, in one canonical form. That is always an integer part, a sign only for a negative number, no negative zero, no thousands separator, no exponent, and no trailing zeros in the fractional part; a duration is written in seconds with the suffix `s`, and a bytecount in bytes with the suffix `b`. So `1.50 AS STRING` and `1.5 AS STRING` are both `"1.5"`, `.5 AS STRING` is `"0.5"`, `+5 AS STRING` is `"5"` and `-0 AS STRING` is `"0"`, while `4m5s AS STRING` is `"245s"` and `1.4kib AS STRING` is `"1433.6b"`. The text always converts back through its own type to the value it came from. It is not a way of presenting a value: the unit is always the base one, whatever the size of the value. The plain number of seconds or bytes is a conversion away, as in `file::duration AS NUMBER AS STRING`.
+
+`AS` binds more tightly than every other operator and may be chained, conversions applying left to right: `x AS NUMBER > 5` compares `x AS NUMBER` with five, and `x AS NUMBER AS STRING` converts `x` to a number and the number to a string. The operand of `AS` is not the operand of a comparison, so a [modifier](#modifiers) may not be applied to it: `ALL(x) AS NUMBER > 5` is an error, and the diagnostic offers `ALL(x AS NUMBER) > 5`. Modifiers go on the outside of a conversion as they do of a function.
+
+Examples:
+
+- `vorbis::raw::tracknumber AS NUMBER > 9` compares track numbers as numbers rather than as text
+- `ape::"length" AS DURATION > 10m` reads an APE item holding a playing time, written as a duration or as a number of seconds
+- `file::size AS STRING` is `"5242880b"` for a file of 5 MiB
 
 #### Unusable occurrences
 
 Unusable occurrences arise in three ways:
 
 - from an identifier whose underlying tag data is present but cannot be interpreted as the identifier's declared type;
-- from a type conversion function whose input cannot be converted; in particular, `NUMBER()` produces an unusable number when its input cannot be converted;
+- from a conversion whose input cannot be converted, such as `x AS NUMBER` where `x` holds text that is not a number;
 - from a comparison, range or regex operator that could not reach an answer because of an unusable occurrence among its operands; its result is an unusable boolean.
 
 The first two are where a defect is found, and consuming the occurrence they produce causes Goro to emit a warning to alert you, as described under [Warnings](#warnings) below. The third is a consequence of the first two rather than a further defect.
 
-Three constructs can examine an unusable occurrence without using it, and therefore without warning. A [state test](#state-test-operator) reports state rather than content, so `ALL(NUMBER(x)) IS USABLE` establishes that every occurrence of `x` converted to a number without reporting the ones that did not. `FALLBACK(expr, default)` substitutes for an occurrence instead of reading it, so it is silent for an unusable occurrence exactly as it is for an absent value. And `PREFERRED()` chooses among its arguments by the state of their occurrences, passing over an argument with nothing usable in it without a word.
+Three constructs can examine an unusable occurrence without using it, and therefore without warning. A [state test](#state-test-operator) reports state rather than content, so `ALL(x AS NUMBER) IS USABLE` establishes that every occurrence of `x` converted to a number without reporting the ones that did not. `FALLBACK(expr, default)` substitutes for an occurrence instead of reading it, so it is silent for an unusable occurrence exactly as it is for an absent value. And `PREFERRED()` chooses among its arguments by the state of their occurrences, passing over an argument with nothing usable in it without a word.
 
 Because identifiers can produce unusable occurrences of their own, state tests and `FALLBACK()` are useful applied directly to identifiers and not only to the results of conversions. `FALLBACK(id3v2::track, 0)` substitutes zero both for a track frame that is missing and for one that is present but unusable, and `ANY(id3v2::track) IS USABLE` is the way to require that at least one usable track number exists; if `ANY` were replaced with `ALL`, the test would require that _all_ potentially existing track numbers are usable.
 
@@ -459,8 +493,10 @@ The errors reported when a predicate is read include:
 - an operand of `AND`, `OR` or `NOT`, or a predicate as a whole, that is not a boolean, or is not exactly one;
 - an operand of `!=` that is not exactly one and carries neither `ALL` nor `ANY`;
 - a boolean used as an operand of an ordering operator, of `BETWEEN`, or of `=~`, booleans being unordered;
-- an argument of the wrong type to a function, such as a boolean passed to `NUMBER()` or `STRING()`;
-- a default of `FALLBACK()` that is not a constant, and a conversion of a constant that does not succeed, such as `NUMBER("x")`;
+- an argument of the wrong type to a function, such as a default of `FALLBACK()` whose type is not that of its first argument;
+- a conversion of a boolean, a conversion between a duration and a bytecount, and a target `AS` does not know;
+- a modifier applied to the operand of `AS`;
+- a default of `FALLBACK()` that is not a constant, and a conversion of a constant that does not succeed, such as `"x" AS NUMBER`;
 - `LITERALLY()` applied to an operand that is not a string, or to the operand of a state test;
 - a modifier applied anywhere other than to an operand of a comparison, range, regex, or state test operator, or to another such modifier;
 - a range whose endpoints are not literals of the same type, or that could hold nothing, its `min` lying above its `max`;
@@ -479,7 +515,7 @@ A predicate emits a warning when an unusable occurrence is consumed while it is 
 **Consuming an unusable occurrence means asking a question of its content.** Only consuming emits a warning. The comparison, range and regex operators are the constructs that ask such questions -- they are where data is turned into a truth value -- and everything else follows from that one rule:
 
 - The comparison, range and regex operators need the content of their operands in order to answer. They consume, so an operator handed an unusable occurrence warns, and its result for the combinations that include the occurrence is unusable.
-- `NUMBER()` and `STRING()` map an unusable occurrence to an unusable occurrence. They ask nothing of its content; they _propagate_ it, keeping its source, and they are silent.
+- A conversion maps an unusable occurrence to an unusable occurrence. It asks nothing of its content; it _propagates_ it, keeping its source, and it is silent.
 - `COUNT()` reads cardinality, which is knowable without interpreting any occurrence. It is silent.
 - `FALLBACK()` substitutes for an occurrence instead of reading it. It is silent.
 - `PREFERRED()` reads the state of its arguments' occurrences, never their content. It is silent, and the arguments it passes over are discarded unreported.
@@ -487,11 +523,11 @@ A predicate emits a warning when an unusable occurrence is consumed while it is 
 - An operator's result is unusable only if the operator consumed an unusable occurrence, which has therefore already been reported. Whatever consumes such a result (for example `AND`, `OR` and `NOT`) cannot report anything new.
 - A modifier computes nothing at all, so applying one leaves the operator that follows as the consumer.
 
-This is what allows the guard `ALL(NUMBER(x)) IS USABLE AND NUMBER(x) > 5` to work even when the unusable data originates in `x` itself rather than in the conversion: `NUMBER()` propagates what it was handed, the state test reads the state of the result without consuming it, and `AND` short-circuits before any operator can.
+This is what allows the guard `ALL(x AS NUMBER) IS USABLE AND x AS NUMBER > 5` to work even when the unusable data originates in `x` itself rather than in the conversion: the conversion propagates what it was handed, the state test reads the state of the result without consuming it, and `AND` short-circuits before any operator can.
 
 #### Where a warning comes from
 
-An unusable occurrence has a _source_: the identifier or the conversion at which it arose. A function that passes an occurrence through does not change its source. A warning is emitted at the point where the occurrence is consumed, but names its source: in `STRING(id3v1::year) == "1991"` applied to a file whose Id3v1 year field holds something that is not a year, the unusable occurrence arises at `id3v1::year`, is propagated through `STRING()`, and the warning is triggered by the consuming `==` but names `id3v1::year` as the source, which is where the problem actually is.
+An unusable occurrence has a _source_: the identifier or the conversion at which it arose. A construct that passes an occurrence through does not change its source. A warning is emitted at the point where the occurrence is consumed, but names its source: in `id3v1::year AS STRING == "1991"` applied to a file whose Id3v1 year field holds something that is not a year, the unusable occurrence arises at `id3v1::year`, is propagated through the conversion, and the warning is triggered by the consuming `==` but names `id3v1::year` as the source, which is where the problem actually is.
 
 #### Deduplication
 
@@ -501,20 +537,21 @@ Two sub-expressions are the same source when they apply the same functions, in t
 
 In the following examples, `x` and `y` are identifiers that resolve to an unusable occurrence for the file being evaluated, `m` is a multivalue that includes at least one unusable occurrence, and `s` and `t` are identifiers holding strings that are not valid numbers.
 
-| Predicate                          | Warnings | Why                                                                          |
-|------------------------------------|:--------:|------------------------------------------------------------------------------|
-| `x > 1`                            | 1        | a single source
-| `x > x`                            | 1        | both mentions are the same source
-| `x < 10 OR x > 20`                 | 1        | the same source, reached twice
-| `x > y`                            | 2        | different identifiers are different sources
-| `m > 1`                            | 1        | every occurrence of a multivalue shares the source of the identifier that produced it
-| `NUMBER(s) > NUMBER(s)`            | 1        | structurally identical sub-expressions are one source
-| `NUMBER(s) > NUMBER(t)`            | 2        | the sources differ below the top level
-| `ALL(m) == "a" OR m == "b"`        | 1        | `ALL()` is transparent, so both operands have the same source
-| `x > 1 AND y > 1`                  | 2        | an unusable first operand does not settle `AND`, so the second is evaluated as well
-| `(x > 1) == (x > 1)`               | 1        | the outer `==` uses an unusable boolean, which has already been reported
-| `FALLBACK(x > 1, FALSE)`           | 1        | `FALLBACK()` replaces the comparison's result after the comparison has warned
-| `PREFERRED(x, y) > 1`              | 1        | neither argument has anything usable, so `x` is chosen and consumed, and `y` is discarded
+| Predicate                               | Warnings | Why                                                                          |
+|-----------------------------------------|:--------:|------------------------------------------------------------------------------|
+| `x > 1`                                 |    1     | a single source
+| `x > x`                                 |    1     | both mentions are the same source
+| `x < 10 OR x > 20`                      |    1     | the same source, reached twice
+| `x > y`                                 |    2     | different identifiers are different sources
+| `m > 1`                                 |    1     | every occurrence of a multivalue shares the source of the identifier that produced it
+| `s AS NUMBER > s AS NUMBER`             |    1     | structurally identical sub-expressions are one source
+| `s AS NUMBER > t AS NUMBER`             |    2     | the sources differ below the top level
+| `s AS NUMBER > 1 OR s AS DURATION > 1m` |    2     | different conversions of one identifier are different sources, the target differing at the top
+| `ALL(m) == "a" OR m == "b"`             |    1     | `ALL()` is transparent, so both operands have the same source
+| `x > 1 AND y > 1`                       |    2     | an unusable first operand does not settle `AND`, so the second is evaluated as well
+| `(x > 1) == (x > 1)`                    |    1     | the outer `==` uses an unusable boolean, which has already been reported
+| `FALLBACK(x > 1, FALSE)`                |    1     | `FALLBACK()` replaces the comparison's result after the comparison has warned
+| `PREFERRED(x, y) > 1`                   |    1     | neither argument has anything usable, so `x` is chosen and consumed, and `y` is discarded
 
 Deduplication resets for every file. A predicate such as `id3v2::track == 1` applied to a collection in which 500 files have junk where the track number should be will therefore produce 500 warnings, one per affected file.
 
@@ -533,9 +570,9 @@ The three are not quite the same kind of thing, which decides what writing one o
 - `ALL` and `ANY` choose a **quantifier**, which belongs to the operand it is written on. Each operand of an operator carries its own, and they are independent: one side may be universal while the other is existential.
 - `LITERALLY` chooses a **comparison mode**, which belongs to the operator. An operator either normalizes the strings it compares or it does not, and a `LITERALLY` on either operand settles that for the comparison as a whole.
 
-**A modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. For `BETWEEN` and `=~` that means the left operand alone, the range and the pattern on the right being parts of the operator rather than operands. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))` and `FALLBACK(LITERALLY(genre), "pop")` are not.
+**A modifier may only be applied to an operand of a comparison, range, regex, or state test operator, or to another such modifier**. For `BETWEEN` and `=~` that means the left operand alone, the range and the pattern on the right being parts of the operator rather than operands. Writing one anywhere else is an error. In particular a modifier may not appear as an argument to a function or as the operand of `AS`: `LITERALLY(genre) == "Pop"` is valid, while `COUNT(ALL(genre))`, `FALLBACK(LITERALLY(genre), "pop")` and `ALL(genre) AS STRING == "x"` are not.
 
-The restriction applies in one direction only. A modifier may be applied to any operand, including one that is itself a function call, so `LITERALLY(FALLBACK(genre, "pop")) == "Pop"` is valid: modifiers go on the outside, functions on the inside.
+The restriction applies in one direction only. A modifier may be applied to any operand, including one that is itself a function call, so `LITERALLY(FALLBACK(genre, "pop")) == "Pop"` and `ALL(x AS NUMBER) > 5` are valid: modifiers go on the outside, functions and conversions on the inside.
 
 Modifiers may be stacked as deeply as desired and in any order, a quantifier and a comparison mode being independent choices. `LITERALLY(ALL(genre))` and `ALL(LITERALLY(genre))` mean the same thing. Repeating a modifier changes nothing, so `ALL(ALL(genre))` is simply universal, but stacking contradictory quantifiers, as in `ALL(ANY(genre))`, is an error.
 
@@ -608,13 +645,6 @@ If `expr` is a multivalue, this function returns a multivalue of the same cardin
 
 `expr` may be of any type, boolean included, and `TRUE` and `FALSE` are literals like any other. Applied to a comparison, `FALLBACK()` decides what a condition that could not be answered should mean; see [Unusable occurrences](#unusable-occurrences), including for why doing so does not silence the comparison.
 
-**NUMBER(expr)**
-: converts its argument to a number.
-
-If `expr` is absent, or is already a number, this function returns the same value. It is an error to pass it a boolean, or a string [constant](#constants) that is not a valid number literal. If `expr` is a bytecount, it returns the count as a number of bytes. If `expr` is a duration, it returns total number of seconds. If `expr` is a string that satisfies the rules for a numeric literal, it is converted to a number and returned. If `expr` is a string that does _not_ validate as a numeric literal, or whose value cannot be represented exactly, the result is an unusable occurrence, which will emit a warning the first time an attempt is made to use it. An unusable input yields an unusable result, propagated in silence.
-
-If the argument is a multivalue, this function returns a multivalue of the same cardinality, with `NUMBER()` applied to each occurrence of the input in turn.
-
 **PREFERRED(expr1, expr2, ...)**
 : chooses one of its arguments, preferring them in the order they are written. It takes two or more arguments, all of one type, and its result is:
 
@@ -643,15 +673,6 @@ Examples:
 - `PREFERRED(vorbis::year, id3v2::year) < 2000` compares the Vorbis year of a file that has a usable one, and its Id3v2 year otherwise
 - `PREFERRED(ape::"album artist", vorbis::albumartist) == "various artists"` looks for an album artist where the global namespace does not
 
-**STRING(expr)**
-: converts its argument to a string.
-
-If `expr` is absent, or is already a string, this function returns the same value. It is an error to pass it a boolean. If `expr` is a bytecount, it returns the count of bytes as a plain number without a unit. If `expr` is a duration, it returns the total duration in seconds as a plain number without a unit. If `expr` is a number, it returns that number.
-
-In every case the text is a number literal in one canonical form: always an integer part, a sign only for a negative number, no negative zero, no thousands separator, no exponent, and no trailing zeros in the fractional part. So `STRING(1.50)` and `STRING(1.5)` are both `"1.5"`, `STRING(.5)` is `"0.5"`, `STRING(+5)` is `"5"` and `STRING(-0)` is `"0"`, and the result always reads back through `NUMBER()` as the value it came from. Every value of every type it accepts has a string form, so this function never produces an unusable occurrence of its own; an unusable input yields an unusable result, propagated in silence.
-
-If the argument is a multivalue, this function returns a multivalue of the same cardinality, with `STRING()` applied to each occurrence of the input in turn.
-
 ## GRAMMAR
 
 The following grammar is given in EBNF. Terminals are quoted; `{ x }` means zero or more repetitions of `x`, `[ x ]` means `x` is optional, and `|` separates alternatives. All quoted keywords, function names, identifier names and unit suffixes are matched case-insensitively.
@@ -677,9 +698,12 @@ comparison_op   = "==" | "!=" | "<=" | ">=" | "<" | ">" ;
 pattern         = raw_string ;
 state           = "USABLE" | "UNUSABLE" | "ABSENT" ;
 
-operand         = modifier "(" operand ")"
+operand         = conversion ;
+conversion      = modified { "AS" target } ;
+modified        = modifier "(" operand ")"
                 | primary ;
 modifier        = "ALL" | "ANY" | "LITERALLY" ;
+target          = name ;
 
 primary         = literal
                 | identifier
@@ -691,7 +715,7 @@ function_call   = name "(" [ expression { "," expression } ] ")" ;
 
 The four levels of `or_expr`, `and_expr`, `not_expr` and `comparison_expr` are what give the operators the precedence listed under [Grouping, precedence, and associativity](#grouping-precedence-and-associativity). `comparison_tail` appears at most once and never recurses, which is what makes the comparison, range, regex and state test operators non-associative.
 
-The grammar admits a modifier wherever an `operand` can occur, and since the tail of a `comparison_expr` is optional, that is wherever an expression can occur. The restriction described under [Modifiers](#modifiers) is therefore completed by static analysis: `COUNT(ALL(genre))` parses, with `ALL(genre)` as the argument of `COUNT`, and is rejected. This is what the modifier names are reserved for, since recognizing one is what allows a misplaced modifier to be reported as such. The recursion in `operand` is what allows modifiers to be stacked without limit. Parentheses change nothing here, as everywhere else: `(ALL(genre)) == "x"` is accepted, its modifier being applied to the operand of `==`, and `COUNT((ALL(genre)))` is rejected exactly as `COUNT(ALL(genre))` is.
+The grammar admits a modifier wherever an `operand` can occur, and since the tail of a `comparison_expr` is optional, that is wherever an expression can occur. The restriction described under [Modifiers](#modifiers) is therefore completed by static analysis: `COUNT(ALL(genre))` parses, with `ALL(genre)` as the argument of `COUNT`, and is rejected. This is what the modifier names are reserved for, since recognizing one is what allows a misplaced modifier to be reported as such. The recursion between `operand` and `modified` is what allows modifiers to be stacked without limit. For the same reason `ALL(x) AS NUMBER` parses, its modifier on the operand of `AS`, and is rejected by static analysis, so that the diagnostic can say where the modifier belongs. Function arguments are expressions, so SQL's `CAST(x AS NUMBER)` parses too, and is answered with `x AS NUMBER`. Parentheses change nothing here, as everywhere else: `(ALL(genre)) == "x"` is accepted, its modifier being applied to the operand of `==`, and `COUNT((ALL(genre)))` is rejected exactly as `COUNT(ALL(genre))` is.
 
 ### Identifiers and names
 
@@ -767,7 +791,8 @@ Not every rule in this document is grammatical, and a construct that this gramma
 - the `operand` of a state test may be of any type, boolean included, since a state test asks about cardinality and state rather than about content;
 - an `identifier` must name a namespace Goro defines, an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may be one of the reserved words only when the identifier begins with `::`;
 - a `name_part` written as a `string` names the same thing as the equivalent bare `name` when the name is one a bare `name` could have spelled, so the two forms are one identifier and not two;
-- a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a constant, `PREFERRED()` takes at least two arguments, all of one type, `NUMBER()` and `STRING()` do not accept a boolean, and a conversion of a constant must succeed, so `NUMBER()` does not accept a string constant that is not a valid number literal;
+- a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a constant, and `PREFERRED()` takes at least two arguments, all of one type;
+- a `conversion` names one of the targets `NUMBER`, `STRING`, `DURATION` and `BYTECOUNT`, its operand is not a boolean, it does not convert a duration and a bytecount into each other, its operand carries no modifier, and a conversion of a constant must succeed, so `"x" AS NUMBER` is an error;
 - the `operand` a `LITERALLY` modifier is applied to must be of type string, and must not be the operand of a state test;
 - `ALL` and `ANY` may not both be applied to the same operand, and neither may be applied to the operand of `IS ABSENT`;
 - the two endpoints of a `range` must be literals of the same type, and the range must be able to hold something: `min` must not lie above `max` when compared with it as an occurrence would be, which for strings means cut to the length of `max`, and compared the way the operator will compare them, so that a `LITERALLY` on the operator's other operand decides whether string endpoints are compared normalized;

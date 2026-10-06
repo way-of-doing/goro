@@ -25,6 +25,7 @@ public static class SyntaxPrinter
         FunctionCallSyntax call => List(["call", call.Name.Text, .. call.Arguments.Select(Print)]),
         ParenthesizedSyntax parentheses => List("paren", Print(parentheses.Expression)),
         ModifierSyntax modifier => List(modifier.Modifier.ToString().ToUpperInvariant(), Print(modifier.Operand)),
+        AsSyntax conversion => List("AS", Print(conversion.Operand), conversion.Target.Text),
         ComparisonSyntax comparison => List(Operator(comparison.Operator), Print(comparison.Left), Print(comparison.Right)),
         BetweenSyntax between => List("BETWEEN", Print(between.Subject), Print(between.Minimum), Print(between.Maximum)),
         MatchSyntax match => List("=~", Print(match.Subject), Literal(match.Pattern)),

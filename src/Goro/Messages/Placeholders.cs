@@ -30,6 +30,7 @@ public enum Expectation
     CommaOrCloseParen,
     Name,
     NameOrQuotedName,
+    Target,
 }
 
 /// <summary>The families of regex construct the non-backtracking engine does not support.</summary>

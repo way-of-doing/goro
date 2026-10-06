@@ -20,8 +20,8 @@ internal sealed class ConstantsDiagnostics(string text) : SemanticDiagnostics(te
     public Diagnostic FallbackDefaultNotConstant(FunctionCallSyntax call) =>
         new(Codes.FallbackDefaultNotConstant, call.Arguments[1].Span, new ErrorMessage.FallbackDefaultNotConstant(new Code(call.Name.Text), Code(call.Arguments[1])));
 
-    public Diagnostic InvalidNumberLiteral(FunctionCallSyntax call, ExpressionSyntax literal) =>
-        new(Codes.InvalidNumberLiteral, literal.Span, new ErrorMessage.InvalidNumberLiteral(Code(literal), new Code(call.Name.Text)));
+    public Diagnostic ConstantDoesNotConvert(ExpressionSyntax operand, GoroType target) =>
+        new(Codes.ConstantDoesNotConvert, operand.Span, new ErrorMessage.ConstantDoesNotConvert(Code(operand), target));
 
     public Diagnostic RangeReversed(BetweenSyntax between, GoroType type, ComparisonMode mode)
     {

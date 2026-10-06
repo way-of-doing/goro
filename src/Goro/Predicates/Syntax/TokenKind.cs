@@ -34,6 +34,7 @@ public enum TokenKind
     Not,
     Between,
     Is,
+    As,
     Usable,
     Unusable,
     Absent,

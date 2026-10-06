@@ -94,7 +94,11 @@ public abstract record ErrorMessage
     public sealed record BooleanCompared(Code Operator) : ErrorMessage;
     public sealed record BooleanBetween(Code Subject) : ErrorMessage;
     public sealed record BooleanRange : ErrorMessage;
-    public sealed record BooleanNotConvertible(Code Function, Code Argument) : ErrorMessage;
+    public sealed record BooleanNotConvertible(Code Operand) : ErrorMessage;
+    public sealed record UnitsDoNotConvert(Code Operand, UnitType From) : ErrorMessage;
+    public sealed record UnknownTarget(Code Target) : ErrorMessage;
+    public sealed record ConversionCalled(Code Function) : ErrorMessage;
+    public sealed record CastCalled(Code Function) : ErrorMessage;
     public sealed record MatchSubjectNotString(Code Subject, GoroType Type) : ErrorMessage;
     public sealed record NotACondition(Code Expression, GoroType Type) : ErrorMessage;
     public sealed record ConditionNotExactlyOne(Code Expression) : ErrorMessage;
@@ -104,6 +108,7 @@ public abstract record ErrorMessage
     public sealed record AmbiguousNotEqualBoth(Code Left, Code Right) : ErrorMessage;
     public sealed record MisplacedModifier(Code Modifier) : ErrorMessage;
     public sealed record MisplacedModifierInCall(Code Modifier, Code Function) : ErrorMessage;
+    public sealed record MisplacedModifierInConversion(Code Modifier) : ErrorMessage;
     public sealed record ContradictoryQuantifiers(Code Inner, Code Outer) : ErrorMessage;
     public sealed record LiterallyNotString(Code Modifier, Code Operand, GoroType Type) : ErrorMessage;
     public sealed record LiterallyOnStateTest(Code Modifier) : ErrorMessage;
@@ -111,7 +116,7 @@ public abstract record ErrorMessage
     public sealed record WrongArgumentCount(Code Function, int Expected, int Actual) : ErrorMessage;
     public sealed record TooFewArguments(Code Function, int Minimum, int Actual) : ErrorMessage;
     public sealed record FallbackDefaultNotConstant(Code Function, Code Default) : ErrorMessage;
-    public sealed record InvalidNumberLiteral(Code Literal, Code Function) : ErrorMessage;
+    public sealed record ConstantDoesNotConvert(Code Operand, GoroType Target) : ErrorMessage;
     public sealed record RangeUnitMissing(Code Number) : ErrorMessage;
     public sealed record RangeUnitAmbiguous(Code Number, UnitType Unit, Code WithUnit) : ErrorMessage;
     public sealed record RangeEndpointTypes(Code Minimum, GoroType MinimumType, Code Maximum, GoroType MaximumType) : ErrorMessage;

@@ -120,8 +120,8 @@ public class EndToEndTests
     [TestCase("COUNT(genre) > 1", Truth.True)]
     [TestCase("COUNT(x) == 0", Truth.True)]
     [TestCase("FALLBACK(year, (0)) == 0", Truth.True)]
-    [TestCase("STRING(1.50) == \"1.5\"", Truth.True)]
-    [TestCase("NUMBER(\".5\") == 0.5", Truth.True)]
+    [TestCase("1.50 AS STRING == \"1.5\"", Truth.True)]
+    [TestCase("\".5\" AS NUMBER == 0.5", Truth.True)]
     public void Quantifiers_SmokeTest(string text, Truth expected)
     {
         Assert.That(Evaluate(text, Bags()).Truth, Is.EqualTo(expected));

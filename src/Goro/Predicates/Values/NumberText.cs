@@ -4,7 +4,7 @@ namespace Goro.Predicates.Values;
 
 /// <summary>
 /// The text of a number, in both directions: reading the number literal syntax, which the lexer and
-/// <c>NUMBER()</c> share, and writing the one canonical form <c>STRING()</c> produces.
+/// <c>AS NUMBER</c> share, and writing the one canonical form <c>AS STRING</c> produces.
 /// </summary>
 public static class NumberText
 {

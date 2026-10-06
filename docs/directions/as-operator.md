@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, design/rationale.md, design/deferred.md, testing.md, src/Goro/Predicates, tests/Goro.Tests
 after: semantic-analysis-passes, cardinality-and-constants
@@ -89,3 +89,55 @@ the code and tests are changed to match.
   taken as total seconds or bytes; the possible ambiguity with future arithmetic is accepted; and a
   modifier on the operand of `AS` stays an error for want of a decisive argument either way.
   Everything under Questions is open. Next step: pick up the line.
+- 2026-10-07 -- Spec and implementation done by the coordinator; nothing is committed yet.
+  - **Decided with PJ:**
+    - **Not as the brief said:** `AS STRING` writes the canonical literal of the value's own type,
+      in its base unit, so `4m5s` gives `"245s"` and `1.4kib` gives `"1433.6b"`. It is still not
+      formatting, there being one form per value and no heuristics. The text says what type it came
+      from and reads back by the literal grammar alone. The bare number is
+      `d AS NUMBER AS STRING`, and `"245s" AS NUMBER` is unusable.
+    - **The brief's questions:**
+      - Targets are not reserved, and an unknown one is answered with the closest.
+      - `ALL(x) AS NUMBER` parses, and the binder rejects it, offering `ALL(x AS NUMBER)`.
+      - `NUMBER(x)`, `STRING(x)`, `DURATION(x)`, `BYTECOUNT(x)` and `CAST(x AS T)` each get one
+        error offering `x AS T`. They are bound as the conversion, so the rest of the predicate is
+        checked as written that way.
+  - **Spec.**
+    - predicates.md gains "The conversion operator" with its table of pairs, and `NUMBER()` and
+      `STRING()` leave Functions.
+    - `AS` is a reserved word with a precedence level of its own, and the grammar is
+      `conversion = modified { "AS" target }`.
+    - Errors and constraints follow, and every example is in the new spelling.
+    - evaluation.md has `e AS T`.
+    - The rationale explains why conversion is an operator and why the result is `"120s"`, not
+      `"2m"`.
+    - The deferred "warning deduplication clarification" can now be shown (`s AS NUMBER` and
+      `s AS DURATION` are two sources), so it moved into the spec's deduplication table.
+    - testing.md has the scenarios.
+  - **Code.**
+    - The `AS` token and `AsSyntax`, and the parser's conversion loop.
+    - Binder: `As`, the shared `Conversion` checks (a boolean or unit-to-unit pair gives an error,
+      with the target type kept), `TargetNamed`, and the old-spelling answers.
+    - Conversions: `DurationFromString`, `ByteCountFromString`, `DurationFromNumber` and
+      `ByteCountFromNumber`. Text is read through the lexer, as exactly one literal.
+    - One conversion table, `TypedNodes.Convert`/`ConvertLiteral`.
+    - `ConstantDoesNotConvert` for any target.
+    - Source shapes are written `x AS NUMBER`.
+  - **Tests.** 2309 pass, 99 of them new. Existing predicates were rewritten by a converter that
+    handles nesting and precedence, and each change was reviewed.
+  - **Resolved after review.** One mistake gave two errors. `ANY(id3v2::title) AS NUMBER != 1`
+    reported the misplaced modifier, and then `!=` reported a missing quantifier, offering rewrites
+    that would not compile. `As` dropped the modifier after reporting it, so the cardinality
+    analysis saw an operand with no quantifier.
+    - PJ chose to have the operand inherit the whole misplaced stack. `Binder.Operand` follows an
+      `AS` chain down to its innermost operand and folds the modifiers there in, as if written
+      outside, which is where the rewrite puts them.
+    - The predicate already has an error, so nothing ambiguous can be evaluated. A second error is
+      now reported only where the rewrite would itself be wrong: a quantifier on `IS ABSENT`,
+      contradictory quantifiers, or `LITERALLY` on a number.
+    - 2317 tests pass.
+
+    Next step: PJ's review, then commit and land.
+- 2026-10-07 -- Landed: PJ approved, so it is marked `landed` and merged into main. Nothing is left
+  open. The mechanism admits targets that are interpretations, such as `AS YEAR` and `AS TRACK`,
+  which belong to sources-and-fields, next on the recommended queue.

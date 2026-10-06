@@ -146,7 +146,7 @@ public class ListFilterTests
 
     [TestCase(@"file::size == ""big""", TestName = "A type mismatch is rejected")]
     [TestCase(@"file::name =~ r""(?=a)""", TestName = "A pattern construct the engine does not support is rejected")]
-    [TestCase(@"NUMBER(TRUE) > 1", TestName = "A function argument of the wrong type is rejected")]
+    [TestCase(@"TRUE AS NUMBER > 1", TestName = "A boolean converted with AS is rejected")]
     [TestCase(@"file::name", TestName = "A predicate that is not a boolean is rejected")]
     public async Task ASemanticError_IsRejectedWith2BeforeAnythingIsProcessed_AndShownAgainstThePredicate(string predicate)
     {

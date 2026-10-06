@@ -69,45 +69,51 @@ internal static class TypedNodes
         var type => throw new UnreachableException($"{type} has no order."),
     });
 
-    /// <summary><c>NUMBER(argument)</c>; a number is returned as it is.</summary>
-    public static Expression Number(Expression argument, Origin origin) => argument.Type switch
-    {
-        GoroType.Number => argument,
-        GoroType.String => new Conversion<string, decimal>((Expression<string>)argument, Conversions.NumberFromString, origin),
-        GoroType.ByteCount => new Conversion<ByteCount, decimal>((Expression<ByteCount>)argument, Conversions.NumberFromByteCount, origin),
-        GoroType.Duration => new Conversion<Duration, decimal>((Expression<Duration>)argument, Conversions.NumberFromDuration, origin),
-        var type => throw new UnreachableException($"NUMBER() does not accept a {type}."),
-    };
-
-    /// <summary><c>STRING(argument)</c>; a string is returned as it is.</summary>
-    public static Expression String(Expression argument, Origin origin) => argument.Type switch
-    {
-        GoroType.String => argument,
-        GoroType.Number => new Conversion<decimal, string>((Expression<decimal>)argument, Conversions.StringFromNumber, origin),
-        GoroType.ByteCount => new Conversion<ByteCount, string>((Expression<ByteCount>)argument, Conversions.StringFromByteCount, origin),
-        GoroType.Duration => new Conversion<Duration, string>((Expression<Duration>)argument, Conversions.StringFromDuration, origin),
-        var type => throw new UnreachableException($"STRING() does not accept a {type}."),
-    };
+    /// <summary>
+    /// <c>argument AS target</c>; a conversion to the type the argument already has is the argument.
+    /// The binder has rejected every pair of types that does not convert.
+    /// </summary>
+    public static Expression Convert(Expression argument, GoroType target, Origin origin) =>
+        argument.Type == target ? argument : PairFor(argument.Type, target).Node(argument, origin);
 
     /// <summary>
-    /// <c>NUMBER()</c> or <c>STRING()</c> of a literal, worked out now: the literal it converts to, or
-    /// null where it does not convert. A conversion to the literal's own type is the literal itself.
+    /// A conversion of a literal, worked out now: the literal it converts to, or null where it does not
+    /// convert. A conversion to the literal's own type is the literal itself.
     /// </summary>
-    public static Expression? ConvertLiteral(Expression literal, GoroType target) => (literal, target) switch
+    public static Expression? ConvertLiteral(Expression literal, GoroType target) =>
+        literal.Type == target ? literal : PairFor(literal.Type, target).Fold(literal);
+
+    private static ConversionPair PairFor(GoroType from, GoroType to) => (from, to) switch
     {
-        (_, _) when literal.Type == target => literal,
-        (Literal<string> text, GoroType.Number) => Conversions.NumberFromString(text.Value, out var number) ? new Literal<decimal>(number) : null,
-        (Literal<ByteCount> bytes, GoroType.Number) => Converted<ByteCount, decimal>(bytes.Value, Conversions.NumberFromByteCount),
-        (Literal<Duration> seconds, GoroType.Number) => Converted<Duration, decimal>(seconds.Value, Conversions.NumberFromDuration),
-        (Literal<decimal> number, GoroType.String) => Converted<decimal, string>(number.Value, Conversions.StringFromNumber),
-        (Literal<ByteCount> bytes, GoroType.String) => Converted<ByteCount, string>(bytes.Value, Conversions.StringFromByteCount),
-        (Literal<Duration> seconds, GoroType.String) => Converted<Duration, string>(seconds.Value, Conversions.StringFromDuration),
-        _ => throw new UnreachableException($"{target.ToString().ToUpperInvariant()}() does not accept a {literal.Type}."),
+        (GoroType.String, GoroType.Number) => new ConversionPair<string, decimal>(Conversions.NumberFromString),
+        (GoroType.String, GoroType.Duration) => new ConversionPair<string, Duration>(Conversions.DurationFromString),
+        (GoroType.String, GoroType.ByteCount) => new ConversionPair<string, ByteCount>(Conversions.ByteCountFromString),
+        (GoroType.Number, GoroType.String) => new ConversionPair<decimal, string>(Conversions.StringFromNumber),
+        (GoroType.Number, GoroType.Duration) => new ConversionPair<decimal, Duration>(Conversions.DurationFromNumber),
+        (GoroType.Number, GoroType.ByteCount) => new ConversionPair<decimal, ByteCount>(Conversions.ByteCountFromNumber),
+        (GoroType.Duration, GoroType.String) => new ConversionPair<Duration, string>(Conversions.StringFromDuration),
+        (GoroType.Duration, GoroType.Number) => new ConversionPair<Duration, decimal>(Conversions.NumberFromDuration),
+        (GoroType.ByteCount, GoroType.String) => new ConversionPair<ByteCount, string>(Conversions.StringFromByteCount),
+        (GoroType.ByteCount, GoroType.Number) => new ConversionPair<ByteCount, decimal>(Conversions.NumberFromByteCount),
+        _ => throw new UnreachableException($"A {from} does not convert to a {to}."),
     };
 
-    private static Literal<TTo> Converted<TFrom, TTo>(TFrom datum, DatumConversion<TFrom, TTo> convert)
-        where TFrom : notnull where TTo : notnull =>
-        convert(datum, out var converted) ? new Literal<TTo>(converted) : throw new UnreachableException("Only text can fail to convert.");
+    private abstract class ConversionPair
+    {
+        public abstract Expression Node(Expression argument, Origin origin);
+
+        public abstract Expression? Fold(Expression literal);
+    }
+
+    private sealed class ConversionPair<TFrom, TTo>(DatumConversion<TFrom, TTo> convert) : ConversionPair
+        where TFrom : notnull where TTo : notnull
+    {
+        public override Expression Node(Expression argument, Origin origin) =>
+            new Conversion<TFrom, TTo>((Expression<TFrom>)argument, convert, origin);
+
+        public override Expression? Fold(Expression literal) =>
+            convert(((Literal<TFrom>)literal).Value, out var converted) ? new Literal<TTo>(converted) : null;
+    }
 
     public static Expression Count(Expression argument) => argument.Apply(CountOf.Instance);
 

@@ -77,7 +77,7 @@ public class ModifierTests
     [TestCase("COUNT((ALL(genre))) > 1", "ALL(genre)", "COUNT(genre) > 1")]
     [TestCase("COUNT(ALL(ANY(genre))) > 1", "ALL(ANY(genre))", "COUNT(genre) > 1")]
     [TestCase("FALLBACK(LITERALLY(genre), \"pop\") == \"Pop\"", "LITERALLY(genre)", "FALLBACK(genre, \"pop\") == \"Pop\"")]
-    [TestCase("NUMBER(ANY(s)) > 1", "ANY(s)", "NUMBER(s) > 1")]
+    [TestCase("ANY(s) AS NUMBER > 1", "ANY(s)", "ANY(s AS NUMBER) > 1")]
     [TestCase("ALL((x == 1))", "ALL((x == 1))", "(x == 1)")]
     [TestCase("x == 1 AND ANY((y == 1))", "ANY((y == 1))", "x == 1 AND (y == 1)")]
     [TestCase("NOT ALL((x == 1))", "ALL((x == 1))", "NOT (x == 1)")]
@@ -106,7 +106,7 @@ public class ModifierTests
     // Modifiers go on the outside of a function call, never inside it.
     [TestCase("LITERALLY(FALLBACK(genre, \"pop\")) == \"Pop\"")]
     [TestCase("ALL(COUNT(genre)) > 1")]
-    [TestCase("ALL(NUMBER(s)) IS USABLE")]
+    [TestCase("ALL(s AS NUMBER) IS USABLE")]
     public void Modifier_OnAFunctionCallOperand_IsValid(string text)
     {
         Compiles(text);

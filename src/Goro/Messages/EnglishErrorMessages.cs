@@ -68,6 +68,7 @@ public sealed class EnglishErrorMessages : IErrorMessages
             Expectation.CommaOrCloseParen => "A `,` or `)` is probably missing there, goro!",
             Expectation.Name => "A name is probably missing after `::`, goro!",
             Expectation.NameOrQuotedName => "A name, or a quoted name, is probably missing after `::`, goro!",
+            Expectation.Target => "A target such as `NUMBER` is probably missing after `AS`, goro!",
         },
         UnexpectedToken(var expected, var found) => expected switch
         {
@@ -80,6 +81,7 @@ public sealed class EnglishErrorMessages : IErrorMessages
             Expectation.CommaOrCloseParen => $"There's a `{found}` there instead of a `,` or `)`, goro!",
             Expectation.Name => $"There's a `{found}` there instead of a name, goro!",
             Expectation.NameOrQuotedName => $"There's a `{found}` there instead of a name, goro!",
+            Expectation.Target => $"There's a `{found}` there instead of a target such as `NUMBER`, goro!",
         },
         ChainedComparison => "One comparison at a time, goro!",
         PatternNotRawString => "A pattern is a raw string like `r\"^the \"`, goro!",
@@ -133,7 +135,15 @@ public sealed class EnglishErrorMessages : IErrorMessages
         BooleanCompared(var op) => $"Booleans don't do `{op}` -- only `==` and `!=`, goro!",
         BooleanBetween => "Booleans don't sit in ranges, goro!",
         BooleanRange => "A range can't run between booleans, goro!",
-        BooleanNotConvertible(var function, _) => $"`{function}()` won't take a boolean, goro!",
+        BooleanNotConvertible => "`AS` won't take a boolean, goro!",
+        UnitsDoNotConvert(_, var from) => from switch
+        {
+            UnitType.Duration => "A duration won't become a bytecount, goro!",
+            UnitType.ByteCount => "A bytecount won't become a duration, goro!",
+        },
+        UnknownTarget(var target) => $"`AS` doesn't know `{target}` -- try `NUMBER`, `STRING`, `DURATION` or `BYTECOUNT`, goro!",
+        ConversionCalled(var function) => $"`{function}()` isn't a function -- write `AS {function}` after the value, goro!",
+        CastCalled => "No `CAST` needed -- write `AS` after the value, goro!",
         MatchSubjectNotString(_, var type) => $"`=~` matches strings, and this is `{Name(type)}`, goro!",
         NotACondition(_, var type) => $"That's `{Name(type)}`, but a condition goes here, goro!",
         ConditionNotExactlyOne(var expression) => $"Compare `{expression}` with `TRUE` or `FALSE` first, goro!",
@@ -143,6 +153,7 @@ public sealed class EnglishErrorMessages : IErrorMessages
         AmbiguousNotEqualBoth => "Pick your `!=` below, goro!",
         MisplacedModifier(var modifier) => $"`{modifier}` can't go here, goro!",
         MisplacedModifierInCall(var modifier, var function) => $"`{modifier}` can't go inside `{function}()`, goro!",
+        MisplacedModifierInConversion(var modifier) => $"`{modifier}` goes outside the `AS`, goro!",
         ContradictoryQuantifiers(var inner, var outer) => $"`{inner}` inside `{outer}`? Pick one, goro!",
         LiterallyNotString(var modifier, _, _) => $"`{modifier}` only matters for strings, goro!",
         LiterallyOnStateTest(var modifier) => $"`{modifier}` isn't allowed in this state test, goro!",
@@ -159,7 +170,13 @@ public sealed class EnglishErrorMessages : IErrorMessages
             _ => $"`{function}()` takes at least {minimum} arguments, not {actual}, goro!",
         },
         FallbackDefaultNotConstant => "The fallback has to be a constant, goro!",
-        InvalidNumberLiteral(var literal, _) => $"`{literal}` will never be a number, goro!",
+        ConstantDoesNotConvert(var operand, var target) => target switch
+        {
+            GoroType.Number => $"`{operand}` will never be a number, goro!",
+            GoroType.Duration => $"`{operand}` will never be a duration, goro!",
+            GoroType.ByteCount => $"`{operand}` will never be a bytecount, goro!",
+            _ => $"`{operand}` will never be a string, goro!",
+        },
         RangeUnitMissing(var number) => $"`{number}` what? Give both ends a unit, goro!",
         RangeUnitAmbiguous(var number, var unit, var withUnit) => unit switch
         {

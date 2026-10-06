@@ -23,12 +23,12 @@ public class SourceTests
         .With("t", Ok("two"));
 
     [TestCase("x > 1", new[] { "x" })]
-    [TestCase("x > 1 AND NUMBER(s) > 1", new[] { "x", "s", "NUMBER(s)" })]
-    [TestCase("NUMBER(s) > NUMBER(t)", new[] { "s", "NUMBER(s)", "t", "NUMBER(t)" })]
+    [TestCase("x > 1 AND s AS NUMBER > 1", new[] { "x", "s", "s AS NUMBER" })]
+    [TestCase("s AS NUMBER > t AS NUMBER", new[] { "s", "s AS NUMBER", "t", "t AS NUMBER" })]
     [TestCase("COUNT(genre) > 1", new[] { "genre" })]
     [TestCase("x > 1 AND TRUE", new[] { "x" })]
-    [TestCase("NUMBER(FALLBACK(s, \"0\")) > 1", new[] { "s", "NUMBER(FALLBACK(s, \"0\"))" })]
-    [TestCase("STRING(COUNT(x > 1)) == \"1\"", new[] { "x", "STRING(COUNT(x > 1))" })]
+    [TestCase("FALLBACK(s, \"0\") AS NUMBER > 1", new[] { "s", "FALLBACK(s, \"0\") AS NUMBER" })]
+    [TestCase("COUNT(x > 1) AS STRING == \"1\"", new[] { "x", "COUNT(x > 1) AS STRING" })]
     [TestCase("ape::\"Album Artist\" == \"x\"", new[] { "ape::\"album artist\"" })]
     [TestCase("1 == 1", new string[0])]
     public void SourceTable_ListsEveryDistinctSource_ChildrenFirst(string text, string[] forms)
@@ -38,13 +38,13 @@ public class SourceTests
 
     // Case, whitespace, an explicit namespace, parentheses and modifiers never make two sources.
     [TestCase("x > 1 OR X > 2 OR ::x > 3 OR ( x ) > 4 OR ::\"X\" > 5", new[] { "x" })]
-    [TestCase("NUMBER(s) > NUMBER( S )", new[] { "s", "NUMBER(s)" })]
-    [TestCase("NUMBER(s) > 1 OR number(::S) > 1", new[] { "s", "NUMBER(s)" })]
+    [TestCase("s AS NUMBER >  S  AS NUMBER", new[] { "s", "s AS NUMBER" })]
+    [TestCase("s AS NUMBER > 1 OR ::S AS number > 1", new[] { "s", "s AS NUMBER" })]
     [TestCase("ALL(m) == \"a\" OR LITERALLY(m) == \"b\" OR (ANY(m)) == \"c\"", new[] { "m" })]
     [TestCase("file::size > 1 AND ::FILE::\"size\" > 2", new[] { "file::size" })]
     [TestCase("vorbis::BPM == \"1\" OR vorbis::bpm == \"2\" OR vorbis::\"Bpm\" == \"3\"", new[] { "vorbis::bpm" })]
-    [TestCase("NUMBER(FALLBACK(s, \"0\")) > NUMBER(FALLBACK(s, r\"0\"))", new[] { "s", "NUMBER(FALLBACK(s, \"0\"))" })]
-    [TestCase("NUMBER(FALLBACK(s, \"0\")) > NUMBER(FALLBACK(s, \"00\"))", new[] { "s", "NUMBER(FALLBACK(s, \"0\"))", "NUMBER(FALLBACK(s, \"00\"))" })]
+    [TestCase("FALLBACK(s, \"0\") AS NUMBER > FALLBACK(s, r\"0\") AS NUMBER", new[] { "s", "FALLBACK(s, \"0\") AS NUMBER" })]
+    [TestCase("FALLBACK(s, \"0\") AS NUMBER > FALLBACK(s, \"00\") AS NUMBER", new[] { "s", "FALLBACK(s, \"0\") AS NUMBER", "FALLBACK(s, \"00\") AS NUMBER" })]
     public void SpellingsOfOneSubExpression_AreOneSource(string text, string[] forms)
     {
         Assert.That(Compiles(text).Sources.CanonicalForms, Is.EqualTo(forms));
@@ -53,14 +53,14 @@ public class SourceTests
     [Test]
     public void QuotedAndRawString_AreOneValue_AndOneSource()
     {
-        const string text = @"NUMBER(FALLBACK(s, ""a\\b"")) > 1 AND NUMBER(FALLBACK(s, r""a\b"")) > 1";
+        const string text = @"FALLBACK(s, ""a\\b"") AS NUMBER > 1 AND FALLBACK(s, r""a\b"") AS NUMBER > 1";
         var catalog = TestCatalog.Standard();
 
         var outcome = Evaluate(text, catalog);
 
-        Assert.That(Compiles(text).Sources.CanonicalForms, Is.EqualTo(new[] { "s", @"NUMBER(FALLBACK(s, ""a\\b""))" }));
+        Assert.That(Compiles(text).Sources.CanonicalForms, Is.EqualTo(new[] { "s", @"FALLBACK(s, ""a\\b"") AS NUMBER" }));
         Assert.That(outcome.Truth, Is.EqualTo(Truth.Unusable));
-        Assert.That(outcome.Quoted, Is.EqualTo(new[] { @"NUMBER(FALLBACK(s, ""a\\b""))" }));
+        Assert.That(outcome.Quoted, Is.EqualTo(new[] { @"FALLBACK(s, ""a\\b"") AS NUMBER" }));
         Assert.That(Evaluate(@"""a\\b"" == r""a\b""", catalog).Truth, Is.EqualTo(Truth.True));
     }
 
@@ -100,17 +100,17 @@ public class SourceTests
     }
 
     [Test]
-    public void Origin_OfAConversion_QuotesTheCallAsWritten()
+    public void Origin_OfAConversion_QuotesTheConversionAsWritten()
     {
-        var outcome = Evaluate("number( s ) > 1", Table());
+        var outcome = Evaluate("s  as  number > 1", Table());
 
-        Assert.That(outcome.Quoted, Is.EqualTo(new[] { "number( s )" }));
+        Assert.That(outcome.Quoted, Is.EqualTo(new[] { "s  as  number" }));
     }
 
     [Test]
     public void Warning_NamesTheSourceThroughAPropagatingFunction()
     {
-        var outcome = Evaluate("STRING(x) == \"1991\"", Table());
+        var outcome = Evaluate("x AS STRING == \"1991\"", Table());
 
         Assert.That(outcome.Quoted, Is.EqualTo(new[] { "x" }));
     }
@@ -120,8 +120,8 @@ public class SourceTests
     [TestCase("x < 10 OR x > 20", 1)]
     [TestCase("x > y", 2)]
     [TestCase("m > \"1\"", 1)]
-    [TestCase("NUMBER(s) > NUMBER(s)", 1)]
-    [TestCase("NUMBER(s) > NUMBER(t)", 2)]
+    [TestCase("s AS NUMBER > s AS NUMBER", 1)]
+    [TestCase("s AS NUMBER > t AS NUMBER", 2)]
     [TestCase("ALL(m) == \"a\" OR m == \"b\"", 1)]
     [TestCase("x > 1 AND y > 1", 2)]
     [TestCase("(x > 1) == (x > 1)", 1)]

@@ -24,6 +24,25 @@ public class ParserTests
         Assert.That(Tree(text), Is.EqualTo(tree));
     }
 
+    // AS binds more tightly than every operator and chains to the left; its operand may be modified,
+    // which the binder rejects, and a target is any name, which the binder judges.
+    [TestCase("x AS NUMBER > 5", "(> (AS x NUMBER) 5)")]
+    [TestCase("5 < x AS NUMBER", "(< 5 (AS x NUMBER))")]
+    [TestCase("x AS NUMBER AS STRING == \"1\"", "(== (AS (AS x NUMBER) STRING) \"1\")")]
+    [TestCase("NOT x AS NUMBER > 5", "(NOT (> (AS x NUMBER) 5))")]
+    [TestCase("ALL(x AS NUMBER) > 5", "(> (ALL (AS x NUMBER)) 5)")]
+    [TestCase("ALL(x) AS NUMBER > 5", "(> (AS (ALL x) NUMBER) 5)")]
+    [TestCase("(x) AS NUMBER > 5", "(> (AS (paren x) NUMBER) 5)")]
+    [TestCase("COUNT(x AS number) > 5", "(> (call COUNT (AS x number)) 5)")]
+    [TestCase("CAST(x AS NUMBER) > 5", "(> (call CAST (AS x NUMBER)) 5)")]
+    [TestCase("x as foo > 5", "(> (AS x foo) 5)")]
+    [TestCase("x AS NUMBER IS USABLE", "(IS (AS x NUMBER) USABLE)")]
+    [TestCase("::as AS STRING == \"a\"", "(== (AS ::as STRING) \"a\")")]
+    public void As_BindsTighterThanEveryOperator_AndChains(string text, string tree)
+    {
+        Assert.That(Tree(text), Is.EqualTo(tree));
+    }
+
     [TestCase("a AND b AND c", "(AND (AND a b) c)")]
     [TestCase("a OR b OR c", "(OR (OR a b) c)")]
     [TestCase("a and b or c and d or e", "(OR (OR (AND a b) (AND c d)) e)")]
@@ -92,7 +111,7 @@ public class ParserTests
     [TestCase("x IS ABSENT", "(IS x ABSENT)")]
     [TestCase("x is usable", "(IS x USABLE)")]
     [TestCase("ALL(x) IS UNUSABLE", "(IS (ALL x) UNUSABLE)")]
-    [TestCase("(NUMBER(x) > 5) IS UNUSABLE", "(IS (paren (> (call NUMBER x) 5)) UNUSABLE)")]
+    [TestCase("(x AS NUMBER > 5) IS UNUSABLE", "(IS (paren (> (AS x NUMBER) 5)) UNUSABLE)")]
     [TestCase("NOT (ALL(x) IS USABLE)", "(NOT (paren (IS (ALL x) USABLE)))")]
     public void StateTest_TakesAStateName(string text, string tree)
     {
@@ -210,7 +229,7 @@ public class ParserTests
     [TestCase("(a == b) != (c == d)")]
     [TestCase("FALLBACK(year, (0))")]
     [TestCase("file::duration > (90)")]
-    [TestCase("NUMBER((\"x\"))")]
+    [TestCase("(\"x\") AS NUMBER")]
     [TestCase("artist")]
     [TestCase("5 AND x")]
     [TestCase("x == 5AND y == 1")]

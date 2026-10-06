@@ -34,7 +34,7 @@ public class ParserDiagnosticTests
 
     [TestCase(@"title =~ artist")]
     [TestCase(@"title =~ 5")]
-    [TestCase(@"title =~ NUMBER(x)")]
+    [TestCase(@"title =~ x AS NUMBER")]
     [TestCase(@"title =~ NULL")]
     public void Pattern_NotAString_IsRejected(string text)
     {
@@ -175,6 +175,7 @@ public class ParserDiagnosticTests
     [TestCase("x == ABSENT", "ABSENT")]
     [TestCase("all == 1", "all")]
     [TestCase("LITERALLY genre == 1", "LITERALLY")]
+    [TestCase("as == 1", "as")]
     public void ReservedWord_AsABareIdentifier_IsAnError(string text, string word)
     {
         var error = Error(text);
@@ -236,6 +237,25 @@ public class ParserDiagnosticTests
     public void Identifier_WithoutANameAfterDoubleColon_IsAnError(string text, string code)
     {
         Assert.That(Error(text).Code, Is.EqualTo(code));
+    }
+
+    [TestCase("x AS > 1", Codes.UnexpectedToken)]
+    [TestCase("x AS", Codes.UnexpectedEnd)]
+    [TestCase("x AS 5 > 1", Codes.UnexpectedToken)]
+    [TestCase("x AS \"NUMBER\" > 1", Codes.UnexpectedToken)]
+    [TestCase("x AS ::NUMBER > 1", Codes.UnexpectedToken)]
+    public void As_WithoutATargetName_IsAnError(string text, string code)
+    {
+        var error = Error(text);
+
+        Assert.That(error.Code, Is.EqualTo(code));
+        var expected = error.Message switch
+        {
+            Goro.Messages.ErrorMessage.UnexpectedEnd end => end.Expected,
+            Goro.Messages.ErrorMessage.UnexpectedToken token => token.Expected,
+            var other => throw new AssertionException($"Unexpected message {other}"),
+        };
+        Assert.That(expected, Is.EqualTo(Goro.Messages.Expectation.Target));
     }
 
     // ---------------------------------------------------------------------------------------------

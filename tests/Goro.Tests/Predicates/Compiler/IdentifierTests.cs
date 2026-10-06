@@ -113,7 +113,7 @@ public class IdentifierTests
     // The error type: an identifier that names nothing has no type, so nothing it meets complains.
     [TestCase("artst == 1")]
     [TestCase("artst != \"x\"")]
-    [TestCase("NUMBER(artst) > 1")]
+    [TestCase("artst AS NUMBER > 1")]
     [TestCase("artst BETWEEN 1..2")]
     [TestCase("artst =~ r\"x\"")]
     [TestCase("LITERALLY(artst) == 1")]

@@ -110,12 +110,12 @@ public class WarningSuppressionTests
 
     // --- data warnings, from a predicate ---
 
-    // Every discovered file's name ends in ".mp3", so NUMBER(file::name) is never a number. The
+    // Every discovered file's name ends in ".mp3", so file::name AS NUMBER is never a number. The
     // clean run is therefore the same predicate over a collection where the junk file has been
     // renamed to one that the predicate settles before it ever converts the name. The junk file's
     // predicate is still answered, false, by the last operand, so only data warnings are in play.
     private const string WarnsForJunkOnly =
-        @"file::name == ""a.mp3"" OR (file::name == ""junk.mp3"" AND NUMBER(file::name) > 1 AND file::size < 0)";
+        @"file::name == ""a.mp3"" OR (file::name == ""junk.mp3"" AND file::name AS NUMBER > 1 AND file::size < 0)";
 
     [Test]
     public async Task NoWarnData_OverDataThatWarns_IsIndistinguishableFromTheSameRunOverCleanData()
@@ -139,7 +139,7 @@ public class WarningSuppressionTests
     public async Task NoWarnData_WhereADataWarningWouldHaveFiredAndNothingMatched_Returns20()
     {
         _collection.Mp3("track.mp3");
-        const string predicate = "--filter=NUMBER(file::name) > 1 AND file::size < 0";
+        const string predicate = "--filter=file::name AS NUMBER > 1 AND file::size < 0";
 
         var warning = await RunAsync("list", "--strict-exit-code", predicate, _collection.Root);
         var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=data", predicate, _collection.Root);
@@ -156,7 +156,7 @@ public class WarningSuppressionTests
     {
         _collection.Mp3("track.mp3");
 
-        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=data", "--filter=NUMBER(file::name) > 1", _collection.Root);
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=data", "--filter=file::name AS NUMBER > 1", _collection.Root);
 
         Assert.That(exitCode, Is.EqualTo(11));
         Assert.That(stdOut, Is.Empty);
@@ -168,11 +168,11 @@ public class WarningSuppressionTests
     {
         var track = _collection.Mp3("track.mp3");
 
-        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=unanswered", "--filter=NUMBER(file::name) > 1", _collection.Root);
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=unanswered", "--filter=file::name AS NUMBER > 1", _collection.Root);
 
         Assert.That(exitCode, Is.EqualTo(10));
         Assert.That(stdOut, Is.Empty);
-        Assert.That(stdErr.Trim(), Is.EqualTo($"goro: warning: {track}: cannot interpret the data of NUMBER(file::name)"));
+        Assert.That(stdErr.Trim(), Is.EqualTo($"goro: warning: {track}: cannot interpret the data of file::name AS NUMBER"));
     }
 
     [Test]
@@ -180,7 +180,7 @@ public class WarningSuppressionTests
     {
         _collection.Mp3("track.mp3");
 
-        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=data,unanswered", "--filter=NUMBER(file::name) > 1", _collection.Root);
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=data,unanswered", "--filter=file::name AS NUMBER > 1", _collection.Root);
 
         Assert.That(exitCode, Is.EqualTo(20));
         Assert.That(stdOut, Is.Empty);
@@ -188,7 +188,7 @@ public class WarningSuppressionTests
     }
 
     // The good file's name warns; the unreadable one warns that it could not be read.
-    private const string WarnsBothWays = "--filter=NUMBER(file::name) > 1 OR file::duration >= 0";
+    private const string WarnsBothWays = "--filter=file::name AS NUMBER > 1 OR file::duration >= 0";
 
     [Test]
     public async Task NoWarnData_WithAFilter_WhereAFileAlsoCouldNotBeRead_Still12_WithOnlyTheFileWarning()
@@ -213,12 +213,12 @@ public class WarningSuppressionTests
 
         Assert.That(exitCode, Is.EqualTo(10));
         Assert.That(stdOut.Trim(), Is.EqualTo(good));
-        Assert.That(stdErr.Trim(), Is.EqualTo($"goro: warning: {good}: cannot interpret the data of NUMBER(file::name)"));
+        Assert.That(stdErr.Trim(), Is.EqualTo($"goro: warning: {good}: cannot interpret the data of file::name AS NUMBER"));
     }
 
     // The good file is answered by its duration and name; the other readable one is left without an
     // answer; the unreadable one cannot have its duration read.
-    private const string WarnsThreeWays = @"--filter=NUMBER(file::name) > 1 OR (file::duration >= 0 AND file::name == ""good.mp3"")";
+    private const string WarnsThreeWays = @"--filter=file::name AS NUMBER > 1 OR (file::duration >= 0 AND file::name == ""good.mp3"")";
 
     [Test]
     public async Task NoWarn_AllAndEveryCategory_WithAFilterThatWarnsThreeWays_AreIdenticalInEveryChannel()

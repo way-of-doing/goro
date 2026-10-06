@@ -43,10 +43,10 @@ public static class Constants
                         : report.FractionalDurationLiteral(literal.Syntax));
                     break;
 
-                // A string constant that does not convert to a number. No other conversion can fail.
-                case SemanticConversion { Type: GoroType.Number, IsConstant: true } conversion
-                    when !values.ContainsKey(conversion) && values.GetValueOrDefault(conversion.Argument) is Literal<string>:
-                    diagnostics.Add(report.InvalidNumberLiteral(conversion.Syntax, conversion.Argument.Syntax));
+                // A conversion of a constant that does not convert: its argument has a value, and it has none.
+                case SemanticConversion { IsConstant: true, IsError: false } conversion
+                    when !values.ContainsKey(conversion) && values.ContainsKey(conversion.Argument):
+                    diagnostics.Add(report.ConstantDoesNotConvert(conversion.Argument.Syntax, conversion.Type!.Value));
                     break;
 
                 case SemanticFallback { Default: { IsError: false, IsConstant: false } } fallback:

@@ -68,9 +68,9 @@ public class SemanticTreeTests
     [Test]
     public void ConversionToItsOwnType_IsKept_SoThatItIsNoLiteral()
     {
-        var tree = Analyse.Bind("NUMBER(5) > 1");
+        var tree = Analyse.Bind("5 AS NUMBER > 1");
 
-        var conversion = tree.Find<SemanticConversion>("NUMBER(5)");
+        var conversion = tree.Find<SemanticConversion>("5 AS NUMBER");
         Assert.That(conversion.IsIdentity, Is.True);
         Assert.That(conversion.Argument, Is.InstanceOf<SemanticLiteral>());
     }
@@ -86,9 +86,9 @@ public class SemanticTreeTests
         Assert.That(tree.Diagnostics.Codes(), Is.EqualTo(new[] { Codes.UnknownIdentifier }));
     }
 
-    [TestCase("COUNT(1, NUMBER(\"x\")) > 1", "NUMBER(\"x\")")]
-    [TestCase("NUMBR(NUMBER(\"x\")) > 1", "NUMBER(\"x\")")]
-    [TestCase("NUMBER(\"x\") == NULL", "NUMBER(\"x\")")]
+    [TestCase("COUNT(1, \"x\" AS NUMBER) > 1", "\"x\" AS NUMBER")]
+    [TestCase("NUMBR(\"x\" AS NUMBER) > 1", "\"x\" AS NUMBER")]
+    [TestCase("\"x\" AS NUMBER == NULL", "\"x\" AS NUMBER")]
     public void WhatARejectedExpressionContains_IsStillInTheTree(string text, string inside)
     {
         Assert.That(Analyse.Bind(text).Find(inside), Is.InstanceOf<SemanticConversion>());
@@ -97,7 +97,7 @@ public class SemanticTreeTests
     // Each of these breaks a rule an analysis owns, which the binder leaves to it.
     [TestCase("flag")]
     [TestCase("genre != \"a\"")]
-    [TestCase("NUMBER(\"x\") > 1")]
+    [TestCase("\"x\" AS NUMBER > 1")]
     [TestCase("FALLBACK(x, y) > 1")]
     [TestCase("file::size > -1")]
     [TestCase("artist BETWEEN \"b\"..\"a\"")]

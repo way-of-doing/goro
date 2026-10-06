@@ -10,7 +10,7 @@ namespace Goro.Predicates.Evaluation;
 public delegate bool DatumConversion<in TFrom, TTo>(TFrom datum, [MaybeNullWhen(false)] out TTo converted);
 
 /// <summary>
-/// <c>NUMBER(e)</c> or <c>STRING(e)</c>: converts each usable occurrence, propagates each unusable
+/// <c>e AS T</c>: converts each usable occurrence, propagates each unusable
 /// one with its origin unchanged, and gives an occurrence that fails to convert this call's own
 /// <see cref="Origin"/>.
 /// </summary>
