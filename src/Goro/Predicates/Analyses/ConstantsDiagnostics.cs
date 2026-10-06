@@ -17,10 +17,10 @@ internal sealed class ConstantsDiagnostics(string text) : SemanticDiagnostics(te
     public Diagnostic FractionalDurationLiteral(LiteralSyntax literal) =>
         new(Codes.FractionalDurationLiteral, literal.Span, new ErrorMessage.FractionalDurationLiteral(Code(literal)));
 
-    public Diagnostic FallbackDefaultNotLiteral(FunctionCallSyntax call) =>
-        new(Codes.FallbackDefaultNotLiteral, call.Arguments[1].Span, new ErrorMessage.FallbackDefaultNotLiteral(new Code(call.Name.Text), Code(call.Arguments[1])));
+    public Diagnostic FallbackDefaultNotConstant(FunctionCallSyntax call) =>
+        new(Codes.FallbackDefaultNotConstant, call.Arguments[1].Span, new ErrorMessage.FallbackDefaultNotConstant(new Code(call.Name.Text), Code(call.Arguments[1])));
 
-    public Diagnostic InvalidNumberLiteral(FunctionCallSyntax call, LiteralSyntax literal) =>
+    public Diagnostic InvalidNumberLiteral(FunctionCallSyntax call, ExpressionSyntax literal) =>
         new(Codes.InvalidNumberLiteral, literal.Span, new ErrorMessage.InvalidNumberLiteral(Code(literal), new Code(call.Name.Text)));
 
     public Diagnostic RangeReversed(BetweenSyntax between, GoroType type, ComparisonMode mode)

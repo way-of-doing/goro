@@ -8,6 +8,8 @@ Identifiers are shown below in their conventional casing, but predicate syntax i
 
 An identifier is **absent** when the file records nothing for it. When the data is there but cannot be interpreted as the type given in the tables below — for example a year field holding something that is not a year — the identifier resolves to an **unusable** occurrence instead, which leaves any comparison that depends on it without an answer and raises a warning when it is used. See [Predicates](../../concepts/predicates.md) for what absence and unusability mean in an expression, and [Absent, usable, and unusable data](#absent-usable-and-unusable-data) below for the rules that decide which of them a given piece of tag data produces.
 
+Every identifier that reads tag data can be absent, since a file need not carry any given tag. Whether one can also hold more than one occurrence is said with its namespace, and the `file` namespace says both for each of its identifiers. Together these decide which expressions are [exactly one](../../concepts/predicates.md#exactly-one).
+
 ### Definitions
 
 #### Open, closed, and raw namespaces
@@ -89,7 +91,7 @@ Each identifier here has the value of a [`PREFERRED()`](../../concepts/predicate
 | `title`     | string     | `PREFERRED(vorbis::title, ape::title, id3v2::title, id3v1::title)`
 | `year`      | number     | `PREFERRED(vorbis::year, ape::year, id3v2::year, id3v1::year)`
 
-So a global identifier takes its value, entire, from the most preferred format holding a usable occurrence, and the formats after that one are not consulted. A format holding only data that cannot be read does not stop the search, and what it held is passed over silently. A global identifier has whatever cardinality the chosen format produced, so `artist` may be a single value in one file and a multivalue in the next.
+So a global identifier takes its value, entire, from the most preferred format holding a usable occurrence, and the formats after that one are not consulted. A format holding only data that cannot be read does not stop the search, and what it held is passed over silently. A global identifier has whatever cardinality the chosen format produced, so `artist` may be a single value in one file and a multivalue in the next, and it can be absent, as every format can.
 
 Writing the expansion out differs in one respect only, which is where a warning points. An unusable occurrence of a global identifier has the global identifier as its source, as any identifier's does, so `year == 1991` warns about `year` rather than about the format whose data could not be read.
 
@@ -125,7 +127,7 @@ Two quirks are worth knowing. APE forbids a tag from carrying two keys that diff
 
 ### Namespace `ape::raw`
 
-Provides the same APE tag information as the `ape` namespace, but without interpreting it. This namespace is **open** and raw.
+Provides the same APE tag information as the `ape` namespace, but without interpreting it. This namespace is **open** and raw, and as in `ape`, any identifier in it can resolve to a multivalue.
 
 This namespace defines no well-known identifiers: every identifier names an item key and resolves to its value(s) as recorded. Because APE item keys and Goro's convenience identifiers happen to coincide, each identifier here is the uninterpreted counterpart of the one of the same name in `ape`. `ape::raw::track` yields a string such as `"3/12"`, and `ape::raw::year` yields the recorded date verbatim.
 
@@ -143,10 +145,11 @@ Includes identifiers to access basic file properties. This namespace is **closed
 
 A path is the one the file was discovered under: symbolic links are not resolved. It is written with `/` as the separator on every platform, so that a file Windows calls `C:\Music\01 Intro.mp3` has the `file::path` `C:/Music/01 Intro.mp3`. `file::extension` is absent when the name has no dot, when its only dot is the first character, or when nothing follows its last dot; `file::path` and `file::name` are never absent. None of the three is ever unusable, and none needs anything read from the file. `file::size`, by contrast, describes the file itself rather than how it was reached, so for a file reached through a symbolic link it is the size of the file the link leads to.
 
-`file::path`, `file::name` and `file::size` are [definite](../concepts/predicates.md#definite-expressions):
-each resolves to exactly one usable occurrence for every file a predicate is evaluated against, since
-a file whose size cannot be had is a [file that cannot be read](../concepts/warnings.md), and is not
-evaluated at all.
+`file::path`, `file::name`, `file::size` and `file::duration` are
+[exactly one](../concepts/predicates.md#exactly-one): each resolves to exactly one usable
+occurrence for every file a predicate is evaluated against, since a file whose size or audio
+properties cannot be had is a [file that cannot be read](../concepts/warnings.md), and is not
+evaluated at all. `file::extension` can be absent, and never holds more than one occurrence.
 
 ### Namespace `id3v1`
 
@@ -212,7 +215,7 @@ The genre and the track of an Id3v1 tag are not text but single numeric bytes, a
 
 ### Namespace `id3v2`
 
-Includes identifiers to access Id3v2 tag information. This namespace is **open**.
+Includes identifiers to access Id3v2 tag information. This namespace is **open**, and any identifier in it can resolve to a multivalue, for the reasons given under [Common behaviour](#common-behaviour).
 
 This namespace is interpreted: everything in it is subject to the assumptions described under
 [open, closed, and raw namespaces](#open-closed-and-raw-namespaces), and `id3v2::raw` is where to go if one of them is in
@@ -269,7 +272,7 @@ The table referred to throughout is the Id3v1 genre table together with its wide
 
 ### Namespace `id3v2::raw`
 
-Provides the same Id3v2 tag information as the `id3v2` namespace, but without interpreting it. This namespace is **open** and raw.
+Provides the same Id3v2 tag information as the `id3v2` namespace, but without interpreting it. This namespace is **open** and raw, and as in `id3v2`, any identifier in it can resolve to a multivalue.
 
 This namespace defines no well-known identifiers. Every identifier in it is taken to be a frame name, exactly as in `id3v2`, and resolves to the text of the frames of that name as recorded in the file. `id3v2::raw::TRCK` is the uninterpreted counterpart of `id3v2::track` and yields a string such as `"3/12"`; `id3v2::raw::TCON` yields whatever the genre frame records, references and separators included.
 

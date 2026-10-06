@@ -19,8 +19,8 @@ public abstract class Expression
 
     public abstract GoroType Type { get; }
 
-    /// <summary>Whether this expression has exactly one occurrence for every file.</summary>
-    public abstract bool IsDefinite { get; }
+    /// <summary>Whether this expression can be absent, and whether it can hold several occurrences.</summary>
+    public abstract Bounds Bounds { get; }
 
     public abstract TResult Apply<TResult>(IExpressionFunc<TResult> func);
 }

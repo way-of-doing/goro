@@ -11,9 +11,9 @@ public sealed class CompiledPredicate
 {
     public CompiledPredicate(string text, Expression<bool> root, SourceTable sources)
     {
-        if (!root.IsDefinite)
+        if (root.Bounds != Bounds.ExactlyOne)
         {
-            throw new ArgumentException("A predicate must be a definite boolean.", nameof(root));
+            throw new ArgumentException("A predicate must be exactly one boolean.", nameof(root));
         }
 
         Text = text;

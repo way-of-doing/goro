@@ -78,7 +78,7 @@ public class LogicalTests
     }
 
     [Test]
-    public void LogicalOperands_MustBeDefinite()
+    public void LogicalOperands_MustBeExactlyOne()
     {
         var p = new TestPredicate();
         var flag = p.Id<bool>("compilation");

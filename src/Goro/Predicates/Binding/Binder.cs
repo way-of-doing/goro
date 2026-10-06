@@ -51,7 +51,7 @@ public sealed class Binder
     // ---------------------------------------------------------------------------------------------
     // The three kinds of place
 
-    /// <summary>Somewhere a boolean is required; that it must also be definite is the cardinality analysis's rule.</summary>
+    /// <summary>Somewhere a boolean is required; that it must also be exactly one is the cardinality analysis's rule.</summary>
     private SemanticExpression Condition(ExpressionSyntax syntax)
     {
         var condition = Unmodified(syntax);
@@ -235,9 +235,9 @@ public sealed class Binder
 
     private SemanticFallback Fallback(FunctionCallSyntax call, SemanticExpression argument, SemanticExpression @default)
     {
-        // A default that is not a literal is the constants analysis's to report, and what type it
-        // has is beside the point once it is reported.
-        if (!argument.IsError && @default is SemanticLiteral)
+        // A default that is not a constant is the constants analysis's to report, and what type it
+        // has is beside the point once it is reported. Only a literal can stand in for a unit.
+        if (!argument.IsError && !@default.IsError && @default.IsConstant)
         {
             @default = StandIn(@default, argument.Type!.Value);
             if (@default.Type != argument.Type)

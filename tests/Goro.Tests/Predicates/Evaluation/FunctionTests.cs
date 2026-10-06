@@ -63,9 +63,9 @@ public class FunctionTests
     }
 
     [Test]
-    public void Count_IsDefinite_WhateverItsArgument()
+    public void Count_IsExactlyOne_WhateverItsArgument()
     {
-        Assert.That(Count(new TestPredicate().Id<decimal>("x")).IsDefinite, Is.True);
+        Assert.That(Count(new TestPredicate().Id<decimal>("x")).Bounds, Is.EqualTo(Bounds.ExactlyOne));
     }
 
     [Test]
@@ -182,14 +182,14 @@ public class FunctionTests
     }
 
     [Test]
-    public void Conversions_AreDefinite_WhenTheirArgumentIs()
+    public void Conversions_AreExactlyOne_WhenTheirArgumentIs()
     {
         var p = new TestPredicate();
 
-        Assert.That(p.String(Lit(1m)).IsDefinite, Is.True);
-        Assert.That(p.Number(p.Id<string>("s")).IsDefinite, Is.False);
-        Assert.That(Fallback(Lit(1m), 0m).IsDefinite, Is.True);
-        Assert.That(Fallback(p.Id<decimal>("x"), 0m).IsDefinite, Is.False);
+        Assert.That(p.String(Lit(1m)).Bounds, Is.EqualTo(Bounds.ExactlyOne));
+        Assert.That(p.Number(p.Id<string>("s")).Bounds, Is.Not.EqualTo(Bounds.ExactlyOne));
+        Assert.That(Fallback(Lit(1m), 0m).Bounds, Is.EqualTo(Bounds.ExactlyOne));
+        Assert.That(Fallback(p.Id<decimal>("x"), 0m).Bounds, Is.Not.EqualTo(Bounds.ExactlyOne));
     }
 
     private sealed class RecordingBinding : IdentifierBinding<decimal>

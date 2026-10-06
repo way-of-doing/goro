@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, features/builtins/identifiers.md, design/rationale.md, testing.md, src/Goro/Predicates, tests/Goro.Tests/Predicates
 after: semantic-analysis-passes
@@ -85,3 +85,66 @@ forms and the new diagnostic, and the cardinality and constants analyses impleme
   exactly one, the bounds of each construct above, constants as literals and conversions of
   constants, and no general constant folding. Next step: pick up the line once
   semantic-analysis-passes has landed.
+- 2026-10-06 -- Spec and implementation done by the coordinator; nothing is committed yet.
+  - **Decided with PJ.**
+    - `file::duration` is exactly one, since a file whose audio properties cannot be read is
+      already unreadable.
+    - Only number *literals* stand in for bytecounts and durations.
+    - An `!=` operand that can be absent but never several gets its own diagnostic, "`x` may be
+      absent", offering `NOT x == y` and `FALLBACK(x, <empty>) != y`. The empty value is the
+      type's: `""`, `0`, `0b`, `0s` or `FALSE`. A written quantifier still satisfies the rule.
+  - **Spec.**
+    - evaluation.md's static judgements give every construct's bounds and whether it is
+      constant, with definite defined as `1..1`.
+    - predicates.md derives its definite list from the bounds, gains a Constants section, and
+      says "constant" for FALLBACK's default and for failing conversions. Its `!=` section covers
+      operands that can only be absent.
+    - identifiers.md states each namespace's bounds.
+    - The rationale explains why definiteness is derived and why folding stops at constants, and
+      revises the `!=` and FALLBACK answers.
+    - testing.md's `!=` rows are rewritten, with a constants row added; architecture.md is updated.
+  - **Code.**
+    - `Values.Bounds` is new, and declarations, catalog rows and evaluation nodes carry `Bounds`,
+      with `IsDefinite` derived from it.
+    - `SemanticExpression.IsConstant` is new.
+    - Cardinality keeps bounds per node and chooses between the two `!=` diagnostics.
+    - Constants folds every conversion of a constant through `TypedNodes.ConvertLiteral` and
+      reports one that fails, the `NUMBER(STRING("abc"))` case included. The FALLBACK rule became
+      `fallback-default-not-constant`.
+    - Lowering uses the folded literal, and Sources no longer counts a constant conversion as a
+      source. The binder type-checks any constant FALLBACK default.
+  - **Tests.** 2187 pass, 48 of them new:
+    - bounds for every construct;
+    - the new diagnostic, with each of its rewrites checked to compile;
+    - the newly valid forms;
+    - constant defaults and their folded values;
+    - failing conversions;
+    - the no-stand-in rule;
+    - a constant conversion not being a source;
+    - catalog bounds.
+  - **Open.** Both rewrites the new diagnostic offers treat absence the same way by default, so
+    absence compares as "not equal" either way. They differ on unreadable data, and in that the
+    FALLBACK default can be edited. A reader wanting "absent counts as equal" writes their own
+    default, or a quantifier. The tag namespaces that are open today keep `0..many` until
+    sources-and-fields gives each concept's cell its own bounds. Next step: PJ's review, then
+    commit and land.
+- 2026-10-07 -- PJ reversed the decision, recorded under Intent, to keep the word "definite". With
+  definiteness derived from bounds, the term needed a definition that "exactly one" does not.
+  "Singular" was considered and rejected because it reads as the upper bound alone:
+  `id3v1::genre` would be called singular, yet it can be absent. The docs now say "exactly one"
+  throughout.
+  - predicates.md's section is now "Exactly one", with the `#exactly-one` anchor and the links to it
+    updated, and the rationale records why the word went.
+  - In code there are no `IsDefinite` properties at all. They only duplicated
+    `bounds == Bounds.ExactlyOne`, which reads as the spec's own definition, so `Bounds`,
+    `Expression`, `IdentifierDeclaration` and `CardinalityAnalysis` lose them.
+  - The condition diagnostic became `condition-not-exactly-one`
+    (`ErrorMessage.ConditionNotExactlyOne`). Its English wording is unchanged and never mentioned
+    the term.
+  - `DefinitenessTests` became `ExactlyOneTests`, and test names and comments follow.
+  - design/predicate-runtime.md and earlier briefs keep the old word as history.
+
+  2187 tests pass. Next step: PJ's review, then commit and land.
+- 2026-10-07 -- Landed: PJ approved, so it is marked `landed` and merged into main. Left for later:
+  the tag namespaces that are open today keep `0..many` until sources-and-fields gives each concept's
+  cell its own bounds. Next on the recommended queue: as-operator.

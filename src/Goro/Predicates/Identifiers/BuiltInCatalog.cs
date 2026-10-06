@@ -1,5 +1,6 @@
 // Owned by the identifier catalog group (G7) of the predicate-runtime-architecture line.
 using System.Collections.Immutable;
+using Goro.Predicates.Values;
 
 namespace Goro.Predicates.Identifiers;
 
@@ -21,56 +22,56 @@ public sealed class BuiltInCatalog : IIdentifierCatalog
     [
         new OpenNamespace("ape", TagBindings.NotImplemented<string>,
         [
-            Tag<string>("artist"),
-            Tag<string>("album"),
-            Tag<string>("comment"),
-            Tag<string>("genre"),
-            Tag<string>("title"),
-            Tag<decimal>("track"),
-            Tag<decimal>("year"),
+            Tag<string>(Bounds.Any, "artist"),
+            Tag<string>(Bounds.Any, "album"),
+            Tag<string>(Bounds.Any, "comment"),
+            Tag<string>(Bounds.Any, "genre"),
+            Tag<string>(Bounds.Any, "title"),
+            Tag<decimal>(Bounds.Any, "track"),
+            Tag<decimal>(Bounds.Any, "year"),
         ]),
         new OpenNamespace("ape::raw", TagBindings.NotImplemented<string>, []),
         new ClosedNamespace("file", FileNamespace.Identifiers),
         new ClosedNamespace("id3v1",
         [
-            Tag<string>("artist"),
-            Tag<string>("album"),
-            Tag<string>("comment"),
-            Tag<string>("genre"),
-            Tag<string>("title"),
-            Tag<decimal>("track"),
-            Tag<decimal>("year"),
+            Tag<string>(Bounds.AtMostOne, "artist"),
+            Tag<string>(Bounds.AtMostOne, "album"),
+            Tag<string>(Bounds.AtMostOne, "comment"),
+            Tag<string>(Bounds.AtMostOne, "genre"),
+            Tag<string>(Bounds.AtMostOne, "title"),
+            Tag<decimal>(Bounds.AtMostOne, "track"),
+            Tag<decimal>(Bounds.AtMostOne, "year"),
         ]),
         new ClosedNamespace("id3v1::raw",
         [
-            Tag<string>("artist"),
-            Tag<string>("album"),
-            Tag<string>("comment"),
-            Tag<decimal>("genre"),
-            Tag<string>("title"),
-            Tag<decimal>("track"),
-            Tag<string>("year"),
+            Tag<string>(Bounds.AtMostOne, "artist"),
+            Tag<string>(Bounds.AtMostOne, "album"),
+            Tag<string>(Bounds.AtMostOne, "comment"),
+            Tag<decimal>(Bounds.AtMostOne, "genre"),
+            Tag<string>(Bounds.AtMostOne, "title"),
+            Tag<decimal>(Bounds.AtMostOne, "track"),
+            Tag<string>(Bounds.AtMostOne, "year"),
         ]),
         new OpenNamespace("id3v2", TagBindings.NotImplemented<string>,
         [
-            Tag<string>("artist"),
-            Tag<string>("album"),
-            Tag<string>("comment"),
-            Tag<string>("genre"),
-            Tag<string>("title"),
-            Tag<decimal>("track"),
-            Tag<decimal>("year"),
+            Tag<string>(Bounds.Any, "artist"),
+            Tag<string>(Bounds.Any, "album"),
+            Tag<string>(Bounds.Any, "comment"),
+            Tag<string>(Bounds.Any, "genre"),
+            Tag<string>(Bounds.Any, "title"),
+            Tag<decimal>(Bounds.Any, "track"),
+            Tag<decimal>(Bounds.Any, "year"),
         ]),
         new OpenNamespace("id3v2::raw", TagBindings.NotImplemented<string>, []),
         new OpenNamespace("vorbis", TagBindings.NotImplemented<string>,
         [
-            Tag<string>("artist"),
-            Tag<string>("album"),
-            Tag<string>("description"),
-            Tag<string>("genre"),
-            Tag<string>("title"),
-            Tag<decimal>("track"),
-            Tag<decimal>("year"),
+            Tag<string>(Bounds.Any, "artist"),
+            Tag<string>(Bounds.Any, "album"),
+            Tag<string>(Bounds.Any, "description"),
+            Tag<string>(Bounds.Any, "genre"),
+            Tag<string>(Bounds.Any, "title"),
+            Tag<decimal>(Bounds.Any, "track"),
+            Tag<decimal>(Bounds.Any, "year"),
         ]),
         new OpenNamespace("vorbis::raw", TagBindings.NotImplemented<string>, []),
     ];
@@ -113,21 +114,24 @@ public sealed class BuiltInCatalog : IIdentifierCatalog
 
     /// <summary>
     /// A global identifier: the <c>PREFERRED()</c> of the identifiers of the same name in the formats,
-    /// in order of preference. None is definite, since every format's can be missing.
+    /// in order of preference, with the bounds that gives.
     /// </summary>
     private static DeclarationRow<T> Preferred<T>(string name) where T : notnull
     {
-        var binding = new PreferredBinding<T>([.. PreferenceOrder.Select(format => FormatBinding<T>(format, name))]);
-        return new(name, IsDefinite: false, _ => binding);
+        var candidates = PreferenceOrder.Select(format => FormatDeclaration<T>(format, name)).ToList();
+        var binding = new PreferredBinding<T>([.. candidates.Select(candidate => candidate.Binding)]);
+        return new(name, Bounds.Preferred(candidates.Select(candidate => candidate.Bounds)), _ => binding);
     }
 
-    private static IdentifierBinding<T> FormatBinding<T>(string format, string name) where T : notnull =>
+    private static IdentifierDeclaration<T> FormatDeclaration<T>(string format, string name) where T : notnull =>
         Formats.Single(@namespace => @namespace.Spelling == format).Declarations
             .OfType<IdentifierDeclaration<T>>()
-            .Single(declaration => declaration.Name.Name == name)
-            .Binding;
+            .Single(declaration => declaration.Name.Name == name);
 
-    /// <summary>An identifier that reads tags. None is definite, since any tag can be missing.</summary>
-    private static DeclarationRow<T> Tag<T>(string name) where T : notnull =>
-        new(name, IsDefinite: false, TagBindings.NotImplemented<T>);
+    /// <summary>
+    /// An identifier that reads tags, which can be absent, any tag being able to be missing, and can
+    /// hold several occurrences or not as its format allows.
+    /// </summary>
+    private static DeclarationRow<T> Tag<T>(Bounds bounds, string name) where T : notnull =>
+        new(name, bounds, TagBindings.NotImplemented<T>);
 }

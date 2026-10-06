@@ -7,7 +7,7 @@ namespace Goro.Predicates.Evaluation;
 /// <summary><c>NOT a</c>.</summary>
 public sealed class Not(Expression<bool> operand) : Condition
 {
-    public Expression<bool> Operand { get; } = RequireDefinite(operand);
+    public Expression<bool> Operand { get; } = RequireExactlyOne(operand);
 
     public override Truth Decide(EvaluationContext context) => Operand.Decide(context) switch
     {
@@ -16,16 +16,16 @@ public sealed class Not(Expression<bool> operand) : Condition
         _ => Truth.Unusable,
     };
 
-    internal static Expression<bool> RequireDefinite(Expression<bool> operand) =>
-        operand.IsDefinite ? operand : throw new ArgumentException("A logical operand must be definite.", nameof(operand));
+    internal static Expression<bool> RequireExactlyOne(Expression<bool> operand) =>
+        operand.Bounds == Bounds.ExactlyOne ? operand : throw new ArgumentException("A logical operand must be exactly one boolean.", nameof(operand));
 }
 
 /// <summary><c>a AND b</c>, short-circuiting on a false <see cref="Left"/>.</summary>
 public sealed class And(Expression<bool> left, Expression<bool> right) : Condition
 {
-    public Expression<bool> Left { get; } = Not.RequireDefinite(left);
+    public Expression<bool> Left { get; } = Not.RequireExactlyOne(left);
 
-    public Expression<bool> Right { get; } = Not.RequireDefinite(right);
+    public Expression<bool> Right { get; } = Not.RequireExactlyOne(right);
 
     /// <remarks>
     /// Only a false <see cref="Left"/> settles the result; an unusable one does not, so the right
@@ -49,9 +49,9 @@ public sealed class And(Expression<bool> left, Expression<bool> right) : Conditi
 /// <summary><c>a OR b</c>, short-circuiting on a true <see cref="Left"/>.</summary>
 public sealed class Or(Expression<bool> left, Expression<bool> right) : Condition
 {
-    public Expression<bool> Left { get; } = Not.RequireDefinite(left);
+    public Expression<bool> Left { get; } = Not.RequireExactlyOne(left);
 
-    public Expression<bool> Right { get; } = Not.RequireDefinite(right);
+    public Expression<bool> Right { get; } = Not.RequireExactlyOne(right);
 
     /// <remarks>
     /// Only a true <see cref="Left"/> settles the result; an unusable one does not, so the right

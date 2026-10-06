@@ -8,14 +8,16 @@ using Goro.Predicates.Values;
 namespace Goro.Predicates.Analyses;
 
 /// <summary>
-/// Literal values, and the rules about them: a number literal standing for a bytecount must not be
-/// negative, and one standing for a duration must also be whole; the default of <c>FALLBACK()</c>
-/// must be a literal; <c>NUMBER()</c> rejects a string literal that is not a number; and the ends of
-/// a range must not be reversed, compared as the operator will compare them.
+/// Values known when the predicate is read, and the rules about them: a number literal standing for
+/// a bytecount must not be negative, and one standing for a duration must also be whole; the default
+/// of <c>FALLBACK()</c> must be a constant; a conversion of a constant must succeed; and the ends of a
+/// range must not be reversed, compared as the operator will compare them.
 /// </summary>
 /// <remarks>
 /// Comparing the ends of a range as the operator will means preparing them as it will, so this is
-/// where every range's ends are prepared, once, and lowering takes them from here.
+/// where every range's ends are prepared, once, and lowering takes them from here. Likewise every
+/// conversion of a constant is worked out here, once, which is how one that fails is found, and
+/// lowering takes the literal it gives instead of converting for every file.
 /// </remarks>
 public static class Constants
 {
@@ -24,8 +26,15 @@ public static class Constants
         var report = new ConstantsDiagnostics(tree.Text);
         var diagnostics = new List<Diagnostic>();
         var ranges = new Dictionary<SemanticRange, PreparedRange>();
+        var values = new Dictionary<SemanticExpression, Expression>();
         foreach (var node in tree.Nodes)
         {
+            // Children come before their parents, so a constant's argument has its value by now.
+            if (Value(node, values) is { } value)
+            {
+                values.Add(node, value);
+            }
+
             switch (node)
             {
                 case SemanticLiteral literal when Fit(literal) is not UnitFit.Fits:
@@ -34,13 +43,14 @@ public static class Constants
                         : report.FractionalDurationLiteral(literal.Syntax));
                     break;
 
-                case SemanticConversion { Type: GoroType.Number, Argument: SemanticLiteral { Token: StringToken text } literal } conversion
-                    when !NumberText.TryParse(text.Value, out _):
-                    diagnostics.Add(report.InvalidNumberLiteral(conversion.Syntax, literal.Syntax));
+                // A string constant that does not convert to a number. No other conversion can fail.
+                case SemanticConversion { Type: GoroType.Number, IsConstant: true } conversion
+                    when !values.ContainsKey(conversion) && values.GetValueOrDefault(conversion.Argument) is Literal<string>:
+                    diagnostics.Add(report.InvalidNumberLiteral(conversion.Syntax, conversion.Argument.Syntax));
                     break;
 
-                case SemanticFallback { Default: { IsError: false } and not SemanticLiteral } fallback:
-                    diagnostics.Add(report.FallbackDefaultNotLiteral(fallback.Syntax));
+                case SemanticFallback { Default: { IsError: false, IsConstant: false } } fallback:
+                    diagnostics.Add(report.FallbackDefaultNotConstant(fallback.Syntax));
                     break;
 
                 case SemanticRange range when Prepare(range) is { } prepared:
@@ -57,8 +67,22 @@ public static class Constants
             }
         }
 
-        return new ConstantsAnalysis(ranges, [.. diagnostics]);
+        return new ConstantsAnalysis(ranges, values, [.. diagnostics]);
     }
+
+    /// <summary>
+    /// The value of a constant, as the literal lowering is to use for it; null for anything that is not
+    /// a constant, or a conversion that fails, or that the binder found mistyped, which is reported
+    /// already.
+    /// </summary>
+    private static Expression? Value(SemanticExpression node, Dictionary<SemanticExpression, Expression> values) => node switch
+    {
+        SemanticLiteral { IsError: false } literal when HoldsItsValue(literal) => TypedNodes.Literal(literal.Token, literal.Type!.Value),
+        SemanticConversion { IsConstant: true, IsError: false } conversion
+            when values.GetValueOrDefault(conversion.Argument) is { Type: not GoroType.Boolean } argument =>
+            TypedNodes.ConvertLiteral(argument, conversion.Type!.Value),
+        _ => null,
+    };
 
     /// <summary>
     /// The ends of a range, prepared in its operator's mode; null where they cannot be compared, the
@@ -109,13 +133,22 @@ public sealed class ConstantsAnalysis
 {
     private readonly IReadOnlyDictionary<SemanticRange, PreparedRange> ranges;
 
-    internal ConstantsAnalysis(IReadOnlyDictionary<SemanticRange, PreparedRange> ranges, ImmutableArray<Diagnostic> diagnostics)
+    private readonly IReadOnlyDictionary<SemanticExpression, Expression> values;
+
+    internal ConstantsAnalysis(
+        IReadOnlyDictionary<SemanticRange, PreparedRange> ranges,
+        IReadOnlyDictionary<SemanticExpression, Expression> values,
+        ImmutableArray<Diagnostic> diagnostics)
     {
         this.ranges = ranges;
+        this.values = values;
         Diagnostics = diagnostics;
     }
 
     public ImmutableArray<Diagnostic> Diagnostics { get; }
+
+    /// <summary>The value of a constant, worked out when the predicate was read: a literal of its type.</summary>
+    public Expression? ValueOf(SemanticExpression constant) => values.GetValueOrDefault(constant);
 
     /// <summary>The ends of <paramref name="range"/>, prepared, if they were sound and in order.</summary>
     public PreparedRange? RangeOf(SemanticRange range) => ranges.GetValueOrDefault(range);

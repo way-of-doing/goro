@@ -1,7 +1,7 @@
 namespace Goro.Predicates.Values;
 
 /// <summary>
-/// The outcome of a definite boolean: what a predicate evaluates to for one file, and what the
+/// The outcome of a boolean that is exactly one: what a predicate evaluates to for one file, and what the
 /// logical operators work with. <see cref="Unusable"/> is a missing answer, not a third truth.
 /// </summary>
 public enum Truth
@@ -19,7 +19,7 @@ public static class Truths
 
     public static Truth Of(bool value) => value ? Truth.True : Truth.False;
 
-    /// <summary>A boolean of exactly one occurrence, as every definite boolean is.</summary>
+    /// <summary>A boolean of exactly one occurrence, as every condition is.</summary>
     public static Value<bool> ToValue(this Truth truth) => truth switch
     {
         Truth.False => FalseValue,
@@ -33,11 +33,11 @@ public static class Truths
         _ => Truth.Unusable,
     };
 
-    /// <summary>The truth of a definite boolean.</summary>
+    /// <summary>The truth of a boolean that is exactly one.</summary>
     /// <exception cref="InvalidOperationException">The value does not hold exactly one occurrence.</exception>
     public static Truth ToTruth(this Value<bool> value) => value.Occurrences switch
     {
         [var single] => single.ToTruth(),
-        _ => throw new InvalidOperationException($"A definite boolean holds exactly one occurrence, not {value}."),
+        _ => throw new InvalidOperationException($"A condition holds exactly one occurrence, not {value}."),
     };
 }

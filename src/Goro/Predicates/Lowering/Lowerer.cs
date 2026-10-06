@@ -33,6 +33,7 @@ public static class Lowerer
         {
             SemanticLiteral literal => TypedNodes.Literal(literal.Token, literal.Type!.Value),
             SemanticIdentifier identifier => TypedNodes.Reference(identifier.Declaration, sources.OriginOf(identifier)),
+            SemanticConversion { IsConstant: true } conversion => Analysed(constants.ValueOf(conversion)),
             SemanticConversion { IsIdentity: true } conversion => Lower(conversion.Argument),
             SemanticConversion conversion => conversion.Type == GoroType.Number
                 ? TypedNodes.Number(Lower(conversion.Argument), sources.OriginOf(conversion))

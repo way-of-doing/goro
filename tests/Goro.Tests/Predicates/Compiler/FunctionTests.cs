@@ -72,11 +72,10 @@ public class FunctionTests
 
     [TestCase("FALLBACK(year, x) > 1")]
     [TestCase("FALLBACK(year, COUNT(genre)) > 1")]
-    [TestCase("FALLBACK(year, NUMBER(\"5\")) > 1")]
     [TestCase("FALLBACK(x > 1, y > 1)")]
-    public void FallbackDefault_ThatIsNotALiteral_IsAnError(string text)
+    public void FallbackDefault_ThatIsNotAConstant_IsAnError(string text)
     {
-        Assert.That(Error(text).Code, Is.EqualTo(Codes.FallbackDefaultNotLiteral));
+        Assert.That(Error(text).Code, Is.EqualTo(Codes.FallbackDefaultNotConstant));
     }
 
     [TestCase("FALLBACK(year, \"2000\") > 1", "FALLBACK(year, 2000) > 1")]
@@ -134,11 +133,11 @@ public class FunctionTests
     }
 
     [Test]
-    public void Number_OfAValidStringLiteral_IsAConversion()
+    public void Number_OfAValidStringLiteral_IsWorkedOutWhenThePredicateIsRead()
     {
         var comparison = (ComparisonTest<decimal>)Compiles("NUMBER(\"5\") > 1").Root;
 
-        Assert.That(comparison.Left.Expression, Is.TypeOf<Conversion<string, decimal>>());
+        Assert.That(((Literal<decimal>)comparison.Left.Expression).Value, Is.EqualTo(5m));
     }
 
     [TestCase("NUMBER(year) > 1")]
@@ -159,9 +158,35 @@ public class FunctionTests
     }
 
     [Test]
-    public void Number_OfANumberLiteral_IsNotALiteral()
+    [TestCase("FALLBACK(year, NUMBER(5)) > 1990", 5)]
+    [TestCase("FALLBACK(year, NUMBER(\"5\")) > 1990", 5)]
+    [TestCase("FALLBACK(year, NUMBER(STRING(5.0))) > 1990", 5)]
+    public void FallbackDefault_ThatIsAConversionOfAConstant_IsWorkedOutWhenThePredicateIsRead(string text, decimal value)
     {
-        Assert.That(Error("FALLBACK(year, NUMBER(5)) > 1").Code, Is.EqualTo(Codes.FallbackDefaultNotLiteral));
+        var comparison = (ComparisonTest<decimal>)Compiles(text).Root;
+
+        Assert.That(((Fallback<decimal>)comparison.Left.Expression).Default, Is.EqualTo(value));
+    }
+
+    [Test]
+    public void FallbackDefault_OfAStringConstant()
+    {
+        var comparison = (ComparisonTest<string>)Compiles("FALLBACK(artist, STRING(5)) == \"5\"").Root;
+
+        Assert.That(((Fallback<string>)comparison.Left.Expression).Default, Is.EqualTo("5"));
+    }
+
+    [Test]
+    public void FallbackDefault_ThatIsAConversionThatFails_IsAnErrorWhenThePredicateIsRead()
+    {
+        Assert.That(Error("FALLBACK(year, NUMBER(\"x\")) > 1").Code, Is.EqualTo(Codes.InvalidNumberLiteral));
+    }
+
+    // Only a number literal stands for a bytecount, not every number constant.
+    [Test]
+    public void FallbackDefault_ThatIsANumberConstantButNotALiteral_DoesNotStandForABytecount()
+    {
+        Assert.That(Error("FALLBACK(file::size, NUMBER(\"5\")) > 1").Code, Is.EqualTo(Codes.TypeMismatch));
     }
 
     [TestCase("NUMBER(s) > 1", typeof(Conversion<string, decimal>))]
@@ -253,15 +278,15 @@ public class FunctionTests
     }
 
     [Test]
-    public void Preferred_OfDefiniteConditions_IsAPredicate()
+    public void Preferred_OfConditionsThatAreExactlyOne_IsAPredicate()
     {
         Compiles("PREFERRED(x > 1, y > 1, FALSE)");
     }
 
     [Test]
-    public void Preferred_WithAnArgumentThatIsNotDefinite_IsNotACondition()
+    public void Preferred_WithAnArgumentThatIsNotExactlyOne_IsNotACondition()
     {
-        Assert.That(Error("PREFERRED(x > 1, flag)").Code, Is.EqualTo(Codes.IndefiniteCondition));
+        Assert.That(Error("PREFERRED(x > 1, flag)").Code, Is.EqualTo(Codes.ConditionNotExactlyOne));
     }
 
     [Test]

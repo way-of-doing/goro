@@ -185,12 +185,12 @@ public class PreferredTests
     }
 
     [Test]
-    public void IsDefinite_OnlyWhenEveryArgumentIs()
+    public void IsExactlyOne_WhenSomeArgumentIsNeverAbsent_AndNoneIsEverSeveral()
     {
         var p = new TestPredicate();
 
-        Assert.That(Preferred(Lit(1m), Lit(2m)).IsDefinite, Is.True);
-        Assert.That(Preferred(Lit(1m), p.Id<decimal>("x")).IsDefinite, Is.False);
-        Assert.That(Preferred(p.Id<decimal>("x"), Lit(1m)).IsDefinite, Is.False);
+        Assert.That(Preferred(Lit(1m), Lit(2m)).Bounds, Is.EqualTo(Bounds.ExactlyOne));
+        Assert.That(Preferred(Lit(1m), p.Id<decimal>("x")).Bounds, Is.Not.EqualTo(Bounds.ExactlyOne));
+        Assert.That(Preferred(p.Id<decimal>("x"), Lit(1m)).Bounds, Is.Not.EqualTo(Bounds.ExactlyOne));
     }
 }

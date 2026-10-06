@@ -13,7 +13,7 @@ public sealed class Fallback<T>(Expression<T> argument, T @default) : Expression
 
     public T Default { get; } = @default;
 
-    public override bool IsDefinite => Argument.IsDefinite;
+    public override Bounds Bounds => Argument.Bounds.Fallback();
 
     // Substitutes rather than reads, so it reports nothing.
     public override Value<T> Evaluate(EvaluationContext context)

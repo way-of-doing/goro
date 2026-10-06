@@ -15,11 +15,11 @@ internal static class FileNamespace
 {
     public static ImmutableArray<DeclarationRow> Identifiers { get; } =
     [
-        Row("duration", isDefinite: false, file => One(WholeSeconds(file.Get(AudioPropertiesFacet.Instance).Duration))),
-        Row("extension", isDefinite: false, file => CandidateFiles.Extension(NameOf(file)) is { } extension ? One(extension) : Value<string>.Absent),
-        Row("name", isDefinite: true, file => One(NameOf(file))),
-        Row("path", isDefinite: true, file => One(FilePaths.ToPredicatePath(file.Path))),
-        Row("size", isDefinite: true, file => One(new ByteCount(file.Get(FileSystemFacet.Instance).Length))),
+        Row("duration", Bounds.ExactlyOne, file => One(WholeSeconds(file.Get(AudioPropertiesFacet.Instance).Duration))),
+        Row("extension", Bounds.AtMostOne, file => CandidateFiles.Extension(NameOf(file)) is { } extension ? One(extension) : Value<string>.Absent),
+        Row("name", Bounds.ExactlyOne, file => One(NameOf(file))),
+        Row("path", Bounds.ExactlyOne, file => One(FilePaths.ToPredicatePath(file.Path))),
+        Row("size", Bounds.ExactlyOne, file => One(new ByteCount(file.Get(FileSystemFacet.Instance).Length))),
     ];
 
     private static string NameOf(FileData file) => Path.GetFileName(file.Path);
@@ -28,10 +28,10 @@ internal static class FileNamespace
 
     private static Value<T> One<T>(T datum) where T : notnull => Value<T>.Single(new Usable<T>(datum));
 
-    private static DeclarationRow<T> Row<T>(string name, bool isDefinite, Func<FileData, Value<T>> resolve) where T : notnull
+    private static DeclarationRow<T> Row<T>(string name, Bounds bounds, Func<FileData, Value<T>> resolve) where T : notnull
     {
         var binding = new Binding<T>(resolve);
-        return new DeclarationRow<T>(name, isDefinite, _ => binding);
+        return new DeclarationRow<T>(name, bounds, _ => binding);
     }
 
     // A file identifier never produces an unusable occurrence, so the origin goes unused.

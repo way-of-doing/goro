@@ -9,7 +9,7 @@ public sealed class Count<T>(Expression<T> argument) : Expression<decimal> where
 {
     public Expression<T> Argument { get; } = argument;
 
-    public override bool IsDefinite => true;
+    public override Bounds Bounds => Bounds.ExactlyOne;
 
     // Reads cardinality only, so it asks nothing of any occurrence and reports nothing.
     public override Value<decimal> Evaluate(EvaluationContext context) =>
