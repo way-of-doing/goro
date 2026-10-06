@@ -100,6 +100,11 @@ Do not fight it. The global namespace guesses well for most files and will occas
 against what you want. Address the tag you mean instead, through a format-specific namespace such
 as `vorbis::artist`, or through its `raw` counterpart if you want the datum exactly as recorded.
 
+If what you want is a different order of preference, write one: every global identifier is a
+`PREFERRED()` of the format-specific ones, and `PREFERRED(id3v2::artist, vorbis::artist)` is the
+same idea with Id3v2 trusted first. The same goes for anything the global namespace does not cover,
+such as `PREFERRED(ape::"album artist", vorbis::albumartist)`.
+
 The global namespace also skips silently over a preferred format whose data cannot be read, when a
 lesser one holds something usable, so no warning tells you about the junk it routed around. To
 find it, ask the format directly: `ANY(vorbis::year) IS UNUSABLE` finds the files whose Vorbis

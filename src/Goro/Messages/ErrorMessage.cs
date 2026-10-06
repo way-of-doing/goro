@@ -87,7 +87,7 @@ public abstract record ErrorMessage
     public sealed record NullComparison : ErrorMessage;
     public sealed record TypeMismatch(Code Left, GoroType LeftType, Code Right, GoroType RightType, Code Operator) : ErrorMessage;
     public sealed record TypeMismatchNumberVariable(Code Left, GoroType LeftType, Code Right, GoroType RightType, Code Operator) : ErrorMessage;
-    public sealed record FallbackTypeMismatch(Code Function, Code Argument, GoroType ArgumentType, Code Default, GoroType DefaultType) : ErrorMessage;
+    public sealed record ArgumentTypeMismatch(Code Function, Code Expected, GoroType ExpectedType, Code Argument, GoroType ArgumentType) : ErrorMessage;
     public sealed record RangeTypeMismatch(Code Subject, GoroType SubjectType, Code Range, GoroType RangeType) : ErrorMessage;
     public sealed record NegativeUnitLiteral(Code Literal, UnitType Unit) : ErrorMessage;
     public sealed record FractionalDurationLiteral(Code Literal) : ErrorMessage;
@@ -107,6 +107,7 @@ public abstract record ErrorMessage
     public sealed record LiterallyOnStateTest(Code Modifier) : ErrorMessage;
     public sealed record QuantifierOnAbsentTest : ErrorMessage;
     public sealed record WrongArgumentCount(Code Function, int Expected, int Actual) : ErrorMessage;
+    public sealed record TooFewArguments(Code Function, int Minimum, int Actual) : ErrorMessage;
     public sealed record FallbackDefaultNotLiteral(Code Function, Code Default) : ErrorMessage;
     public sealed record InvalidNumberLiteral(Code Literal, Code Function) : ErrorMessage;
     public sealed record RangeUnitMissing(Code Number) : ErrorMessage;

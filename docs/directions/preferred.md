@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, features/builtins/identifiers.md, design/rationale.md, design/deferred.md, testing.md, faq.md, src/Goro/Predicates, tests/Goro.Tests/Predicates
 after:
@@ -93,3 +93,59 @@ through a later argument whose data would have made the file unreadable.
   answers the question COALESCE was dropped over. The semantics in the Intent were agreed in
   discussion, and so was the name, as recorded there; nothing is decided beyond them. Next step:
   pick up the line.
+- 2026-10-06 -- Line started. Handing it to a Sonnet `line-worker` was considered and decided
+  against, by the directions README's own tests. Most of the line is normative prose (seven
+  documents), which stays with Opus or the coordinator. The code's likely mistakes would be silent:
+  dropping the unusable occurrences of the chosen argument instead of taking it entire, or
+  evaluating every argument eagerly, both give well-formed answers. Nothing independent checks the
+  short-circuit, since the worker would write those tests as well. And the line is focused and
+  sequential, spec before code, with no parallel phase, so a worker starting cold would cost more
+  than the piece. The coordinator does it. Next step: read the touched documents and the global
+  namespace's resolution code, then propose a plan with the spec edits first, as the contract,
+  and the implementation and tests after them.
+- 2026-10-06 -- Spec and implementation done, all by the coordinator; nothing is committed yet.
+  - **Decided with PJ: a global identifier has its expansion's value but keeps its own source.**
+    `artist` has exactly the value `PREFERRED(vorbis::artist, ape::artist, id3v2::artist,
+    id3v1::artist)` has, consulting the same formats, but its unusable occurrences have `artist`
+    as their source, as evaluation.md says of every identifier. The two could not agree on
+    warnings otherwise: a warning quotes what was written, and the expansion would dedupe with
+    any other mention of `vorbis::artist`. The docs therefore say "has the value of", and the
+    deferred question of naming the format in a warning stays open.
+  - **Spec.** `PREFERRED()` is specified in predicates.md (with the worked table moved there) and
+    in evaluation.md. identifiers.md gives each global identifier's expansion. The rationale has
+    a new question on why the function's semantics are the global namespace's, and the FALLBACK
+    and range-endpoint questions are rewritten without COALESCE. The deferred COALESCE entry is
+    removed. The unusable-data wording in the rationale, testing.md and the test file is now
+    intent about the operators, and the "nothing but negation" claim is corrected with
+    `(year < 2000) == FALSE`. The FAQ answers "a global identifier picked the wrong value" with
+    `PREFERRED()`.
+  - **Code.** One choice, `Values/Preference.Preferred`, serves both the `Preferred<T>`
+    evaluation node and a new `PreferredBinding<T>`. The global namespace's bindings are now
+    `PreferredBinding`s over the format identifiers' bindings, so they will follow the tag line
+    when it replaces those, with no further change. The binder takes a minimum arity for
+    `PREFERRED` and types it by its first argument that is not a number literal.
+    `FallbackTypeMismatch` became the shared `ArgumentTypeMismatch`, and `TooFewArguments` is
+    new.
+  - **Tests.** 2107 pass, 53 of them new:
+    - the worked table and every other two-argument combination;
+    - the short-circuit, asserted through resolution counts, an unreadable later argument and
+      warnings;
+    - the compiler's arity, types, stand-ins and definiteness;
+    - each global identifier's candidates being the documented four in the documented order;
+    - `PreferredBinding` agreeing with the node over every combination of bags.
+
+    `UnusableNeverSelectsTests` is now `OperatorDefaultsOverUnusableDataTests`, with its scope
+    stated.
+  - **Open.** That a global identifier agrees with its expansion over real tags can only be
+    checked once the tag line lands; the structural test is what stands in for it until then.
+    design/predicate-runtime.md still says "rank order", left as design history. Next step:
+    PJ's review, then commit on the branch and, if PJ approves, merge to main.
+- 2026-10-06 -- Landed: PJ asked for it to be committed and completed, so it is marked `landed`
+  and merged into main. Left for later:
+  - checking a global identifier against its expansion over real tags, which waits for the
+    tag-reading line;
+  - `PREFERRED()`'s bounds: it is never absent if any argument never is, which
+    cardinality-and-constants anticipates stating;
+  - "rank order" in design/predicate-runtime.md.
+
+  Next on the recommended queue: unanswered-predicates.

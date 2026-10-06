@@ -184,6 +184,11 @@ public sealed class Binder
             .ToImmutableArray();
 
         var function = call.Name.Text.ToUpperInvariant();
+        if (function == "PREFERRED")
+        {
+            return Preferred(call, arguments);
+        }
+
         int? arity = function switch
         {
             "COUNT" or "NUMBER" or "STRING" => 1,
@@ -237,11 +242,47 @@ public sealed class Binder
             @default = StandIn(@default, argument.Type!.Value);
             if (@default.Type != argument.Type)
             {
-                Report(report.FallbackTypeMismatch(call, argument, @default));
+                Report(report.ArgumentTypeMismatch(call, 0, argument, 1, @default));
             }
         }
 
         return new SemanticFallback(call, argument, @default);
+    }
+
+    /// <summary>
+    /// <c>PREFERRED()</c>, which takes two or more arguments of one type. The call takes the type of its
+    /// first argument that is not a number literal, so that a number literal anywhere among the others
+    /// can stand in for a bytecount or a duration, as it does beside an operator; each argument that
+    /// still does not agree is reported where it was written.
+    /// </summary>
+    private SemanticExpression Preferred(FunctionCallSyntax call, ImmutableArray<SemanticExpression> arguments)
+    {
+        var expected = FirstIndex(arguments, argument => !argument.IsError && argument is not SemanticLiteral { IsNumber: true });
+        if (expected < 0)
+        {
+            expected = FirstIndex(arguments, argument => !argument.IsError);
+        }
+
+        GoroType? type = expected < 0 ? null : arguments[expected].Type;
+        if (type is { } wanted)
+        {
+            arguments = [.. arguments.Select(argument => argument.IsError ? argument : StandIn(argument, wanted))];
+            for (var i = 0; i < arguments.Length; i++)
+            {
+                if (!arguments[i].IsError && arguments[i].Type != wanted)
+                {
+                    Report(report.ArgumentTypeMismatch(call, expected, arguments[expected], i, arguments[i]));
+                }
+            }
+        }
+
+        if (arguments.Length < 2)
+        {
+            Report(report.TooFewArguments(call, 2));
+            return new SemanticMalformedCall(call, "PREFERRED", type, arguments);
+        }
+
+        return new SemanticPreferred(call, type, arguments);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -397,6 +438,19 @@ public sealed class Binder
     /// <summary>The mode belongs to the operator: <c>LITERALLY</c> on any operand makes it literal.</summary>
     private static ComparisonMode ModeOf(params SemanticOperand[] operands) =>
         operands.Any(operand => operand.Literally is not null) ? ComparisonMode.Literal : ComparisonMode.Normalized;
+
+    private static int FirstIndex(ImmutableArray<SemanticExpression> expressions, Func<SemanticExpression, bool> predicate)
+    {
+        for (var i = 0; i < expressions.Length; i++)
+        {
+            if (predicate(expressions[i]))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 
     private static bool IsUnit(GoroType? type) => type is GoroType.ByteCount or GoroType.Duration;
 

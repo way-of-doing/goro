@@ -39,6 +39,7 @@ public static class Lowerer
                 : TypedNodes.String(Lower(conversion.Argument), sources.OriginOf(conversion)),
             SemanticCount count => TypedNodes.Count(Lower(count.Argument)),
             SemanticFallback fallback => TypedNodes.Fallback(Lower(fallback.Argument), Lower(fallback.Default)),
+            SemanticPreferred preferred => TypedNodes.Preferred([.. preferred.Arguments.Select(Lower)]),
             SemanticComparison comparison => TypedNodes.Comparison(
                 Lower(comparison.Left.Expression), comparison.Left.Quantifier, comparison.Operator,
                 Lower(comparison.Right.Expression), comparison.Right.Quantifier, comparison.Mode),

@@ -142,6 +142,20 @@ public sealed class SemanticFallback(FunctionCallSyntax syntax, SemanticExpressi
 }
 
 /// <summary>
+/// <c>PREFERRED(arguments)</c>, with two or more arguments, which has the type they agree on: that of
+/// its first argument that is not a number literal, a number literal being able to stand in for it.
+/// </summary>
+public sealed class SemanticPreferred(FunctionCallSyntax syntax, GoroType? type, ImmutableArray<SemanticExpression> arguments)
+    : SemanticExpression(syntax, type)
+{
+    public new FunctionCallSyntax Syntax => (FunctionCallSyntax)base.Syntax;
+
+    public ImmutableArray<SemanticExpression> Arguments { get; } = arguments;
+
+    public override IEnumerable<SemanticExpression> Children => Arguments;
+}
+
+/// <summary>
 /// A call of a function that does not exist, or with the wrong number of arguments, which the
 /// binder has reported. Its arguments are kept, so that the mistakes inside them are found too.
 /// </summary>

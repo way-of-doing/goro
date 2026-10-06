@@ -1,5 +1,6 @@
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Values;
+using Goro.Tests.Predicates.Support;
 using static Goro.Tests.Predicates.Support.CompileAssert;
 using Codes = Goro.Predicates.Binding.SemanticDiagnosticCodes;
 
@@ -14,6 +15,8 @@ public class FunctionTests
     [TestCase("FALLBACK(year, 0) > 1")]
     [TestCase("number(s) > 1")]
     [TestCase("String(year) == \"1\"")]
+    [TestCase("preferred(x, y) > 1")]
+    [TestCase("Preferred(x, y) > 1")]
     public void FunctionNames_IgnoreCase(string text)
     {
         Compiles(text);
@@ -23,6 +26,7 @@ public class FunctionTests
     [TestCase("COUNTS(genre) > 1", "COUNT(genre) > 1")]
     [TestCase("NUMBR(s) > 1", "NUMBER(s) > 1")]
     [TestCase("FALLBAKC(year, 0) > 1", "FALLBACK(year, 0) > 1")]
+    [TestCase("PREFERED(x, y) > 1", "PREFERRED(x, y) > 1")]
     public void UnknownFunction_OffersTheClosest(string text, string rewrite)
     {
         var error = Error(text);
@@ -49,6 +53,8 @@ public class FunctionTests
     [TestCase("STRING() == \"x\"")]
     [TestCase("FALLBACK(year) > 1")]
     [TestCase("FALLBACK(year, 0, 1) > 1")]
+    [TestCase("PREFERRED() > 1")]
+    [TestCase("PREFERRED(x) > 1")]
     public void WrongNumberOfArguments_IsOneError(string text)
     {
         Assert.That(Codes(text), Is.EqualTo(new[] { Codes.WrongArgumentCount }));
@@ -180,5 +186,96 @@ public class FunctionTests
     public void Count_AcceptsAnyType(string text)
     {
         Compiles(text);
+    }
+
+    [TestCase("PREFERRED(x, y) > 1", 2)]
+    [TestCase("PREFERRED(x, y, a, b) > 1", 4)]
+    [TestCase("PREFERRED(x, 0) > 1", 2)]
+    public void Preferred_TakesTwoOrMoreArguments(string text, int count)
+    {
+        var comparison = (ComparisonTest<decimal>)Compiles(text).Root;
+
+        Assert.That(((Preferred<decimal>)comparison.Left.Expression).Arguments, Has.Length.EqualTo(count));
+    }
+
+    [TestCase("PREFERRED(x, artist) > 1", "artist", null)]
+    [TestCase("PREFERRED(x, \"2000\") > 1", "\"2000\"", "PREFERRED(x, 2000) > 1")]
+    [TestCase("PREFERRED(\"a\", x) == \"b\"", "x", null)]
+    [TestCase("PREFERRED(1, artist) == \"b\"", "1", null)]
+    public void Preferred_AnArgumentOfAnotherType_IsAnErrorWhereItIsWritten(string text, string marked, string? rewrite)
+    {
+        var error = Error(text);
+
+        Assert.That(error.Code, Is.EqualTo(Codes.TypeMismatch));
+        Assert.That(Marked(text, error), Is.EqualTo(marked));
+        Assert.That(Rewrites(text, error), Is.EqualTo(rewrite is null ? Array.Empty<string>() : new[] { rewrite }));
+    }
+
+    [Test]
+    public void Preferred_EachArgumentOfAnotherType_IsAnErrorOfItsOwn()
+    {
+        Assert.That(Codes("PREFERRED(x, artist, y, genre) > 1"), Is.EqualTo(new[] { Codes.TypeMismatch, Codes.TypeMismatch }));
+    }
+
+    [TestCase("PREFERRED(file::size, 1000) > 1kb")]
+    [TestCase("PREFERRED(1000, file::size) > 1kb")]
+    public void Preferred_NumberLiteral_StandsForABytecount_WhereverItIsWritten(string text)
+    {
+        var comparison = (ComparisonTest<ByteCount>)Compiles(text).Root;
+
+        var literal = ((Preferred<ByteCount>)comparison.Left.Expression).Arguments.OfType<Literal<ByteCount>>().Single();
+        Assert.That(literal.Value, Is.EqualTo(new ByteCount(1000)));
+    }
+
+    [TestCase("PREFERRED(file::duration, 1.5) > 1m", Codes.FractionalDurationLiteral)]
+    [TestCase("PREFERRED(-1, file::size) > 1", Codes.NegativeUnitLiteral)]
+    public void Preferred_NumberLiteral_ThatCannotStandIn_IsAnError(string text, string code)
+    {
+        Assert.That(Error(text).Code, Is.EqualTo(code));
+    }
+
+    [Test]
+    public void Preferred_OnlyOfNumberLiterals_IsANumber()
+    {
+        Assert.That(((ComparisonTest<decimal>)Compiles("PREFERRED(1, 2) > 1").Root).Left.Expression, Is.TypeOf<Preferred<decimal>>());
+    }
+
+    [Test]
+    public void Preferred_AModifierOnAnArgument_IsMisplaced()
+    {
+        Assert.That(Codes("PREFERRED(ALL(x), y) > 1"), Is.EqualTo(new[] { Codes.MisplacedModifier }));
+    }
+
+    [Test]
+    public void Preferred_AnArgumentInError_IsReportedOnce_AndTheRestStillAgree()
+    {
+        Assert.That(Codes("PREFERRED(artst, y) > 1"), Is.EqualTo(new[] { Codes.UnknownIdentifier }));
+    }
+
+    [Test]
+    public void Preferred_OfDefiniteConditions_IsAPredicate()
+    {
+        Compiles("PREFERRED(x > 1, y > 1, FALSE)");
+    }
+
+    [Test]
+    public void Preferred_WithAnArgumentThatIsNotDefinite_IsNotACondition()
+    {
+        Assert.That(Error("PREFERRED(x > 1, flag)").Code, Is.EqualTo(Codes.IndefiniteCondition));
+    }
+
+    [Test]
+    public void Preferred_EndToEnd_PassesOverJunk_AndWarnsAboutNothingItPassedOver()
+    {
+        var catalog = TestCatalog.Standard()
+            .With("x", new Unusable<decimal>(null))
+            .With("y", new Usable<decimal>(5m))
+            .With<decimal>("a", new Usable<decimal>(9m));
+
+        var outcome = Evaluate("PREFERRED(x, y, a) == 5", catalog);
+
+        Assert.That(outcome.Truth, Is.EqualTo(Truth.True));
+        Assert.That(outcome.Reported, Is.Empty);
+        Assert.That(catalog.Resolutions("a"), Is.Zero);
     }
 }

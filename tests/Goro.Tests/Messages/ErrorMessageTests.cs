@@ -91,6 +91,14 @@ public class ErrorMessageTests
     }
 
     [Test]
+    public void AMinimumArgumentCount_SaysAtLeast()
+    {
+        var message = new ErrorMessage.TooFewArguments(new Code("PREFERRED"), 2, 1);
+
+        Assert.That(EnglishErrorMessages.Instance.Render(message), Is.EqualTo("`PREFERRED()` takes at least two arguments, not 1, goro!"));
+    }
+
+    [Test]
     public void TheWordsOfLayout_AreTheProvidersOwn()
     {
         Assert.That(EnglishErrorMessages.Instance.ErrorPrefix, Is.EqualTo("goro: error: "));

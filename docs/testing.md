@@ -106,13 +106,15 @@ interpreted and the raw namespace.
 
 ### Global namespace resolution
 
-An identifier in the global namespace is resolved across up to four tag formats in rank order, and
-which format supplies the answer is decided by whether a format produced a *usable* occurrence
+An identifier in the global namespace is resolved across up to four tag formats in order of
+preference, as a `PREFERRED()` of the format-specific identifiers, and which format supplies the answer is decided by whether a format produced a *usable* occurrence
 rather than merely a present one. Getting that wrong returns a value from the wrong tag without
 any visible symptom, which is the same failure mode as the rest of this class and earns the same
 treatment. The scenarios are few and they are exhaustive, so they should all be written.
 
 These require a file carrying more than one tag format, so the fixtures differ from those above.
+The same scenarios are asserted of `PREFERRED()` itself, over identifiers that need no file, and the
+global identifiers are asserted to be built from the format-specific ones in the documented order.
 
 | Scenario | What it is there to catch |
 |---|---|
@@ -181,19 +183,27 @@ tell an exhaustive implementation from a short-circuiting one.
 **Universal quantification is non-vacuous.** `ALL(x)` in any operator is false for an absent `x`,
 where ordinary set semantics would make it true.
 
-**Unusable data never selects a file by default.** A predicate that evaluates to true must be true
-whatever the data that could not be read had held, unless it says otherwise with a state test or
-`FALLBACK()`. Two properties together establish it, and both are
-suited to generated predicates rather than hand-picked ones: a predicate without `NOT` selects
-exactly the same files whether unusable results are kept or read as false, and a predicate with
-`NOT` never selects a file that the same predicate would reject for some usable replacement of its
-unusable occurrences.
+**The operators never answer from unusable data.** Where a comparison, range, regex or logical
+operator gives true or false, it must give the same answer whatever the unreadable data had held.
+This is a property of the operators rather than of predicates: state tests, `FALLBACK()`,
+`PREFERRED()` and the global namespace make a result depend on unreadable data by design, and so
+does comparing a condition with a boolean. Two properties together establish it over predicates
+built from the operators alone, and both are suited to generated predicates rather than
+hand-picked ones: such a predicate without `NOT` selects exactly the same files whether unusable
+results are kept or read as false, and a predicate with `NOT` that answers at all gives the same
+answer for every usable replacement of its unusable occurrences.
 
 **The logical operators follow their table, and short-circuit only on a settling operand.** Every
 row of the table in the predicate documentation should be asserted, for both operand orders. The
 short-circuit is observable through warnings, so it needs asserting there: an unusable first
 operand of `AND` or `OR` must lead to the second operand being evaluated, and a false first operand
 of `AND`, or a true one of `OR`, must not.
+
+**`PREFERRED()` stops at the first usable argument, and passes over the rest in silence.** The
+arguments after the one chosen must not be evaluated, which shows only in what evaluating them
+would have done: a later argument whose data would make the file unreadable must leave it readable.
+The unusable occurrences of an argument passed over must not warn, even when the operator consuming
+the result warns about the argument chosen.
 
 **An unusable boolean is never reported twice.** Comparing, testing, substituting for or combining
 an unusable boolean emits nothing beyond what the operator that produced it emitted.

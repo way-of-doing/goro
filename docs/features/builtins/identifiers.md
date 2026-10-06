@@ -73,41 +73,25 @@ Note that these rules are about extracting a number out of text, so they apply o
 
 ### Global namespace
 
-Includes high-convenience accessors for structured metadata, such as `artist` to retrieve the artist name on a best-effort basis without having to specify where it comes from. This namespace is **closed**.
+Includes high-convenience accessors for structured metadata, such as `artist` to retrieve the artist name without having to specify where it comes from. This namespace is **closed**.
 
 This namespace is interpreted: everything in it is subject to the assumptions described under
-[open, closed, and raw namespaces](#open-closed-and-raw-namespaces), and the format-specific `raw` namespaces is where to go if one of them is in
+[open, closed, and raw namespaces](#open-closed-and-raw-namespaces), and the format-specific `raw` namespaces are where to go if one of them is in
 your way.
 
-| Identifier  | Type       | Description  |
-|-------------|------------|--------------|
-| `artist`    | string     | A best-effort attempt on the track artist name (see below)
-| `album`     | string     | A best-effort attempt on the album name (see below)
-| `genre`     | string     | A best-effort attempt on the musical genre (see below)
-| `title`     | string     | A best-effort attempt on the track title (see below)
-| `year`      | number     | A best-effort attempt on the track release year (see below)
+Each identifier here has the value of a [`PREFERRED()`](../../concepts/predicates.md#functions) of the format-specific identifiers with the same meaning, in order of preference: Vorbis comments, then APE, then Id3v2, then Id3v1.
 
-Depending on the tag data present in each file, and on which tag formats are consulted, any of these identifiers can resolve to a multivalue: a global identifier has whatever cardinality was produced by the format that resolved it, meaning the one the rules below select. `artist` may therefore be a single value in one file and a multivalue in the next.
+| Identifier  | Type       | Value  |
+|-------------|------------|--------|
+| `artist`    | string     | `PREFERRED(vorbis::artist, ape::artist, id3v2::artist, id3v1::artist)`
+| `album`     | string     | `PREFERRED(vorbis::album, ape::album, id3v2::album, id3v1::album)`
+| `genre`     | string     | `PREFERRED(vorbis::genre, ape::genre, id3v2::genre, id3v1::genre)`
+| `title`     | string     | `PREFERRED(vorbis::title, ape::title, id3v2::title, id3v1::title)`
+| `year`      | number     | `PREFERRED(vorbis::year, ape::year, id3v2::year, id3v1::year)`
 
-The meaning of "best-effort" is:
-  - tag formats are ranked by order of preference, strongest to weakest: vorbis > ape > id3v2 > id3v1
-  - the result is the value of the highest-ranked format that produced **at least one usable occurrence**, and that value is taken entire, unusable occurrences included
-  - failing that, it is the value of the highest-ranked format that produced any non-absent result, which is necessarily (due to the previous rule) a value all of whose occurrences are unusable
-  - failing that, every format was absent, and so is the result
+So a global identifier takes its value, entire, from the most preferred format holding a usable occurrence, and the formats after that one are not consulted. A format holding only data that cannot be read does not stop the search, and what it held is passed over silently. A global identifier has whatever cardinality the chosen format produced, so `artist` may be a single value in one file and a multivalue in the next.
 
-Usability decides the fall-through, not mere presence: a format holding only data that cannot be read does not stop the search. A format that holds a usable year loses to none but a better-ranked format that also holds one.
-
-Evaluation stops as soon as a format yields a usable occurrence; until then every format in rank order is consulted. Worked through:
-
-| vorbis                    | ape          | result |
-|---------------------------|--------------|--------|
-| absent                    | usable       | ape's value; the ordinary fall-through
-| unusable                  | usable       | ape's value; a preferred format holding junk does not win over a usable one
-| usable and unusable       | usable       | vorbis's value entire, the unusable occurrence included, since the preferred format did produce something usable
-| unusable                  | absent       | vorbis's value, all of it unusable; a defect is reported rather than passed off as absence
-| absent                    | absent       | absent
-
-Where a preferred format holds unreadable data and a lesser one holds a usable value, the defect is discarded silently: the occurrences that could not be read are not part of the value returned, so nothing warns about them.
+Writing the expansion out differs in one respect only, which is where a warning points. An unusable occurrence of a global identifier has the global identifier as its source, as any identifier's does, so `year == 1991` warns about `year` rather than about the format whose data could not be read.
 
 The format-specific namespaces and their `raw` counterparts are not affected by anything in this section: each of their identifiers resolves exactly one thing from exactly one place.
 

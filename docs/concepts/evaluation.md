@@ -23,17 +23,18 @@ Evaluation is against one file at a time. Each operand of a comparison, range or
 
 Every expression has a type and is or is not definite, both decided when the predicate is read. Here, an _operator_ is any comparison, range, regex, state test or logical operator.
 
-| Expression                | Type        | Definite  |
-|---------------------------|-------------|-----------|
-| literal                   | as written  | yes
-| identifier                | as declared | as declared
-| `COUNT(e)`                | number      | yes
-| `NUMBER(e)`               | number      | when `e` is
-| `STRING(e)`               | string      | when `e` is
-| `FALLBACK(e, d)`          | that of `e` | when `e` is
-| any operator              | boolean     | yes
-| `(e)`                     | that of `e` | when `e` is
-| a modifier applied to `e` | that of `e` | when `e` is
+| Expression                | Type         | Definite  |
+|---------------------------|--------------|-----------|
+| literal                   | as written   | yes
+| identifier                | as declared  | as declared
+| `COUNT(e)`                | number       | yes
+| `NUMBER(e)`               | number       | when `e` is
+| `STRING(e)`               | string       | when `e` is
+| `FALLBACK(e, d)`          | that of `e`  | when `e` is
+| `PREFERRED(e1 … en)`      | that of `e1` | when every `ei` is
+| any operator              | boolean      | yes
+| `(e)`                     | that of `e`  | when `e` is
+| a modifier applied to `e` | that of `e`  | when `e` is
 
 The operands each construct accepts are given in the predicate documentation, and under [Constraints not expressed by the grammar](predicates.md#constraints-not-expressed-by-the-grammar).
 
@@ -59,6 +60,13 @@ eval(STRING(e))        = ABSENT                         if eval(e) is ABSENT
 
 eval(FALLBACK(e, d))   = bag{ usable(d) }               if eval(e) is ABSENT
                        = eval(e) with each unusable occurrence replaced by usable(d)
+
+eval(PREFERRED(e1 … en)):
+    for k = 1 … n:
+        vk = eval(ek)
+        if vk holds a usable occurrence: return vk      -- e(k+1) … en are not evaluated
+    return the first vi that is not ABSENT, if any; ABSENT otherwise
+                                                        -- nothing is reported
 ```
 
 ### Comparison, range and regex operators

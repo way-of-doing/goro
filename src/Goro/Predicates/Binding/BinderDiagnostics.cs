@@ -12,7 +12,7 @@ namespace Goro.Predicates.Binding;
 /// <summary>The binder's errors, about names, types and modifiers, and the rewrites it offers for them.</summary>
 internal sealed partial class BinderDiagnostics(string text) : SemanticDiagnostics(text)
 {
-    private static readonly string[] Functions = ["COUNT", "FALLBACK", "NUMBER", "STRING"];
+    private static readonly string[] Functions = ["COUNT", "FALLBACK", "NUMBER", "PREFERRED", "STRING"];
 
     // ---------------------------------------------------------------------------------------------
     // Names
@@ -95,13 +95,20 @@ internal sealed partial class BinderDiagnostics(string text) : SemanticDiagnosti
         return new Diagnostic(Codes.TypeMismatch, comparison.Span, message, suggestions.ToImmutable());
     }
 
-    public Diagnostic FallbackTypeMismatch(FunctionCallSyntax call, SemanticExpression argument, SemanticExpression @default)
+    /// <summary>
+    /// An argument of a function whose arguments must agree in type, such as the default of
+    /// <c>FALLBACK()</c>, that does not agree with the one whose type the call took.
+    /// </summary>
+    /// <param name="expected">The position of the argument whose type the call took.</param>
+    /// <param name="mismatched">The position of the argument that does not agree with it.</param>
+    public Diagnostic ArgumentTypeMismatch(
+        FunctionCallSyntax call, int expected, SemanticExpression expectedArgument, int mismatched, SemanticExpression argument)
     {
-        var argumentSyntax = call.Arguments[0];
-        var defaultSyntax = call.Arguments[1];
-        ImmutableArray<Suggestion> suggestions = Unquoted(@default, argument.Type) is { } unquoted ? [unquoted] : [];
-        return new Diagnostic(Codes.TypeMismatch, defaultSyntax.Span,
-            new ErrorMessage.FallbackTypeMismatch(new Code(call.Name.Text), Code(argumentSyntax), argument.Type!.Value, Code(defaultSyntax), @default.Type!.Value),
+        var expectedSyntax = call.Arguments[expected];
+        var argumentSyntax = call.Arguments[mismatched];
+        ImmutableArray<Suggestion> suggestions = Unquoted(argument, expectedArgument.Type) is { } unquoted ? [unquoted] : [];
+        return new Diagnostic(Codes.TypeMismatch, argumentSyntax.Span,
+            new ErrorMessage.ArgumentTypeMismatch(new Code(call.Name.Text), Code(expectedSyntax), expectedArgument.Type!.Value, Code(argumentSyntax), argument.Type!.Value),
             suggestions);
     }
 
@@ -163,6 +170,9 @@ internal sealed partial class BinderDiagnostics(string text) : SemanticDiagnosti
 
     public Diagnostic WrongArgumentCount(FunctionCallSyntax call, int expected) =>
         new(Codes.WrongArgumentCount, call.Span, new ErrorMessage.WrongArgumentCount(new Code(call.Name.Text), expected, call.Arguments.Length));
+
+    public Diagnostic TooFewArguments(FunctionCallSyntax call, int minimum) =>
+        new(Codes.WrongArgumentCount, call.Span, new ErrorMessage.TooFewArguments(new Code(call.Name.Text), minimum, call.Arguments.Length));
 
     // ---------------------------------------------------------------------------------------------
     // Ranges

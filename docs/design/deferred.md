@@ -16,7 +16,7 @@ Only `goro list` currently accepts a predicate, although the predicate documenta
 The revision of a file's Id3v2 tag is known while it is being read, and an identifier reporting it would be trivial to add. It is worth more than it looks. Goro hides the differences between revisions, but a handful of quirks remain that cannot be hidden, and they are all confined to specific revisions. Being able to write a predicate against the revision would let a user both locate the files that a given quirk can affect and exclude them from a run, which in turn means the remaining files are known to be free of it. That is the difference between a documented caveat a user has to reason about and one they can mechanically rule out. The open questions are what the identifier should be called, whether it belongs in the `id3v2` namespace or alongside `file::size`, what it resolves to for a file with no Id3v2 tag at all, and what type it has, given that `2.3` as a number would compare unhelpfully against `2.4`.
 
 **Should a warning name the tag format behind a global identifier?**
-A global identifier such as `artist` resolves on a best-effort basis across several tag formats, so a warning naming `artist` as its source tells you that a file has bad data but not which of its tags holds it. Since the purpose of the warning is to send somebody to fix the data, naming the format that actually produced the unusable occurrence would be more useful. The source machinery tracks the identifier that was written rather than the format it delegated to, so this needs the warning to carry something beyond its source, and it should not be allowed to make two files with the same problem report differently.
+A global identifier such as `artist` resolves across several tag formats in order of preference, so a warning naming `artist` as its source tells you that a file has bad data but not which of its tags holds it. Since the purpose of the warning is to send somebody to fix the data, naming the format that actually produced the unusable occurrence would be more useful. The source machinery tracks the identifier that was written rather than the format it delegated to, so this needs the warning to carry something beyond its source, and it should not be allowed to make two files with the same problem report differently.
 
 **Addressing a single `TXXX`, `COMM` or `WXXX` frame by its description**
 These frames are distinguished from one another by a description rather than by their identifier, so Goro currently surfaces them as a multivalue of strings that carry the description inside them. Selecting one by description needs a name made of two parts, the frame and the description, where the rest of the language only ever names one thing. A further `::` part would be the obvious spelling, but it would mean an identifier whose parts are not all namespaces, which wants thinking about before it is committed to.
@@ -60,18 +60,3 @@ Interesting but not must-have; in case array types appear in our grammar, there 
 
 **Using STRING() on durations, bytecounts etc to produce a human-readable representation**:
 STRING() is intended as a type conversion function only, if formatting is required for presentation reasons that concern should be handled entirely separately
-
-**Multi-candidate priority fallback (COALESCE)**
-Removed prior to first publication. The originally-intended use case (keep working when data is missing or invalid) is covered by FALLBACK(). A true priority-select-among-several-candidates construct is not reducible to FALLBACK() + AND/OR in general — the natural rewrite using guarded disjunction is value-equivalent but cannot replicate exhaustive auditing of unused candidates for unusable data without abandoning AND/OR short-circuiting, which was deliberately kept so that a state test can guard a value before an operator reaches it. Revisit only if a real need for that specific behavior (auditing candidates that end up unused) emerges.
-
-Initial draft text was:
-  > **COALESCE(expr1, expr2, ...)**
-  > : the result of this function is equal to the first of its arguments that has a non-null value. This function can accept any number of arguments. All arguments are evaluated regardless of whether an earlier one already produced a non-null result. Note that, in contrast to `FALLBACK()` and `ISNULL()`, this function will not suppress warnings if one of its inputs is a tainted null value.
-  >
-  > (Quoted as drafted, in the vocabulary of the time: what it calls a tainted null is now an unusable occurrence, and `ISNULL()` has been replaced by the `IS` operator.)
-  >
-  > Examples:
-  >
-  > - `COALESCE("foo", "bar")` results in `"foo"`
-  > - `COALESCE(genre, "foo")` results in the value of `genre`, or `"foo"` if that is null
-  > - `COALESCE(id3v2::COMM, "no comments")` results in the value of the Id3v2 COMM frame, or "no comments" if such a frame does not exist (in which case `id3v2::COMM` will be null)
