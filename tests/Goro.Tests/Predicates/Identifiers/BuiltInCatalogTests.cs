@@ -1,5 +1,8 @@
+using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
+using Goro.Tests.Predicates.Evaluation.Support;
+using static Goro.Tests.Predicates.Evaluation.Support.Nodes;
 
 namespace Goro.Tests.Predicates.Identifiers;
 
@@ -196,5 +199,85 @@ public class BuiltInCatalogTests
         };
 
         Assert.That(resolve, Throws.TypeOf<NotSupportedException>().With.Message.Contains("not implemented yet"));
+    }
+
+    // The expansions identifiers.md gives, written out independently of the catalog's tables.
+    [TestCase("artist", "vorbis::artist", "ape::artist", "id3v2::artist", "id3v1::artist")]
+    [TestCase("album", "vorbis::album", "ape::album", "id3v2::album", "id3v1::album")]
+    [TestCase("genre", "vorbis::genre", "ape::genre", "id3v2::genre", "id3v1::genre")]
+    [TestCase("title", "vorbis::title", "ape::title", "id3v2::title", "id3v1::title")]
+    [TestCase("year", "vorbis::year", "ape::year", "id3v2::year", "id3v1::year")]
+    public void GlobalIdentifier_IsThePreferredOfItsExpansion_InTheDocumentedOrder(string global, params string[] expansion)
+    {
+        var declaration = Found(Lookup(global));
+
+        var candidates = declaration switch
+        {
+            IdentifierDeclaration<string> typed => Candidates(typed),
+            IdentifierDeclaration<decimal> typed => Candidates(typed),
+            _ => throw new AssertionException($"Unexpected declaration {declaration}"),
+        };
+        Assert.That(candidates, Has.Length.EqualTo(expansion.Length));
+        for (var i = 0; i < expansion.Length; i++)
+        {
+            var binding = Found(Lookup(expansion[i])) switch
+            {
+                IdentifierDeclaration<string> typed => (object)typed.Binding,
+                IdentifierDeclaration<decimal> typed => typed.Binding,
+                var other => throw new AssertionException($"Unexpected declaration {other}"),
+            };
+            Assert.That(candidates[i], Is.SameAs(binding), $"candidate {i + 1} of {global}");
+        }
+    }
+
+    private static object[] Candidates<T>(IdentifierDeclaration<T> declaration) where T : notnull
+    {
+        Assert.That(declaration.Binding, Is.InstanceOf<PreferredBinding<T>>());
+        return [.. ((PreferredBinding<T>)declaration.Binding).Candidates];
+    }
+
+    private static readonly Occurrence<decimal>[][] Bags =
+        [[], [Ok(1991m)], [BadNumber], [Ok(1991m), BadNumber], [BadNumber, BadNumber]];
+
+    // Every combination of two candidates' bags: the binding a global identifier has resolves to what
+    // PREFERRED() written over the same identifiers evaluates to, except that its unusable occurrences
+    // carry the global identifier's origin.
+    [Test]
+    public void PreferredBinding_ResolvesAsPreferredEvaluates_WithTheGlobalIdentifiersOrigin()
+    {
+        foreach (var first in Bags)
+        {
+            foreach (var second in Bags.Select(bag => bag.Select(o => o is Usable<decimal> ? Ok(2000m) : o).ToArray()))
+            {
+                var p = new TestPredicate();
+                var global = p.Id<decimal>("year");
+                var expansion = Preferred(p.Id("vorbis::year", first), p.Id("ape::year", second));
+                var binding = new PreferredBinding<decimal>([new CannedBinding<decimal>([.. first]), new CannedBinding<decimal>([.. second])]);
+
+                var resolved = binding.Resolve(p.File, global.Origin);
+                var evaluated = p.Evaluate(expansion).Value;
+
+                var context = $"{Value<decimal>.Of(first)} then {Value<decimal>.Of(second)}";
+                Assert.That(resolved.IsAbsent, Is.EqualTo(evaluated.IsAbsent), context);
+                Assert.That(resolved.Occurrences.Select(Datum), Is.EqualTo(evaluated.Occurrences.Select(Datum)), context);
+                Assert.That(resolved.Occurrences.OfType<Unusable<decimal>>().Select(o => o.Origin),
+                    Is.All.EqualTo(global.Origin), context);
+            }
+        }
+    }
+
+    private static decimal? Datum(Occurrence<decimal> occurrence) => occurrence is Usable<decimal>(var datum) ? datum : null;
+
+    [Test]
+    public void PreferredBinding_DoesNotResolveTheCandidatesAfterTheOneChosen()
+    {
+        var chosen = new CannedBinding<decimal>([Ok(1991m)]);
+        var after = new CannedBinding<decimal>([Ok(2000m)]);
+        var binding = new PreferredBinding<decimal>([new CannedBinding<decimal>([BadNumber]), chosen, after]);
+
+        var value = binding.Resolve(new FileData("any"), new Origin(new SourceId(0), "year", 0));
+
+        Assert.That(value.Occurrences, Is.EqualTo(new[] { Ok(1991m) }));
+        Assert.That(after.Resolutions, Is.Zero);
     }
 }

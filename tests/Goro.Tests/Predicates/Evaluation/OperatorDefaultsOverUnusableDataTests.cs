@@ -7,20 +7,24 @@ using static Goro.Tests.Predicates.Evaluation.Support.Nodes;
 namespace Goro.Tests.Predicates.Evaluation;
 
 /// <summary>
-/// Unusable data never selects a file, asserted over generated predicates and files rather than
-/// hand-picked ones. The predicates are drawn from comparisons, ranges, <c>COUNT()</c> and the
-/// logical operators: state tests and <c>FALLBACK()</c> exist to observe or replace unusable
-/// data, so a predicate using them may rightly depend on it.
+/// The operators never answer from unusable data: where a comparison, range or logical operator
+/// gives true or false, it gives the same answer whatever the unreadable data had held. That is a
+/// property of the operators' three-valued logic, not a guarantee about predicates, so it is
+/// asserted over generated predicates built from the operators alone -- comparisons and ranges of
+/// numbers, <c>COUNT()</c>, and the logical operators. Left out are the constructs that make a
+/// result depend on unusable data by design: state tests, <c>FALLBACK()</c> and <c>PREFERRED()</c>,
+/// which observe, replace or route around it, and comparing a condition with a boolean, which turns
+/// a false into a true as <c>NOT</c> does.
 /// </summary>
-public class UnusableNeverSelectsTests
+public class OperatorDefaultsOverUnusableDataTests
 {
     private const int Seed = 20261005;
     private const int Predicates = 400;
     private const int FilesPerPredicate = 12;
     private static readonly decimal[] Domain = [0m, 1m, 2m, 3m, 4m];
 
-    // Without NOT, nothing can turn false into true, so keeping unusable results or reading them
-    // as false selects exactly the same files. Wrapping every operator in FALLBACK(..., FALSE) is
+    // Within that scope and without NOT, nothing can turn a false into a true, so keeping unusable
+    // results or reading them as false selects exactly the same files. Wrapping every operator in FALLBACK(..., FALSE) is
     // what reads them as false.
     [Test]
     public void WithoutNot_ReadingUnusableResultsAsFalse_SelectsTheSameFiles()
@@ -41,8 +45,8 @@ public class UnusableNeverSelectsTests
     }
 
     // A predicate that answers at all gives the same answer whatever the unreadable data had held:
-    // so with NOT too, a true predicate is true for every usable replacement of the unusable
-    // occurrences, and is never true on the strength of data that could not be read.
+    // so with NOT too, an answer survives every usable replacement of the unusable occurrences, and
+    // the operators never make a predicate true on the strength of data that could not be read.
     [Test]
     public void WithNot_AnAnswer_SurvivesEveryUsableReplacementOfTheUnusableOccurrences()
     {

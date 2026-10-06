@@ -68,7 +68,7 @@ A reserved word may still appear in an identifier, but never as its first part u
 
 The modifiers `ALL`, `ANY`, and `LITERALLY` (case-insensitive) are reserved on the same terms.
 
-Function names (such as `COUNT`, `FALLBACK`, `NUMBER`, and `STRING`) are not reserved words in this sense.
+Function names (such as `COUNT`, `FALLBACK`, `NUMBER`, `PREFERRED` and `STRING`) are not reserved words in this sense.
 
 Although the grammar does not require it, no built-in identifier in the global namespace has the same name as a function, and no function is given the name of a built-in global identifier. This is a constraint on what Goro defines rather than on what a predicate may write.
 
@@ -93,7 +93,7 @@ Absence is a property of a whole value, while unusability is a property of a sin
 
 Operators and the boolean literals always produce exactly one boolean, never an absent one, which makes them [definite](#definite-expressions). A boolean can be unusable: a comparison, range or regex operator whose answer depended on an occurrence it could not interpret has no answer to give, and its result is an unusable boolean (see [General operator rules](#general-operator-rules)).
 
-Booleans are **unordered**. They may be compared with `==` and `!=`, tested with a state test, and passed to `COUNT()` and `FALLBACK()`, but it is an error to use one as an operand of an ordering operator, of `BETWEEN`, or of `=~`, or as an argument to `NUMBER()` or `STRING()`.
+Booleans are **unordered**. They may be compared with `==` and `!=`, tested with a state test, and passed to `COUNT()`, `FALLBACK()` and `PREFERRED()`, but it is an error to use one as an operand of an ordering operator, of `BETWEEN`, or of `=~`, or as an argument to `NUMBER()` or `STRING()`.
 
 **string**
 : a sequence of characters, written in either of two forms.
@@ -172,6 +172,7 @@ Some expressions are guaranteed by their form to produce exactly one occurrence,
 - the result of every operator: comparison, range, regex, state test, and the logical operators `AND`, `OR` and `NOT`;
 - `COUNT()`, whatever its argument;
 - `FALLBACK()`, `NUMBER()` and `STRING()` applied to a definite argument;
+- `PREFERRED()` whose every argument is definite;
 - the identifiers `file::path`, `file::name` and `file::size`, which every file has exactly one of;
 - a parenthesized definite expression.
 
@@ -319,7 +320,7 @@ The `AND` and `OR` operators are _short-circuiting_: their operands will always 
 
 This short-circuiting behavior is intended to allow a [state test](#state-test-operator) to be used for checking that a value is fit to use before an operator uses it and emits a warning. A comparison cannot perform that check itself, since by the time it can tell that an occurrence is unusable it has already consumed it; refer to the state tests above for the guard idiom. A state test never evaluates to unusable, so a guard always settles an `AND` when it fails.
 
-The operands of `AND`, `OR`, and `NOT` must be [definite](#definite-expressions) booleans, and it is an error to apply them to anything else. In practice this means their operands are comparisons, state tests, other logical expressions, the literals `TRUE` and `FALSE`, or a `FALLBACK()` of one of these, optionally parenthesized.
+The operands of `AND`, `OR`, and `NOT` must be [definite](#definite-expressions) booleans, and it is an error to apply them to anything else. In practice this means their operands are comparisons, state tests, other logical expressions, the literals `TRUE` and `FALSE`, or a `FALLBACK()` or `PREFERRED()` of these, optionally parenthesized.
 
 #### Grouping, precedence, and associativity
 
@@ -426,7 +427,7 @@ Unusable occurrences arise in three ways:
 
 The first two are where a defect is found, and consuming the occurrence they produce causes Goro to emit a warning to alert you, as described under [Warnings](#warnings) below. The third is a consequence of the first two rather than a further defect.
 
-Two constructs can examine an unusable occurrence without using it, and therefore without warning. A [state test](#state-test-operator) reports state rather than content, so `ALL(NUMBER(x)) IS USABLE` establishes that every occurrence of `x` converted to a number without reporting the ones that did not. And `FALLBACK(expr, literal_default)` substitutes for an occurrence instead of reading it, so it is silent for an unusable occurrence exactly as it is for an absent value.
+Three constructs can examine an unusable occurrence without using it, and therefore without warning. A [state test](#state-test-operator) reports state rather than content, so `ALL(NUMBER(x)) IS USABLE` establishes that every occurrence of `x` converted to a number without reporting the ones that did not. `FALLBACK(expr, literal_default)` substitutes for an occurrence instead of reading it, so it is silent for an unusable occurrence exactly as it is for an absent value. And `PREFERRED()` chooses among its arguments by the state of their occurrences, passing over an argument with nothing usable in it without a word.
 
 Because identifiers can produce unusable occurrences of their own, state tests and `FALLBACK()` are useful applied directly to identifiers and not only to the results of conversions. `FALLBACK(id3v2::track, 0)` substitutes zero both for a track frame that is missing and for one that is present but unusable, and `ANY(id3v2::track) IS USABLE` is the way to require that at least one usable track number exists; if `ANY` were replaced with `ALL`, the test would require that _all_ potentially existing track numbers are usable.
 
@@ -468,6 +469,7 @@ A predicate emits a warning when an unusable occurrence is consumed while it is 
 - `NUMBER()` and `STRING()` map an unusable occurrence to an unusable occurrence. They ask nothing of its content; they _propagate_ it, keeping its source, and they are silent.
 - `COUNT()` reads cardinality, which is knowable without interpreting any occurrence. It is silent.
 - `FALLBACK()` substitutes for an occurrence instead of reading it. It is silent.
+- `PREFERRED()` reads the state of its arguments' occurrences, never their content. It is silent, and the arguments it passes over are discarded unreported.
 - A [state test](#state-test-operator) reads state rather than content. It is silent.
 - An operator's result is unusable only if the operator consumed an unusable occurrence, which has therefore already been reported. Whatever consumes such a result (for example `AND`, `OR` and `NOT`) cannot report anything new.
 - A modifier computes nothing at all, so applying one leaves the operator that follows as the consumer.
@@ -499,6 +501,7 @@ In the following examples, `x` and `y` are identifiers that resolve to an unusab
 | `x > 1 AND y > 1`                  | 2        | an unusable first operand does not settle `AND`, so the second is evaluated as well
 | `(x > 1) == (x > 1)`               | 1        | the outer `==` uses an unusable boolean, which has already been reported
 | `FALLBACK(x > 1, FALSE)`           | 1        | `FALLBACK()` replaces the comparison's result after the comparison has warned
+| `PREFERRED(x, y) > 1`              | 1        | neither argument has anything usable, so `x` is chosen and consumed, and `y` is discarded
 
 Deduplication resets for every file. A predicate such as `id3v2::track == 1` applied to a collection in which 500 files have junk where the track number should be will therefore produce 500 warnings, one per affected file.
 
@@ -598,6 +601,34 @@ If `expr` is a multivalue, this function returns a multivalue of the same cardin
 If `expr` is absent, or is already a number, this function returns the same value. It is an error to pass it a boolean, or a string literal that is not a valid number literal. If `expr` is a bytecount, it returns the count as a number of bytes. If `expr` is a duration, it returns total number of seconds. If `expr` is a string that satisfies the rules for a numeric literal, it is converted to a number and returned. If `expr` is a string that does _not_ validate as a numeric literal, or whose value cannot be represented exactly, the result is an unusable occurrence, which will emit a warning the first time an attempt is made to use it. An unusable input yields an unusable result, propagated in silence.
 
 If the argument is a multivalue, this function returns a multivalue of the same cardinality, with `NUMBER()` applied to each occurrence of the input in turn.
+
+**PREFERRED(expr1, expr2, ...)**
+: chooses one of its arguments, preferring them in the order they are written. It takes two or more arguments, all of one type, and its result is:
+
+- the first argument holding at least one usable occurrence, taken entire, unusable occurrences included;
+- failing that, the first argument that is not absent, every occurrence of which is therefore unusable;
+- failing that, absent.
+
+Usability decides the choice, not mere presence: an argument holding only data that cannot be read does not stop the search, and one holding a usable occurrence wins against every argument after it, whatever else it holds.
+
+The arguments are evaluated left to right, and evaluation stops at the first one holding a usable occurrence: the arguments after it are not evaluated at all, just as the second operand of an `AND` settled by its first is not. This function reads only the state of an occurrence, never its content, so it never consumes one and never warns. The unusable occurrences of an argument it passes over are not part of its result, and nothing reports them. Its result is [definite](#definite-expressions) when every argument is.
+
+Taking two arguments, each absent or holding the occurrences shown:
+
+| `vorbis::year`      | `ape::year` | `PREFERRED(vorbis::year, ape::year)` |
+|---------------------|-------------|--------------------------------------|
+| absent              | usable      | `ape::year`'s value
+| unusable            | usable      | `ape::year`'s value; a preferred argument holding junk does not win over a usable one
+| usable and unusable | usable      | `vorbis::year`'s value entire, the unusable occurrence included
+| unusable            | absent      | `vorbis::year`'s value, all of it unusable; a defect is passed on rather than passed off as absence
+| absent              | absent      | absent
+
+Every identifier in the global namespace has the value of such a call; see [built-in identifiers](../features/builtins/identifiers.md).
+
+Examples:
+
+- `PREFERRED(vorbis::year, id3v2::year) < 2000` compares the Vorbis year of a file that has a usable one, and its Id3v2 year otherwise
+- `PREFERRED(ape::"album artist", vorbis::albumartist) == "various artists"` looks for an album artist where the global namespace does not
 
 **STRING(expr)**
 : converts its argument to a string.
@@ -723,7 +754,7 @@ Not every rule in this document is grammatical, and a construct that this gramma
 - the `operand` of a state test may be of any type, boolean included, since a state test asks about cardinality and state rather than about content;
 - an `identifier` must name a namespace Goro defines, an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may be one of the reserved words only when the identifier begins with `::`;
 - a `name_part` written as a `string` names the same thing as the equivalent bare `name` when the name is one a bare `name` could have spelled, so the two forms are one identifier and not two;
-- a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a literal, `NUMBER()` and `STRING()` do not accept a boolean, and `NUMBER()` does not accept a string literal that is not a valid number literal;
+- a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a literal, `PREFERRED()` takes at least two arguments, all of one type, `NUMBER()` and `STRING()` do not accept a boolean, and `NUMBER()` does not accept a string literal that is not a valid number literal;
 - the `operand` a `LITERALLY` modifier is applied to must be of type string, and must not be the operand of a state test;
 - `ALL` and `ANY` may not both be applied to the same operand, and neither may be applied to the operand of `IS ABSENT`;
 - the two endpoints of a `range` must be literals of the same type, and the range must be able to hold something: `min` must not lie above `max` when compared with it as an occurrence would be, which for strings means cut to the length of `max`, and compared the way the operator will compare them, so that a `LITERALLY` on the operator's other operand decides whether string endpoints are compared normalized;

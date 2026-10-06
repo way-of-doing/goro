@@ -122,7 +122,7 @@ public sealed class EnglishErrorMessages : IErrorMessages
         NullComparison => "That won't work -- we need to test with `IS ABSENT`, goro!",
         TypeMismatch(_, var left, _, var right, _) => $"`{Name(left)}` and `{Name(right)}` don't compare, goro!",
         TypeMismatchNumberVariable(_, var left, _, var right, _) => $"`{Name(left)}` and `{Name(right)}` don't compare; only a literal number stands in, goro!",
-        FallbackTypeMismatch(_, var argument, var argumentType, var @default, var defaultType) => $"`{@default}` is `{Name(defaultType)}`, but `{argument}` is `{Name(argumentType)}`, goro!",
+        ArgumentTypeMismatch(_, var expected, var expectedType, var argument, var argumentType) => $"`{argument}` is `{Name(argumentType)}`, but `{expected}` is `{Name(expectedType)}`, goro!",
         RangeTypeMismatch(_, var subjectType, _, var rangeType) => $"`{Name(subjectType)}` can't sit in a `{Name(rangeType)}` range, goro!",
         NegativeUnitLiteral(_, var unit) => unit switch
         {
@@ -150,6 +150,11 @@ public sealed class EnglishErrorMessages : IErrorMessages
             1 => $"`{function}()` takes one argument, not {actual}, goro!",
             2 => $"`{function}()` takes two arguments, not {actual}, goro!",
             _ => $"`{function}()` takes {expected} arguments, not {actual}, goro!",
+        },
+        TooFewArguments(var function, var minimum, var actual) => minimum switch
+        {
+            2 => $"`{function}()` takes at least two arguments, not {actual}, goro!",
+            _ => $"`{function}()` takes at least {minimum} arguments, not {actual}, goro!",
         },
         FallbackDefaultNotLiteral => "The fallback has to be a literal, goro!",
         InvalidNumberLiteral(var literal, _) => $"`{literal}` will never be a number, goro!",

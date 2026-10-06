@@ -85,6 +85,8 @@ internal static class Nodes
 
     public static Fallback<T> Fallback<T>(Expression<T> argument, T @default) where T : notnull => new(argument, @default);
 
+    public static Preferred<T> Preferred<T>(params Expression<T>[] arguments) where T : notnull => new([.. arguments]);
+
     /// <summary>The mirror image of a comparison operator: <c>a op b</c> says what <c>b mirror a</c> says.</summary>
     public static ComparisonOperator Mirror(ComparisonOperator @operator) => @operator switch
     {

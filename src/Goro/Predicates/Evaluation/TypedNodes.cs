@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Syntax;
@@ -94,6 +95,10 @@ internal static class TypedNodes
     public static Expression Fallback(Expression argument, Expression @default) =>
         argument.Apply(new FallbackOf(@default));
 
+    /// <param name="arguments">Two or more expressions of one type.</param>
+    public static Expression Preferred(ImmutableArray<Expression> arguments) =>
+        arguments[0].Apply(new PreferredOf(arguments));
+
     public static Condition Comparison(
         Expression left, Quantifier leftQuantifier, ComparisonOperator @operator,
         Expression right, Quantifier rightQuantifier, ComparisonMode mode) =>
@@ -120,6 +125,12 @@ internal static class TypedNodes
     {
         public Expression Invoke<T>(Expression<T> expression) where T : notnull =>
             new Fallback<T>(expression, ((Literal<T>)@default).Value);
+    }
+
+    private sealed class PreferredOf(ImmutableArray<Expression> arguments) : IExpressionFunc<Expression>
+    {
+        public Expression Invoke<T>(Expression<T> first) where T : notnull =>
+            new Preferred<T>([.. arguments.Select(argument => (Expression<T>)argument)]);
     }
 
     private sealed class ComparisonOf(

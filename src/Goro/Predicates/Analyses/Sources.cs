@@ -51,6 +51,7 @@ public static class Sources
             SemanticConversion conversion => Source(conversion, Shape.Call(conversion.Type == GoroType.Number ? "NUMBER" : "STRING", Visit(conversion.Argument))),
             SemanticCount count => Shape.Call("COUNT", Visit(count.Argument)),
             SemanticFallback fallback => Shape.Call("FALLBACK", Visit(fallback.Argument), Visit(fallback.Default)),
+            SemanticPreferred preferred => Shape.Call("PREFERRED", [.. preferred.Arguments.Select(Visit)]),
             SemanticComparison comparison => Shape.Operator(Symbol(comparison.Operator), Visit(comparison.Left.Expression), Visit(comparison.Right.Expression)),
             SemanticRange range => Range(range),
             SemanticMatch match => Shape.Operator("=~", Visit(match.Subject.Expression), Shape.Quote(match.Pattern.Value)),

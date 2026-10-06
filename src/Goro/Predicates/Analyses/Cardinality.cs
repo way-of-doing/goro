@@ -49,8 +49,11 @@ public static class Cardinality
                 SemanticConversion conversion => Definite[conversion.Argument],
                 SemanticCount => true,
                 SemanticFallback fallback => Definite[fallback.Argument],
+                SemanticPreferred preferred => preferred.Arguments.All(argument => Definite[argument]),
                 // A FALLBACK with the wrong number of arguments is still as definite as its argument.
                 SemanticMalformedCall { Function: "FALLBACK", Arguments: [var argument, ..] } => Definite[argument],
+                // A PREFERRED with too few arguments is still definite when they all are.
+                SemanticMalformedCall { Function: "PREFERRED" } malformed => malformed.Arguments.All(argument => Definite[argument]),
                 SemanticMalformedCall => true,
                 SemanticInvalid => true,
                 SemanticOperator => true,
