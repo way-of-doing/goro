@@ -248,7 +248,7 @@ public class PredicateStageTests
         public Expression<T> Identifier<T>(IdentifierName name, string written) where T : notnull
         {
             var found = (IdentifierLookup.Found)BuiltInCatalog.Instance.Lookup(name);
-            return (Expression<T>)found.Declaration.Bind(Next(written));
+            return new IdentifierReference<T>((IdentifierDeclaration<T>)found.Declaration, Next(written));
         }
 
         public Expression<decimal> NumberOf(Expression<string> argument, string? written = null)

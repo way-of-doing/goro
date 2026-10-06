@@ -160,3 +160,18 @@ account of the predicate compiler describes the binder, the analyses and lowerin
   instead.
 
   Next step: review, then merge into `main`.
+- 2026-10-06 -- Removed `IdentifierDeclaration.Bind`, which was the one reference from `Identifiers`
+  into `Evaluation`. `TypedNodes.Reference` now builds the reference, with one type pattern per
+  datum type. That puts it where every other step from a Goro type held as data to a C# type
+  parameter already happens. `Bind` had been a second place doing it, through a virtual call.
+  `Identifiers` now depends only on `Values`. Checked by the suite, 2051 tests, and by the
+  comparison against `main`, which still matches exactly.
+
+  Two other cycles remain between namespaces:
+  - `Analyses` and `Lowering`, introduced by the previous entry's split: the constants analysis
+    prepares range ends with `TypedNodes` and `PreparedRange`, which are in `Lowering`, while
+    lowering reads the analyses' results.
+  - `Syntax` and `Diagnostics`, which predates this line: `Diagnostic` holds a `TextSpan`, and the
+    lexer and parser return `StageResult`s.
+
+  Next step: decide how to break those two, then review and merge into `main`.

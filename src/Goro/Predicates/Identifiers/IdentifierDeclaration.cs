@@ -1,4 +1,3 @@
-using Goro.Predicates.Evaluation;
 using Goro.Predicates.Values;
 
 namespace Goro.Predicates.Identifiers;
@@ -21,12 +20,6 @@ public abstract class IdentifierDeclaration
     public bool IsDefinite { get; }
 
     public abstract GoroType Type { get; }
-
-    /// <summary>
-    /// A reference to this identifier. The declaration knows its own datum type, so this is how
-    /// lowering gets a typed node from a name the binder looked up.
-    /// </summary>
-    public abstract Expression Bind(Origin origin);
 }
 
 public sealed class IdentifierDeclaration<T>(IdentifierName name, bool isDefinite, IdentifierBinding<T> binding)
@@ -35,6 +28,4 @@ public sealed class IdentifierDeclaration<T>(IdentifierName name, bool isDefinit
     public IdentifierBinding<T> Binding { get; } = binding;
 
     public override GoroType Type => GoroTypes.Of<T>();
-
-    public override Expression Bind(Origin origin) => new IdentifierReference<T>(this, origin);
 }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Goro.Predicates.Binding;
 using Goro.Predicates.Evaluation;
+using Goro.Predicates.Identifiers;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Text;
 using Goro.Predicates.Values;
@@ -15,10 +16,21 @@ namespace Goro.Predicates.Lowering;
 /// Where a node is generic over its operand's datum type, <see cref="Expression.Apply{TResult}"/>
 /// hands the operand back with its type as a type argument, and every other operand of the same
 /// node is cast to match; the binder has checked that the types agree before lowering asks. Where both
-/// types are concrete, as for literals and conversions, a switch says it directly.
+/// types are concrete, as for literals, conversions and identifier references, a switch says it directly.
 /// </remarks>
 internal static class TypedNodes
 {
+    /// <summary>A reference to an identifier the binder looked up, typed by its declaration.</summary>
+    public static Expression Reference(IdentifierDeclaration declaration, Origin origin) => declaration switch
+    {
+        IdentifierDeclaration<string> typed => new IdentifierReference<string>(typed, origin),
+        IdentifierDeclaration<decimal> typed => new IdentifierReference<decimal>(typed, origin),
+        IdentifierDeclaration<ByteCount> typed => new IdentifierReference<ByteCount>(typed, origin),
+        IdentifierDeclaration<Duration> typed => new IdentifierReference<Duration>(typed, origin),
+        IdentifierDeclaration<bool> typed => new IdentifierReference<bool>(typed, origin),
+        _ => throw new UnreachableException($"{declaration.Type} has no datum type."),
+    };
+
     /// <summary>A literal, standing for what the binder decided it stands for.</summary>
     public static Expression Literal(SemanticLiteral literal) =>
         literal.StandsIn ? UnitLiteral(literal.Type!.Value, ((NumberToken)literal.Token).Value) : Literal(literal.Token);
