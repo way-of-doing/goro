@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, features/builtins/identifiers.md, design/rationale.md, testing.md, src/Goro/Predicates, tests/Goro.Tests/Predicates
 after: semantic-analysis-passes
@@ -145,3 +145,6 @@ forms and the new diagnostic, and the cardinality and constants analyses impleme
   - design/predicate-runtime.md and earlier briefs keep the old word as history.
 
   2187 tests pass. Next step: PJ's review, then commit and land.
+- 2026-10-07 -- Landed: PJ approved, so it is marked `landed` and merged into main. Left for later:
+  the tag namespaces that are open today keep `0..many` until sources-and-fields gives each concept's
+  cell its own bounds. Next on the recommended queue: as-operator.
