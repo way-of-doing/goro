@@ -1,7 +1,7 @@
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Evaluation.Support;
-using static Goro.Tests.Predicates.Evaluation.Support.Bound;
+using static Goro.Tests.Predicates.Evaluation.Support.Nodes;
 
 namespace Goro.Tests.Predicates.Evaluation;
 
@@ -114,7 +114,7 @@ public class QuantifierTests
             [], [Ok(1m)], [Ok(2m)], [BadNumber], [Ok(1m), Ok(2m)], [Ok(2m), Ok(3m)], [Ok(1m), Ok(2m), Ok(3m)],
             [Ok(1m), BadNumber], [Ok(3m), BadNumber], [BadNumber, BadNumber],
         ];
-        Func<Goro.Predicates.Binding.BoundExpression<decimal>, Goro.Predicates.Binding.BoundExpression<decimal>>[] quantifiers = [e => e, All];
+        Func<Goro.Predicates.Evaluation.Expression<decimal>, Goro.Predicates.Evaluation.Expression<decimal>>[] quantifiers = [e => e, All];
         var cases = 0;
 
         Assert.Multiple(() =>

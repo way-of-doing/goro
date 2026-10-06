@@ -1,8 +1,8 @@
-using Goro.Predicates.Binding;
+using Goro.Predicates.Evaluation;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Evaluation.Support;
-using static Goro.Tests.Predicates.Evaluation.Support.Bound;
+using static Goro.Tests.Predicates.Evaluation.Support.Nodes;
 
 namespace Goro.Tests.Predicates.Evaluation;
 
@@ -184,12 +184,12 @@ public class UnusableNeverSelectsTests
         return p.Decide(Build(predicate, identifiers, unusableAsFalse)).Truth;
     }
 
-    private static BoundExpression<bool> Build(Node node, IdentifierReference<decimal>[] identifiers, bool unusableAsFalse)
+    private static Expression<bool> Build(Node node, IdentifierReference<decimal>[] identifiers, bool unusableAsFalse)
     {
-        BoundExpression<decimal> Quantified(int identifier, bool all) =>
+        Expression<decimal> Quantified(int identifier, bool all) =>
             all ? All(identifiers[identifier]) : identifiers[identifier];
 
-        BoundExpression<bool> Operator(BoundExpression<bool> condition) =>
+        Expression<bool> Operator(Expression<bool> condition) =>
             unusableAsFalse ? Fallback(condition, false) : condition;
 
         return node switch

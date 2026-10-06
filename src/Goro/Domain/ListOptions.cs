@@ -1,5 +1,5 @@
 using Goro.Output;
-using Goro.Predicates.Binding;
+using Goro.Predicates;
 
 namespace Goro.Domain;
 

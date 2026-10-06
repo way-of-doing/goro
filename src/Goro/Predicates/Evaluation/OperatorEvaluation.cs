@@ -1,5 +1,4 @@
 // Owned by the evaluator group (G5) of the predicate-runtime-architecture line.
-using Goro.Predicates.Binding;
 using Goro.Predicates.Values;
 
 namespace Goro.Predicates.Evaluation;

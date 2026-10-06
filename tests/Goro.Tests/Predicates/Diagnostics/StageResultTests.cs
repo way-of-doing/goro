@@ -1,6 +1,5 @@
 using Goro.Messages;
 using Goro.Predicates.Diagnostics;
-using Goro.Predicates.Syntax;
 
 namespace Goro.Tests.Predicates.Diagnostics;
 

@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Goro.Messages;
-using Goro.Predicates.Syntax;
 
 namespace Goro.Predicates.Diagnostics;
 

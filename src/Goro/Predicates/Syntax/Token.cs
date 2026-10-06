@@ -1,3 +1,4 @@
+using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Values;
 
 namespace Goro.Predicates.Syntax;

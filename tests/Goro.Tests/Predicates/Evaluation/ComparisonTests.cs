@@ -1,7 +1,7 @@
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Evaluation.Support;
-using static Goro.Tests.Predicates.Evaluation.Support.Bound;
+using static Goro.Tests.Predicates.Evaluation.Support.Nodes;
 
 namespace Goro.Tests.Predicates.Evaluation;
 

@@ -1,6 +1,7 @@
 using Goro.Domain;
 using Goro.Pipeline;
-using Goro.Predicates.Binding;
+using Goro.Predicates;
+using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Text;
@@ -232,7 +233,7 @@ public class PredicateStageTests
             new(sources.File<Duration>("duration"), Quantifier.Existential), ComparisonOperator.GreaterOrEqual,
             new(new Literal<Duration>(new Duration(0)), Quantifier.Existential), NaturalOrder<Duration>.Instance));
 
-    private static ComparisonTest<decimal> GreaterThanOne(BoundExpression<decimal> left) =>
+    private static ComparisonTest<decimal> GreaterThanOne(Expression<decimal> left) =>
         new(new(left, Quantifier.Existential), ComparisonOperator.Greater,
             new(new Literal<decimal>(1m), Quantifier.Existential), NaturalOrder<decimal>.Instance);
 
@@ -241,22 +242,22 @@ public class PredicateStageTests
     {
         private readonly List<string> _forms = [];
 
-        public BoundExpression<T> File<T>(string name) where T : notnull =>
+        public Expression<T> File<T>(string name) where T : notnull =>
             Identifier<T>(new IdentifierName(["file"], name), $"file::{name}");
 
-        public BoundExpression<T> Identifier<T>(IdentifierName name, string written) where T : notnull
+        public Expression<T> Identifier<T>(IdentifierName name, string written) where T : notnull
         {
             var found = (IdentifierLookup.Found)BuiltInCatalog.Instance.Lookup(name);
-            return (BoundExpression<T>)found.Declaration.Bind(Next(written));
+            return new IdentifierReference<T>((IdentifierDeclaration<T>)found.Declaration, Next(written));
         }
 
-        public BoundExpression<decimal> NumberOf(BoundExpression<string> argument, string? written = null)
+        public Expression<decimal> NumberOf(Expression<string> argument, string? written = null)
         {
             var form = $"NUMBER({_forms[^1]})";
             return new Conversion<string, decimal>(argument, Conversions.NumberFromString, Next(form, written));
         }
 
-        public CompiledPredicate Compile(BoundExpression<bool> root) =>
+        public CompiledPredicate Compile(Expression<bool> root) =>
             new("(built by hand)", root, new SourceTable([.. _forms]));
 
         private Origin Next(string form, string? written = null)

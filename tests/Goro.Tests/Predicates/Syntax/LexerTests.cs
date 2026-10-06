@@ -1,3 +1,4 @@
+using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Syntax;
 using static Goro.Tests.Predicates.Syntax.SyntaxAssert;
 using Codes = Goro.Predicates.Syntax.SyntaxDiagnosticCodes;

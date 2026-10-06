@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using Goro.Predicates.Binding;
+using Goro.Predicates;
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
@@ -14,7 +14,7 @@ namespace Goro.Tests.Predicates.Evaluation.Support;
 internal sealed class TestPredicate
 {
     private readonly Dictionary<string, SourceId> sources = new(StringComparer.Ordinal);
-    private readonly ConditionalWeakTable<BoundExpression, string> canonicalForms = [];
+    private readonly ConditionalWeakTable<Expression, string> canonicalForms = [];
 
     public int SourceCount => sources.Count;
 
@@ -37,32 +37,32 @@ internal sealed class TestPredicate
     public IdentifierReference<T> Mention<T>(IdentifierReference<T> identifier, string text, int start) where T : notnull =>
         Register(new IdentifierReference<T>(identifier.Declaration, new Origin(identifier.Origin.Source, text, start)), CanonicalForm(identifier));
 
-    public Conversion<string, decimal> Number(BoundExpression<string> argument, string? text = null) =>
+    public Conversion<string, decimal> Number(Expression<string> argument, string? text = null) =>
         Convert<string, decimal>(argument, Conversions.NumberFromString, "NUMBER", text);
 
-    public Conversion<ByteCount, decimal> Number(BoundExpression<ByteCount> argument) =>
+    public Conversion<ByteCount, decimal> Number(Expression<ByteCount> argument) =>
         Convert<ByteCount, decimal>(argument, Conversions.NumberFromByteCount, "NUMBER", null);
 
-    public Conversion<Duration, decimal> Number(BoundExpression<Duration> argument) =>
+    public Conversion<Duration, decimal> Number(Expression<Duration> argument) =>
         Convert<Duration, decimal>(argument, Conversions.NumberFromDuration, "NUMBER", null);
 
-    public Conversion<decimal, string> String(BoundExpression<decimal> argument) =>
+    public Conversion<decimal, string> String(Expression<decimal> argument) =>
         Convert<decimal, string>(argument, Conversions.StringFromNumber, "STRING", null);
 
-    public Conversion<ByteCount, string> String(BoundExpression<ByteCount> argument) =>
+    public Conversion<ByteCount, string> String(Expression<ByteCount> argument) =>
         Convert<ByteCount, string>(argument, Conversions.StringFromByteCount, "STRING", null);
 
-    public Conversion<Duration, string> String(BoundExpression<Duration> argument) =>
+    public Conversion<Duration, string> String(Expression<Duration> argument) =>
         Convert<Duration, string>(argument, Conversions.StringFromDuration, "STRING", null);
 
-    public Outcome Decide(BoundExpression<bool> predicate)
+    public Outcome Decide(Expression<bool> predicate)
     {
         var context = new EvaluationContext(File, SourceCount);
         var truth = new CompiledPredicate("(test)", predicate, SourceTable.Empty).Evaluate(context);
         return new(truth, context.Reported);
     }
 
-    public (Value<T> Value, IReadOnlyList<Origin> Reported) Evaluate<T>(BoundExpression<T> expression) where T : notnull
+    public (Value<T> Value, IReadOnlyList<Origin> Reported) Evaluate<T>(Expression<T> expression) where T : notnull
     {
         var context = new EvaluationContext(File, SourceCount);
         return (expression.Evaluate(context), context.Reported);
@@ -71,7 +71,7 @@ internal sealed class TestPredicate
     public SourceId SourceOf(string canonicalForm) => sources[canonicalForm];
 
     private Conversion<TFrom, TTo> Convert<TFrom, TTo>(
-        BoundExpression<TFrom> argument, DatumConversion<TFrom, TTo> convert, string function, string? text)
+        Expression<TFrom> argument, DatumConversion<TFrom, TTo> convert, string function, string? text)
         where TFrom : notnull where TTo : notnull
     {
         var canonical = $"{function}({CanonicalForm(argument)})";
@@ -89,19 +89,19 @@ internal sealed class TestPredicate
         return new Origin(source, text, 0);
     }
 
-    private TNode Register<TNode>(TNode node, string canonicalForm) where TNode : BoundExpression
+    private TNode Register<TNode>(TNode node, string canonicalForm) where TNode : Expression
     {
         canonicalForms.Add(node, canonicalForm);
         return node;
     }
 
-    private string CanonicalForm(BoundExpression expression) =>
+    private string CanonicalForm(Expression expression) =>
         canonicalForms.TryGetValue(expression, out var form) ? form
         : expression.Apply(new LiteralText()) ?? throw new ArgumentException($"{expression} has no source here.");
 
-    private sealed class LiteralText : IBoundExpressionFunc<string?>
+    private sealed class LiteralText : IExpressionFunc<string?>
     {
-        public string? Invoke<T>(BoundExpression<T> expression) where T : notnull =>
+        public string? Invoke<T>(Expression<T> expression) where T : notnull =>
             expression is Literal<T> literal ? $"{literal.Value}" : null;
     }
 }
