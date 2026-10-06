@@ -65,11 +65,11 @@ Any per-file state that a pipeline stage needs -- for example the set of already
 
 ## Executor
 
-The executor is responsible for invoking the pipeline for each input file, managing concurrency, and collecting the pipeline results. Each file outcome is recorded in the run's tally, which hands the file's warnings on as one batch and counts what the file counts towards; the result, if there is one, is passed on to the output renderer. An exception escaping a pipeline invocation is a defect, not a fact about the file, and fails the run.
+The executor is responsible for invoking the pipeline for each input file, managing concurrency, and collecting the pipeline results. Each file outcome is recorded in the run's tally, which hands the file's warnings on as one batch and counts what the file counts towards, including whether its predicate could not be answered; the result, if there is one, is passed on to the output renderer. Once every result has been rendered, a run in which some predicate could not be answered emits the one warning about it, worded by the command, so that it comes after every other warning and is never written by a run that was interrupted. An exception escaping a pipeline invocation is a defect, not a fact about the file, and fails the run.
 
 ## Warning sink
 
-This component receives each file's warnings as one batch, from any number of concurrent invocations, and writes them to standard error, each as a whole line. It drops a suppressed category on arrival, so that a suppressed warning is never written and never counted. What it did produce, together with the tally's counts, is what the exit code is chosen from.
+This component receives each file's warnings as one batch, from any number of concurrent invocations, and the run's own warning at the end, and writes them to standard error, each as a whole line. It drops a suppressed category on arrival, so that a suppressed warning is never written and never counted. What it did produce, together with the tally's counts, is what the exit code is chosen from.
 
 ## Output renderer
 

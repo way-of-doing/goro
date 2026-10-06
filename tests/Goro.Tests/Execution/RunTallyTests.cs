@@ -34,6 +34,21 @@ public class RunTallyTests
     }
 
     [Test]
+    public void Record_CountsTheUnansweredFiles_WhateverTheirDisposition()
+    {
+        var tally = new RunTally(new RecordingWarningSink());
+
+        tally.Record(FileOutcome<string>.Unmatched(unanswered: true));
+        tally.Record(FileOutcome<string>.Matched("b", unanswered: true));
+        tally.Record(FileOutcome<string>.Unmatched());
+        tally.Record(FileOutcome<string>.Matched("d"));
+        tally.Record(FileOutcome<string>.Unreadable(new FileWarning("e", "damaged")));
+
+        Assert.That(tally.Outcome, Has.Property(nameof(RunOutcome.Unanswered)).EqualTo(2)
+            .And.Property(nameof(RunOutcome.Examined)).EqualTo(4));
+    }
+
+    [Test]
     public void Record_HandsTheFilesWarningsToTheSinkTogether_AndOutcomeReportsTheirCategories()
     {
         var sink = new RecordingWarningSink();

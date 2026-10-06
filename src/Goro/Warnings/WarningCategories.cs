@@ -14,6 +14,7 @@ public static class WarningCategories
     private static readonly (string Name, WarningCategory Value)[] Entries =
     [
         ("data", WarningCategory.Data),
+        ("unanswered", WarningCategory.Unanswered),
         ("file", WarningCategory.File),
     ];
 

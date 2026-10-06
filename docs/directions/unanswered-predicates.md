@@ -81,3 +81,50 @@ tested, including a run under `--no-warn=data` whose only file was defaulted ret
   run worded by each command, a count only, unreadable files not counted, no option to list the
   defaulted files since `(P) IS UNUSABLE` already does, and the codes renumbered to `10`, `11` and
   `12`. Next step: pick up the line.
+- 2026-10-06 -- Spec and implementation done by the coordinator, not a worker: most of it is
+  normative prose, and a wrong exit-code precedence would pass plausible tests. Nothing is
+  committed yet.
+  - **Decided with PJ:**
+    - **The wording**, predicate-first, as one whole sentence per case:
+      - "the predicate could not be answered for 3 of the 120 files examined, which were not
+        listed";
+      - "1 of the 120 … which was not listed";
+      - "the one file examined";
+      - "any of the 5 files examined".
+    - **The shape of the code**, a flag on `FileOutcome` rather than a new disposition or a subtype
+      of `Unmatched`. Which disposition an unanswered file gets is each command's policy. `list`
+      makes it `Unmatched`, which counts towards `20`, while a future `hash --filter` would make it
+      `Matched`, so "unanswered" and the disposition are separate axes.
+  - **Spec.**
+    - Three categories in warnings.md. The new one is the only warning naming a run; it comes last,
+      is never written by an interrupted run, and reports the command's defaults, never the
+      author's.
+    - Codes `10`, `11` and `12` in exit-codes.md, with the reason for the order.
+    - list.md shows the warning.
+    - The rationale's categories question now answers for three, and why the new code sits between
+      the other two.
+    - The deferred entry on an exit code for unanswered predicates is gone, and the FAQ and
+      testing.md are brought in line.
+  - **Code.**
+    - `WarningCategory.Unanswered`, and `Warning` split into `PathWarning`, for data and file
+      warnings, and `UnansweredWarning`.
+    - `FileOutcome.IsUnanswered`, and a count in `RunTally`/`RunOutcome`.
+    - `FileRun` emits the command's summary through the sink after rendering, so suppression and
+      the exit code treat it like any other warning.
+    - `PredicateStage.Unanswered` words `list`'s summary.
+    - `ExitCodes` renumbered, and `ExitCodes.UnansweredPredicates = 11` added.
+  - **Tests.** 2139 pass, 32 of them new. Among them:
+    - the precedence cases;
+    - the wording's four cases;
+    - the tally;
+    - the sink suppressing the new category;
+    - end to end: one summary for several files, written last; an unreadable file not counted; the
+      brief's `--no-warn=data` run whose only file was defaulted, returning `11`;
+      `--no-warn=unanswered` returning `10`; and `all` indistinguishable from every category named.
+
+    Existing tests whose predicates went unanswered were changed to keep testing what they meant
+    to. Data-warning-only scenarios now end in a false `AND`, as in
+    `NUMBER(file::name) > 1 AND file::size < 0`.
+  - **Open.** The brief's question on data warnings being on by default in commands other than a
+    future `goro audit` remains for when such a command exists. Next step: PJ's review, then commit
+    and land.

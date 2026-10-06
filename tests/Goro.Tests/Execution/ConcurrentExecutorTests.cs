@@ -122,7 +122,7 @@ public class ConcurrentExecutorTests
 
         Assert.That(_warnings.Batches, Has.Count.EqualTo(20));
         Assert.That(_warnings.Batches.Select(b => b.Count), Has.All.EqualTo(2));
-        Assert.That(_warnings.Batches.Select(b => b.Select(w => w.Path).Distinct().Count()), Has.All.EqualTo(1));
+        Assert.That(_warnings.Batches.Select(b => b.Select(w => ((PathWarning)w).Path).Distinct().Count()), Has.All.EqualTo(1));
     }
 
     // A stage reports a file it cannot read through its outcome; an exception means something is

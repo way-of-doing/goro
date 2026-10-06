@@ -13,6 +13,7 @@ public sealed class RunTally(IWarningSink warnings)
     private int _found;
     private int _examined;
     private int _matched;
+    private int _unanswered;
 
     public void Record<TResult>(FileOutcome<TResult> outcome)
         where TResult : class
@@ -23,6 +24,11 @@ public sealed class RunTally(IWarningSink warnings)
         }
 
         Interlocked.Increment(ref _found);
+        if (outcome.IsUnanswered)
+        {
+            Interlocked.Increment(ref _unanswered);
+        }
+
         switch (outcome.Disposition)
         {
             case FileDisposition.Matched:
@@ -44,5 +50,6 @@ public sealed class RunTally(IWarningSink warnings)
         Volatile.Read(ref _found),
         Volatile.Read(ref _examined),
         Volatile.Read(ref _matched),
-        warnings.Produced);
+        warnings.Produced,
+        Volatile.Read(ref _unanswered));
 }

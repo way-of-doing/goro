@@ -10,7 +10,8 @@ warning - a remark about the data a run met, which does not stop the run
 
 A warning reports something about the data Goro was asked to work with that deserves a person's
 attention and that Goro cannot settle on their behalf: a tag field holding something that is not
-what it should be, or a file that cannot be read at all. A warning is not an error. **It never
+what it should be, a predicate left without an answer because of one, or a file that cannot be
+read at all. A warning is not an error. **It never
 interrupts a run, and it never changes what the run produces for any other file.**
 
 Every condition Goro can detect is one of two things. An **error** is reported before
@@ -21,7 +22,7 @@ There is no third category, and nothing about one file is ever allowed to become
 
 ### What warns
 
-Every warning belongs to exactly one of two categories, which `--no-warn` and the exit code
+Every warning belongs to exactly one of three categories, which `--no-warn` and the exit code
 refer to.
 
 **Data that cannot be interpreted -- the `data` category.** A tag field holding something that cannot be read as the kind
@@ -30,10 +31,23 @@ exactly when it fires -- which constructs consume an unusable occurrence and whi
 how a warning is attributed, and how warnings are deduplicated within a file -- belong to
 predicates and are described under [Warnings](predicates.md#warnings) there.
 
-Unusable data can leave a predicate without an answer for a file, where the answer depended on
-the data that could not be read. What a command does with such a file is the command's to say,
-and each command that accepts a predicate documents it; `goro list` does not list the file. The
-warning is emitted where the data was used, whether or not the answer turned out to depend on it.
+The warning is emitted where the data was used, whether or not the answer turned out to depend on
+it. A data warning therefore says that junk was seen, and nothing about whether it mattered.
+
+**A predicate that could not be answered -- the `unanswered` category.** Unusable data can leave a
+predicate without an answer for a file, where the answer depended on the data that could not be
+read. What a command does with such a file is the command's to say, and each command that accepts
+a predicate documents it; `goro list` does not list the file. Once every file has been processed,
+a run in which this happened to any file emits **one warning** saying how many files it was, out
+of how many examined, and what the command did with them. A predicate that settles its own
+default, as `FALLBACK(condition, TRUE)` does, always has an answer, so this warning reports the
+command's defaults and never the author's. A file that cannot be read is not counted, having a
+warning of its own.
+
+This is the one warning about a run rather than about a file. It comes after every other warning
+the run emits, and a run that is interrupted never emits it. It is a count and nothing more: it
+does not say which files were affected, and `(P) IS UNUSABLE`, where `P` is the predicate, is how
+to select exactly those.
 
 **A file that cannot be read -- the `file` category.** Where Goro must read a file to do what was asked and cannot -- the
 file has gone since it was discovered, permission is refused, or its contents are damaged or not
@@ -62,9 +76,9 @@ could read none of a thousand files emits a thousand warnings.
 ### Where warnings go
 
 Warnings are written to standard error and never to standard output. Each one names where to
-look -- the file being processed, or a directory that could not be listed -- together with
-whatever identifies the cause: for unusable data, the sub-expression responsible as it was
-written in the predicate.
+look -- the file being processed, a directory that could not be listed, or the run as a whole --
+together with whatever identifies the cause: for unusable data, the sub-expression responsible as
+it was written in the predicate.
 
 ### Suppressing warnings
 
@@ -73,8 +87,9 @@ suppress, attached with `=` or as the next argument, like any other option value
 
 ```
 --no-warn=data           suppress data warnings only
+--no-warn=unanswered     suppress the warning about predicates that could not be answered
 --no-warn=file           suppress file warnings only
---no-warn=data,file      both, which is every category there is
+--no-warn=data,file      data and file warnings, leaving the unanswered one
 --no-warn=all            every category, however many there are
 ```
 
@@ -97,6 +112,6 @@ format or one file.
 
 A warning does not by itself make a command fail. A run that warned is still a run that completed,
 and reporting that fact through the exit code is opt-in. With `--strict-exit-code` a run that
-emitted at least one data warning returns `10`, and one that emitted at least one file warning
-returns `11`. See [Exit codes](exit-codes.md) for the codes, for which of them takes precedence,
+emitted at least one data warning returns `10`, one that emitted the warning about predicates that
+could not be answered returns `11`, and one that emitted at least one file warning returns `12`. See [Exit codes](exit-codes.md) for the codes, for which of them takes precedence,
 and for what suppressing a category does to them.

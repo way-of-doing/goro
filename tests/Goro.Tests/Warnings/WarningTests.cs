@@ -23,6 +23,15 @@ public class WarningTests
     }
 
     [Test]
+    public void UnansweredWarning_NamesNoPath_SayingWhatTheCommandWroteWhole()
+    {
+        var warning = new UnansweredWarning("the predicate could not be answered for the one file examined, which was not listed");
+
+        Assert.That(warning.Category, Is.EqualTo(WarningCategory.Unanswered));
+        Assert.That(warning.ToString(), Is.EqualTo("goro: warning: the predicate could not be answered for the one file examined, which was not listed"));
+    }
+
+    [Test]
     public void FileWarning_From_DescribesCommonCausesWithoutRepeatingThePath()
     {
         Assert.That(FileWarning.From("/a.mp3", new FileNotFoundException("Could not find file '/a.mp3'.")).Cause, Is.EqualTo("no such file or directory"));

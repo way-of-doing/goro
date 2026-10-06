@@ -48,6 +48,19 @@ public class WarningSinkTests
     }
 
     [Test]
+    public void Emit_SuppressedUnanswered_IsNeitherWrittenNorRecorded_AndLeavesTheOthersAlone()
+    {
+        var writer = new StringWriter();
+        var sink = new WarningSink(writer, new HashSet<WarningCategory> { WarningCategory.Unanswered });
+
+        sink.Emit([Data, File]);
+        sink.Emit([new UnansweredWarning("the predicate could not be answered for the one file examined, which was not listed")]);
+
+        Assert.That(Lines(writer), Is.EqualTo(new[] { Data.ToString(), File.ToString() }));
+        Assert.That(sink.Produced, Is.EquivalentTo(new[] { WarningCategory.Data, WarningCategory.File }));
+    }
+
+    [Test]
     public void Emit_EveryCategorySuppressed_LeavesNoTraceAtAll()
     {
         var writer = new StringWriter();

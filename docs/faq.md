@@ -133,10 +133,12 @@ finds the zero-filled tags without catching the deliberate ones.
 
 Suppressing data warnings on a library whose tags are known to be imperfect is ordinary
 housekeeping: nobody needs to be told twice a week that a tag they have decided not to fix is
-still unfixed. Suppressing file warnings is a different matter. A file that cannot be read is the
-condition Goro exists to find, and silencing it in a scheduled run removes the one signal that
-would report a disc going bad. The two categories are separate so that the noisy condition you
-have accepted need not bury the quiet one you have not.
+still unfixed. It costs you nothing you need, because when junk actually changes what a run did --
+a file left out because its predicate could not be answered -- the `unanswered` warning says so
+on its own, once per run. Suppressing file warnings is a different matter. A file that cannot be
+read is the condition Goro exists to find, and silencing it in a scheduled run removes the one
+signal that would report a disc going bad. The categories are separate so that the noisy condition
+you have accepted need not bury the quiet ones you have not.
 
 ## Scripting
 
@@ -161,20 +163,24 @@ fi
 
 See [Exit codes](concepts/exit-codes.md) for what each code means.
 
-### Why did my run return `10` when nothing matched?
+### Why did my run return `10` or `11` when nothing matched?
 
 Because something wrong with the data a run read is reported ahead of what the query found: it
-may well be the reason the query found nothing. A value that cannot be interpreted leaves every
-comparison using it without an answer, and `goro list` leaves such a file out. If you have
-accepted the junk in your tags, `--no-warn=data` removes the data warnings, and with them `10`,
-so that an empty result shows up as `20`.
+may well be the reason the query found nothing. `10` means some data could not be interpreted;
+if you have accepted the junk in your tags, `--no-warn=data` removes the data warnings, and with
+them `10`, so that an empty result shows up as `20`. `11` means more than that: the junk left the
+predicate without an answer for some files, and `goro list` left them out. Suppressing data
+warnings does not hide that, since it is a different thing to be told; `--no-warn=unanswered`
+does, if you really do not mind.
 
-### Why does `11` outrank `10`?
+### Why does `12` outrank `11`, and `11` outrank `10`?
 
-A data warning means every file was answered, and some data was disregarded along the way. A file
-warning means some file was not processed at all, so the output is incomplete and anything
-concluded from it may be wrong for a reason it does not show. That is the more serious thing to
-learn, and one a script may well want to branch on separately.
+Because each says more about how far to trust the result. A data warning means some data was
+disregarded, which may have changed nothing. An unanswered predicate means it did change
+something: `goro list` decided for itself to leave some files out. A file warning means some file
+was not processed at all, so the output is incomplete and anything concluded from it may be wrong
+for a reason it does not show. That is the most serious thing to learn, and one a script may well
+want to branch on separately.
 
 ### Why does an interrupted run not return a code of Goro's own?
 

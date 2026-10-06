@@ -71,6 +71,7 @@ public sealed class ListCommand(
         var renderer = output.CreateRenderer<ListResult>(r => r.File);
 
         return new FileRun(fileDiscovery, executor, messages)
-            .ExecuteAsync(settings, options.PathSpecs, () => pipelinePlanner.PlanList(options), renderer, cancellationToken);
+            .ExecuteAsync(settings, options.PathSpecs, () => pipelinePlanner.PlanList(options), renderer, cancellationToken,
+                unanswered: filter is null ? null : PredicateStage.Unanswered);
     }
 }
