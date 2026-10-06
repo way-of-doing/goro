@@ -22,7 +22,7 @@ internal sealed class TestCatalog : IIdentifierCatalog
     /// <summary>
     /// Numbers <c>a</c>, <c>b</c>, <c>c</c>, <c>d</c>, <c>v</c>, <c>w</c>, <c>x</c>, <c>y</c> and
     /// <c>year</c>; strings <c>artist</c>, <c>genre</c>, <c>m</c>, <c>s</c>, <c>t</c> and <c>title</c>;
-    /// the boolean <c>flag</c>; and <c>one</c>, a definite string. All absent.
+    /// the boolean <c>flag</c>; and <c>one</c>, a string that is exactly one. All absent.
     /// </summary>
     public static TestCatalog Standard()
     {
@@ -38,7 +38,7 @@ internal sealed class TestCatalog : IIdentifierCatalog
         }
 
         catalog.With<bool>("flag");
-        catalog.Declare("one", isDefinite: true, new CannedBinding<string>([new Usable<string>("one")]));
+        catalog.Declare("one", Bounds.ExactlyOne, new CannedBinding<string>([new Usable<string>("one")]));
         return catalog;
     }
 
@@ -47,7 +47,7 @@ internal sealed class TestCatalog : IIdentifierCatalog
     /// <c>lab::q</c> declares it in a closed namespace of the test's own.
     /// </summary>
     public TestCatalog With<T>(string name, params Occurrence<T>[] occurrences) where T : notnull =>
-        Declare(name, isDefinite: false, new CannedBinding<T>([.. occurrences]));
+        Declare(name, Bounds.Any, new CannedBinding<T>([.. occurrences]));
 
     /// <summary>How often the named identifier was resolved: a test's way of seeing that nothing was evaluated.</summary>
     public int Resolutions(string name) => bindings[name] switch
@@ -71,11 +71,11 @@ internal sealed class TestCatalog : IIdentifierCatalog
             : BuiltInCatalog.Instance.Lookup(name);
     }
 
-    private TestCatalog Declare<T>(string name, bool isDefinite, CannedBinding<T> binding) where T : notnull
+    private TestCatalog Declare<T>(string name, Bounds bounds, CannedBinding<T> binding) where T : notnull
     {
         var parts = name.Split("::");
         var identifier = new IdentifierName(parts[..^1], parts[^1]);
-        declarations[identifier] = new IdentifierDeclaration<T>(identifier, isDefinite, binding);
+        declarations[identifier] = new IdentifierDeclaration<T>(identifier, bounds, binding);
         bindings[name] = binding;
         return this;
     }

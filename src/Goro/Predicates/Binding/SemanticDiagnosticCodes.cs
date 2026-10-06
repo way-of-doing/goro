@@ -20,9 +20,9 @@ public static class SemanticDiagnosticCodes
     public const string BooleanNotConvertible = "boolean-not-convertible";
     public const string MatchSubjectNotString = "match-subject-not-string";
 
-    // Definiteness.
+    // Exactly one.
     public const string NotACondition = "not-a-condition";
-    public const string IndefiniteCondition = "indefinite-condition";
+    public const string ConditionNotExactlyOne = "condition-not-exactly-one";
     public const string AmbiguousNotEqual = "ambiguous-not-equal";
 
     // Modifiers.
@@ -34,7 +34,7 @@ public static class SemanticDiagnosticCodes
 
     // Functions.
     public const string WrongArgumentCount = "wrong-argument-count";
-    public const string FallbackDefaultNotLiteral = "fallback-default-not-literal";
+    public const string FallbackDefaultNotConstant = "fallback-default-not-constant";
     public const string InvalidNumberLiteral = "invalid-number-literal";
 
     // Ranges.

@@ -10,7 +10,7 @@ namespace Goro.Predicates.Binding;
 /// could not be made sense of, so that every analysis can still look for mistakes of its own.
 /// </summary>
 /// <param name="Syntax">The syntax tree it was bound from.</param>
-/// <param name="Root">The predicate, which the specification requires to be a definite boolean.</param>
+/// <param name="Root">The predicate, which the specification requires to be exactly one boolean.</param>
 /// <param name="Diagnostics">The binder's own errors.</param>
 public sealed record SemanticTree(SyntaxTree Syntax, SemanticExpression Root, ImmutableArray<Diagnostic> Diagnostics)
 {

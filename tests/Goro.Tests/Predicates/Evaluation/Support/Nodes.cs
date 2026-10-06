@@ -123,7 +123,7 @@ internal static class Nodes
 
         public Quantifier Quantifier { get; } = quantifier;
 
-        public override bool IsDefinite => Operand.IsDefinite;
+        public override Bounds Bounds => Operand.Bounds;
 
         public override Value<T> Evaluate(EvaluationContext context) =>
             throw new InvalidOperationException("A modifier belongs to the operator that reads it.");

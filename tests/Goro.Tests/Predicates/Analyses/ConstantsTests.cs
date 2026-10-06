@@ -14,17 +14,42 @@ public class ConstantsTests
     [TestCase("file::size > 1.5", new string[0])]
     [TestCase("x > -1.5", new string[0])]
     [TestCase("FALLBACK(file::size, -1) > 1", new[] { Codes.NegativeUnitLiteral })]
-    [TestCase("FALLBACK(x, y) > 1", new[] { Codes.FallbackDefaultNotLiteral })]
+    [TestCase("FALLBACK(x, y) > 1", new[] { Codes.FallbackDefaultNotConstant })]
     [TestCase("FALLBACK(x, (1)) > 1", new string[0])]
-    [TestCase("FALLBACK(x, NUMBER(1)) > 1", new[] { Codes.FallbackDefaultNotLiteral })]
+    [TestCase("FALLBACK(x, NUMBER(1)) > 1", new string[0])]
+    [TestCase("FALLBACK(x, NUMBER(\"5\")) > 1", new string[0])]
+    [TestCase("FALLBACK(x, NUMBER(\"y\")) > 1", new[] { Codes.InvalidNumberLiteral })]
+    [TestCase("FALLBACK(x, COUNT(y)) > 1", new[] { Codes.FallbackDefaultNotConstant })]
+    [TestCase("FALLBACK(artist, STRING(5)) == \"5\"", new string[0])]
     [TestCase("NUMBER(\"abc\") > 1", new[] { Codes.InvalidNumberLiteral })]
     [TestCase("NUMBER(\"12\") > 1", new string[0])]
-    [TestCase("NUMBER(STRING(\"abc\")) > 1", new string[0])]
+    [TestCase("NUMBER(STRING(\"abc\")) > 1", new[] { Codes.InvalidNumberLiteral })]
+    [TestCase("NUMBER(NUMBER(\"abc\")) > 1", new[] { Codes.InvalidNumberLiteral })]
+    [TestCase("NUMBER(TRUE) > 1", new string[0])]
     [TestCase("artist BETWEEN \"b\"..\"a\"", new[] { Codes.RangeReversed })]
     [TestCase("file::size BETWEEN 5..1", new[] { Codes.RangeReversed })]
     public void Rules(string text, string[] codes)
     {
         Assert.That(Constants.Analyse(Analyse.Bind(text)).Diagnostics.Codes(), Is.EqualTo(codes));
+    }
+
+    [TestCase("NUMBER(\"5\") > 1", "NUMBER(\"5\")", "5")]
+    [TestCase("STRING(1.50) == \"x\"", "STRING(1.50)", "1.5")]
+    [TestCase("NUMBER(STRING(1kb)) > 1", "NUMBER(STRING(1kb))", "1000")]
+    [TestCase("STRING(file::duration) == \"x\"", "STRING(file::duration)", null)]
+    public void AConversionOfAConstant_IsWorkedOutWhenThePredicateIsRead(string text, string written, string? value)
+    {
+        var tree = Analyse.Bind(text);
+
+        var folded = Constants.Analyse(tree).ValueOf(tree.Find(written));
+
+        Assert.That(folded?.Apply(new LiteralText()), Is.EqualTo(value));
+    }
+
+    private sealed class LiteralText : Goro.Predicates.Evaluation.IExpressionFunc<string?>
+    {
+        public string? Invoke<T>(Goro.Predicates.Evaluation.Expression<T> expression) where T : notnull =>
+            expression is Goro.Predicates.Evaluation.Literal<T> literal ? $"{literal.Value}" : null;
     }
 
     [TestCase("artist BETWEEN \"B\"..\"a\"", true)]

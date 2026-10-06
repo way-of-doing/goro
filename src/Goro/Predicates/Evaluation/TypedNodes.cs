@@ -89,6 +89,26 @@ internal static class TypedNodes
         var type => throw new UnreachableException($"STRING() does not accept a {type}."),
     };
 
+    /// <summary>
+    /// <c>NUMBER()</c> or <c>STRING()</c> of a literal, worked out now: the literal it converts to, or
+    /// null where it does not convert. A conversion to the literal's own type is the literal itself.
+    /// </summary>
+    public static Expression? ConvertLiteral(Expression literal, GoroType target) => (literal, target) switch
+    {
+        (_, _) when literal.Type == target => literal,
+        (Literal<string> text, GoroType.Number) => Conversions.NumberFromString(text.Value, out var number) ? new Literal<decimal>(number) : null,
+        (Literal<ByteCount> bytes, GoroType.Number) => Converted<ByteCount, decimal>(bytes.Value, Conversions.NumberFromByteCount),
+        (Literal<Duration> seconds, GoroType.Number) => Converted<Duration, decimal>(seconds.Value, Conversions.NumberFromDuration),
+        (Literal<decimal> number, GoroType.String) => Converted<decimal, string>(number.Value, Conversions.StringFromNumber),
+        (Literal<ByteCount> bytes, GoroType.String) => Converted<ByteCount, string>(bytes.Value, Conversions.StringFromByteCount),
+        (Literal<Duration> seconds, GoroType.String) => Converted<Duration, string>(seconds.Value, Conversions.StringFromDuration),
+        _ => throw new UnreachableException($"{target.ToString().ToUpperInvariant()}() does not accept a {literal.Type}."),
+    };
+
+    private static Literal<TTo> Converted<TFrom, TTo>(TFrom datum, DatumConversion<TFrom, TTo> convert)
+        where TFrom : notnull where TTo : notnull =>
+        convert(datum, out var converted) ? new Literal<TTo>(converted) : throw new UnreachableException("Only text can fail to convert.");
+
     public static Expression Count(Expression argument) => argument.Apply(CountOf.Instance);
 
     /// <param name="default">A literal of the argument's type.</param>

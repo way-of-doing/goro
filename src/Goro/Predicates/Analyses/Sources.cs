@@ -48,6 +48,8 @@ public static class Sources
             SemanticLiteral literal => Shape.OfLiteral(literal.Token),
             SemanticIdentifier identifier => Source(identifier, Identifier(identifier.Declaration.Name)),
             SemanticConversion { IsIdentity: true } conversion => Visit(conversion.Argument),
+            // Worked out when the predicate is read, so it can never be unusable, and is no source.
+            SemanticConversion { IsConstant: true } conversion => Shape.Call(conversion.Type == GoroType.Number ? "NUMBER" : "STRING", Visit(conversion.Argument)),
             SemanticConversion conversion => Source(conversion, Shape.Call(conversion.Type == GoroType.Number ? "NUMBER" : "STRING", Visit(conversion.Argument))),
             SemanticCount count => Shape.Call("COUNT", Visit(count.Argument)),
             SemanticFallback fallback => Shape.Call("FALLBACK", Visit(fallback.Argument), Visit(fallback.Default)),

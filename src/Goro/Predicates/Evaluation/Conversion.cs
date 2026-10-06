@@ -25,7 +25,7 @@ public sealed class Conversion<TFrom, TTo>(Expression<TFrom> argument, DatumConv
 
     public Origin Origin { get; } = origin;
 
-    public override bool IsDefinite => Argument.IsDefinite;
+    public override Bounds Bounds => Argument.Bounds;
 
     // Maps each occurrence to one occurrence, so cardinality is kept and absence stays absence. An
     // unusable occurrence is propagated rather than read, keeping its origin, and nothing is reported.

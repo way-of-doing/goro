@@ -198,7 +198,7 @@ public class ParserTests
         Assert.That(Tree("year == null"), Is.EqualTo("(== year NULL)"));
     }
 
-    // The definiteness, typing and literal-ness of these are the binder's; the parser must accept them.
+    // The bounds, typing and literal-ness of these are the binder's; the parser must accept them.
     [TestCase("genre != \"x\"")]
     [TestCase("LITERALLY(genre) != \"x\"")]
     [TestCase("FALLBACK(genre, \"\") != \"x\"")]

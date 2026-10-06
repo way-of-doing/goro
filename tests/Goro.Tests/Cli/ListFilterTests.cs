@@ -134,7 +134,7 @@ public class ListFilterTests
     }
 
     [Test]
-    public async Task NotEqualOnAnOperandThatIsNotDefinite_IsRejected_OfferingBothRewrites()
+    public async Task NotEqualOnAnOperandThatIsNotExactlyOne_IsRejected_OfferingBothRewrites()
     {
         _collection.Mp3("a.mp3");
 

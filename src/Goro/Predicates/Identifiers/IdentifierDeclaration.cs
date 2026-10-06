@@ -3,27 +3,27 @@ using Goro.Predicates.Values;
 namespace Goro.Predicates.Identifiers;
 
 /// <summary>
-/// What the binder knows about an identifier before any file is read: its type, whether it is
-/// definite, and how to resolve it for a file.
+/// What the binder knows about an identifier before any file is read: its type, its bounds, and how
+/// to resolve it for a file.
 /// </summary>
 public abstract class IdentifierDeclaration
 {
-    private protected IdentifierDeclaration(IdentifierName name, bool isDefinite)
+    private protected IdentifierDeclaration(IdentifierName name, Bounds bounds)
     {
         Name = name;
-        IsDefinite = isDefinite;
+        Bounds = bounds;
     }
 
     public IdentifierName Name { get; }
 
-    /// <summary>Whether every file evaluated has exactly one occurrence of it.</summary>
-    public bool IsDefinite { get; }
+    /// <summary>Whether a file evaluated can have none of it, and whether it can have several.</summary>
+    public Bounds Bounds { get; }
 
     public abstract GoroType Type { get; }
 }
 
-public sealed class IdentifierDeclaration<T>(IdentifierName name, bool isDefinite, IdentifierBinding<T> binding)
-    : IdentifierDeclaration(name, isDefinite) where T : notnull
+public sealed class IdentifierDeclaration<T>(IdentifierName name, Bounds bounds, IdentifierBinding<T> binding)
+    : IdentifierDeclaration(name, bounds) where T : notnull
 {
     public IdentifierBinding<T> Binding { get; } = binding;
 

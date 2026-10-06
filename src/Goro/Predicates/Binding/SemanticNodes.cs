@@ -42,6 +42,12 @@ public abstract class SemanticExpression
 
     public bool IsError => Type is null;
 
+    /// <summary>
+    /// Whether its value is known when the predicate is read: a literal, or a conversion of a constant.
+    /// Parentheses are gone already, so a parenthesized constant is one too.
+    /// </summary>
+    public virtual bool IsConstant => false;
+
     /// <summary>The sub-expressions it is made of, in the order they were written.</summary>
     public abstract IEnumerable<SemanticExpression> Children { get; }
 
@@ -75,6 +81,8 @@ public sealed class SemanticLiteral(LiteralSyntax syntax, GoroType type) : Seman
 
     /// <summary>A number literal taken as a number, which is what may stand for a bytecount or a duration.</summary>
     public bool IsNumber => Token is NumberToken && Type == GoroType.Number;
+
+    public override bool IsConstant => true;
 
     public override IEnumerable<SemanticExpression> Children => [];
 
@@ -113,6 +121,8 @@ public sealed class SemanticConversion(FunctionCallSyntax syntax, GoroType targe
     public SemanticExpression Argument { get; } = argument;
 
     public bool IsIdentity => Argument.Type == Type;
+
+    public override bool IsConstant => Argument.IsConstant;
 
     public override IEnumerable<SemanticExpression> Children => [Argument];
 }

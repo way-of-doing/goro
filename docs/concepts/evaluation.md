@@ -21,20 +21,24 @@ Evaluation is against one file at a time. Each operand of a comparison, range or
 
 ### Static judgements
 
-Every expression has a type and is or is not definite, both decided when the predicate is read. Here, an _operator_ is any comparison, range, regex, state test or logical operator.
+Every expression has a type, bounds, and is or is not a constant, all decided when the predicate is read. Here, an _operator_ is any comparison, range, regex, state test or logical operator.
 
-| Expression                | Type         | Definite  |
-|---------------------------|--------------|-----------|
-| literal                   | as written   | yes
-| identifier                | as declared  | as declared
-| `COUNT(e)`                | number       | yes
-| `NUMBER(e)`               | number       | when `e` is
-| `STRING(e)`               | string       | when `e` is
-| `FALLBACK(e, d)`          | that of `e`  | when `e` is
-| `PREFERRED(e1 … en)`      | that of `e1` | when every `ei` is
-| any operator              | boolean      | yes
-| `(e)`                     | that of `e`  | when `e` is
-| a modifier applied to `e` | that of `e`  | when `e` is
+The bounds of an expression are written `l..u`. Its lower bound `l` is `0` if it can be absent for some file and `1` if it never can; its upper bound `u` is `1` if it never holds more than one occurrence and `many` if it can. An expression is _exactly one_ when its bounds are `1..1`.
+
+| Expression                | Type         | Constant    | Bounds  |
+|---------------------------|--------------|-------------|---------|
+| literal                   | as written   | yes         | `1..1`
+| identifier                | as declared  | no          | as declared
+| `COUNT(e)`                | number       | no          | `1..1`
+| `NUMBER(e)`               | number       | when `e` is | those of `e`
+| `STRING(e)`               | string       | when `e` is | those of `e`
+| `FALLBACK(e, d)`          | that of `e`  | no          | `1..u`, where `e` is `l..u`
+| `PREFERRED(e1 … en)`      | that of `e1` | no          | the largest lower bound among the `ei`, and the largest upper bound
+| any operator              | boolean      | no          | `1..1`
+| `(e)`                     | that of `e`  | when `e` is | those of `e`
+| a modifier applied to `e` | that of `e`  | when `e` is | those of `e`
+
+A constant is evaluated when the predicate is read rather than for each file. A conversion of a constant that does not convert is therefore an error, reported then, and a constant always has exactly one usable occurrence, the same for every file.
 
 The operands each construct accepts are given in the predicate documentation, and under [Constraints not expressed by the grammar](predicates.md#constraints-not-expressed-by-the-grammar).
 

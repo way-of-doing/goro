@@ -11,7 +11,7 @@ public sealed class Literal<T>(T value) : Expression<T> where T : notnull
 
     public T Value { get; } = value;
 
-    public override bool IsDefinite => true;
+    public override Bounds Bounds => Bounds.ExactlyOne;
 
     public override Value<T> Evaluate(EvaluationContext context) => occurrence;
 }

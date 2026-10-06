@@ -13,7 +13,7 @@ public sealed class IdentifierReference<T>(IdentifierDeclaration<T> declaration,
 
     public Origin Origin { get; } = origin;
 
-    public override bool IsDefinite => Declaration.IsDefinite;
+    public override Bounds Bounds => Declaration.Bounds;
 
     public override Value<T> Evaluate(EvaluationContext context) => Declaration.Binding.Resolve(context.File, Origin);
 }

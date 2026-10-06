@@ -30,7 +30,7 @@ public class TruthsTests
     }
 
     [Test]
-    public void ToTruth_OfValueThatIsNotDefinite_Throws()
+    public void ToTruth_OfValueThatIsNotExactlyOne_Throws()
     {
         var multivalue = Value<bool>.Of(new Usable<bool>(true), new Usable<bool>(false));
 

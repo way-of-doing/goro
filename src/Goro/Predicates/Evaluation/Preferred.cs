@@ -11,7 +11,7 @@ public sealed class Preferred<T>(ImmutableArray<Expression<T>> arguments) : Expr
 {
     public ImmutableArray<Expression<T>> Arguments { get; } = arguments;
 
-    public override bool IsDefinite => Arguments.All(argument => argument.IsDefinite);
+    public override Bounds Bounds => Bounds.Preferred(Arguments.Select(argument => argument.Bounds));
 
     // Evaluates its arguments in written order and stops at the one chosen. It reads only the state of
     // their occurrences, so it reports nothing, and what it passes over is discarded unreported.

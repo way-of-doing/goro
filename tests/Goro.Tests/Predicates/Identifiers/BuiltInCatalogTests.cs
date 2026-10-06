@@ -23,8 +23,8 @@ public class BuiltInCatalogTests
 
     private static IEnumerable<TestCaseData> DeclaredIdentifiers()
     {
-        TestCaseData Row(string identifier, GoroType type, bool isDefinite = false) =>
-            new TestCaseData(identifier, type, isDefinite).SetArgDisplayNames(identifier);
+        TestCaseData Row(string identifier, GoroType type, Bounds? bounds = null) =>
+            new TestCaseData(identifier, type, bounds ?? Bounds.Any).SetArgDisplayNames(identifier);
 
         yield return Row("artist", GoroType.String);
         yield return Row("album", GoroType.String);
@@ -32,25 +32,25 @@ public class BuiltInCatalogTests
         yield return Row("title", GoroType.String);
         yield return Row("year", GoroType.Number);
 
-        yield return Row("file::duration", GoroType.Duration);
-        yield return Row("file::extension", GoroType.String);
-        yield return Row("file::name", GoroType.String, isDefinite: true);
-        yield return Row("file::path", GoroType.String, isDefinite: true);
-        yield return Row("file::size", GoroType.ByteCount, isDefinite: true);
+        yield return Row("file::duration", GoroType.Duration, Bounds.ExactlyOne);
+        yield return Row("file::extension", GoroType.String, Bounds.AtMostOne);
+        yield return Row("file::name", GoroType.String, Bounds.ExactlyOne);
+        yield return Row("file::path", GoroType.String, Bounds.ExactlyOne);
+        yield return Row("file::size", GoroType.ByteCount, Bounds.ExactlyOne);
 
         foreach (var @namespace in new[] { "id3v1", "id3v1::raw" })
         {
-            yield return Row($"{@namespace}::artist", GoroType.String);
-            yield return Row($"{@namespace}::album", GoroType.String);
-            yield return Row($"{@namespace}::comment", GoroType.String);
-            yield return Row($"{@namespace}::title", GoroType.String);
-            yield return Row($"{@namespace}::track", GoroType.Number);
+            yield return Row($"{@namespace}::artist", GoroType.String, Bounds.AtMostOne);
+            yield return Row($"{@namespace}::album", GoroType.String, Bounds.AtMostOne);
+            yield return Row($"{@namespace}::comment", GoroType.String, Bounds.AtMostOne);
+            yield return Row($"{@namespace}::title", GoroType.String, Bounds.AtMostOne);
+            yield return Row($"{@namespace}::track", GoroType.Number, Bounds.AtMostOne);
         }
 
-        yield return Row("id3v1::genre", GoroType.String);
-        yield return Row("id3v1::year", GoroType.Number);
-        yield return Row("id3v1::raw::genre", GoroType.Number);
-        yield return Row("id3v1::raw::year", GoroType.String);
+        yield return Row("id3v1::genre", GoroType.String, Bounds.AtMostOne);
+        yield return Row("id3v1::year", GoroType.Number, Bounds.AtMostOne);
+        yield return Row("id3v1::raw::genre", GoroType.Number, Bounds.AtMostOne);
+        yield return Row("id3v1::raw::year", GoroType.String, Bounds.AtMostOne);
 
         foreach (var @namespace in new[] { "ape", "id3v2", "vorbis" })
         {
@@ -82,17 +82,17 @@ public class BuiltInCatalogTests
     }
 
     [TestCaseSource(nameof(DeclaredIdentifiers))]
-    public void Lookup_DeclaredIdentifier_IsFoundWithItsTypeAndDefiniteness(string identifier, GoroType type, bool isDefinite)
+    public void Lookup_DeclaredIdentifier_IsFoundWithItsTypeAndBounds(string identifier, GoroType type, Bounds bounds)
     {
         var declaration = Found(Lookup(identifier));
 
         Assert.That(declaration.Name, Is.EqualTo(Parse(identifier)));
         Assert.That(declaration.Type, Is.EqualTo(type));
-        Assert.That(declaration.IsDefinite, Is.EqualTo(isDefinite));
+        Assert.That(declaration.Bounds, Is.EqualTo(bounds));
     }
 
     [TestCaseSource(nameof(DeclaredIdentifiers))]
-    public void Lookup_DeclaredIdentifier_IgnoresCase(string identifier, GoroType type, bool isDefinite)
+    public void Lookup_DeclaredIdentifier_IgnoresCase(string identifier, GoroType type, Bounds bounds)
     {
         var declaration = Found(Lookup(identifier.ToUpperInvariant()));
 
@@ -162,7 +162,7 @@ public class BuiltInCatalogTests
     [TestCase(new[] { "vorbis" }, "raw")]
     [TestCase(new[] { "vorbis", "raw" }, "year")]
     [TestCase(new[] { "vorbis", "raw" }, "tracknumber")]
-    public void Lookup_AnyOtherNameInOpenNamespace_IsAStringThatIsNotDefinite(string[] @namespace, string name)
+    public void Lookup_AnyOtherNameInOpenNamespace_IsAStringThatCanBeAbsentOrSeveral(string[] @namespace, string name)
     {
         var identifier = new IdentifierName(@namespace, name);
 
@@ -170,7 +170,7 @@ public class BuiltInCatalogTests
 
         Assert.That(declaration.Name, Is.EqualTo(identifier));
         Assert.That(declaration.Type, Is.EqualTo(GoroType.String));
-        Assert.That(declaration.IsDefinite, Is.False);
+        Assert.That(declaration.Bounds, Is.EqualTo(Bounds.Any));
     }
 
     [Test]

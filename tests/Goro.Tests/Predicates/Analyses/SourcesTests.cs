@@ -30,6 +30,13 @@ public class SourcesTests
         Assert.That(Sources.Analyse(Analyse.Bind("NUMBER(x) > 1")).Table.CanonicalForms, Is.EqualTo(new[] { "x" }));
     }
 
+    // Worked out when the predicate is read, a conversion of a constant can never be unusable.
+    [Test]
+    public void ConversionOfAConstant_IsNoSource()
+    {
+        Assert.That(Sources.Analyse(Analyse.Bind("NUMBER(\"5\") > x")).Table.CanonicalForms, Is.EqualTo(new[] { "x" }));
+    }
+
     [Test]
     public void NumberStandingForAUnit_HasTheShapeOfThatUnit()
     {
