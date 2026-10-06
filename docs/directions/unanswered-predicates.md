@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: focused
 touches: concepts/warnings.md, concepts/exit-codes.md, commands/list.md, design/rationale.md, design/deferred.md, architecture.md, faq.md, testing.md, src/Goro/Warnings, src/Goro/Pipeline, src/Goro/Execution, src/Goro/Messages, src/Goro/Cli, tests/Goro.Tests
 after:
-branch:
+branch: line/unanswered-predicates
 ---
 # A warning for predicates that could not be answered
 
