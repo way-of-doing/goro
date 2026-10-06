@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: broad
 touches: concepts/predicates.md, concepts/evaluation.md, features/builtins/identifiers.md, design/rationale.md, design/deferred.md, architecture.md, testing.md, faq.md, src/Goro/Predicates
 after: preferred, as-operator, semantic-analysis-passes, cardinality-and-constants
-branch:
+branch: line/sources-and-fields
 ---
 # Sources, concepts and fields
 
