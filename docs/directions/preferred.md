@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, features/builtins/identifiers.md, design/rationale.md, design/deferred.md, testing.md, faq.md, src/Goro/Predicates, tests/Goro.Tests/Predicates
 after:
-branch:
+branch: line/preferred
 ---
 # `PREFERRED()`
 
