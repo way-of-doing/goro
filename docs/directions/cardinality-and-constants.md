@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, features/builtins/identifiers.md, design/rationale.md, testing.md, src/Goro/Predicates, tests/Goro.Tests/Predicates
 after: semantic-analysis-passes
-branch:
+branch: line/cardinality-and-constants
 ---
 # Cardinality bounds and constants
 
