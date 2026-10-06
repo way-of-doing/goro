@@ -1,4 +1,5 @@
 using Goro.Messages;
+using Goro.Predicates.Diagnostics;
 using static Goro.Tests.Predicates.Syntax.SyntaxAssert;
 using Codes = Goro.Predicates.Syntax.SyntaxDiagnosticCodes;
 
@@ -410,6 +411,6 @@ public class ParserDiagnosticTests
     {
         const string text = "artist = \"metallica\" && year = 2000";
         var error = Error(text);
-        Assert.That(error.Span, Is.EqualTo(new Goro.Predicates.Syntax.TextSpan(7, 1)));
+        Assert.That(error.Span, Is.EqualTo(new TextSpan(7, 1)));
     }
 }

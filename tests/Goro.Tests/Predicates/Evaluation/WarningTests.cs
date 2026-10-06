@@ -1,4 +1,3 @@
-using Goro.Predicates.Evaluation;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Evaluation.Support;

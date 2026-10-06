@@ -1,5 +1,4 @@
 using Goro.Predicates.Analyses;
-using Goro.Predicates.Binding;
 using Goro.Tests.Predicates.Support;
 using Codes = Goro.Predicates.Binding.SemanticDiagnosticCodes;
 

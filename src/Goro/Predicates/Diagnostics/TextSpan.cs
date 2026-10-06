@@ -1,4 +1,4 @@
-namespace Goro.Predicates.Syntax;
+namespace Goro.Predicates.Diagnostics;
 
 /// <summary>
 /// A stretch of the predicate text, by character offset. Every token and syntax node carries one,

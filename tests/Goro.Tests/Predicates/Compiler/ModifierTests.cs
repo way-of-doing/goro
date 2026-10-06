@@ -1,4 +1,3 @@
-using Goro.Predicates.Binding;
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Text;
 using static Goro.Tests.Predicates.Support.CompileAssert;

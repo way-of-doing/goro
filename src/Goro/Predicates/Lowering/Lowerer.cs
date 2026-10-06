@@ -31,7 +31,7 @@ public static class Lowerer
     {
         public Expression Lower(SemanticExpression node) => node switch
         {
-            SemanticLiteral literal => TypedNodes.Literal(literal),
+            SemanticLiteral literal => TypedNodes.Literal(literal.Token, literal.Type!.Value),
             SemanticIdentifier identifier => TypedNodes.Reference(identifier.Declaration, sources.OriginOf(identifier)),
             SemanticConversion { IsIdentity: true } conversion => Lower(conversion.Argument),
             SemanticConversion conversion => conversion.Type == GoroType.Number

@@ -175,3 +175,25 @@ account of the predicate compiler describes the binder, the analyses and lowerin
     lexer and parser return `StageResult`s.
 
   Next step: decide how to break those two, then review and merge into `main`.
+- 2026-10-06 -- Broke both remaining cycles, so no namespace under `Goro.Predicates` depends on
+  itself through another. Each layer now uses only those before it, in the order `Values`, `Text`,
+  `Diagnostics`, `Syntax`, `Identifiers`, `Evaluation`, `Binding`, `Analyses`, `Lowering`, then the
+  root. `Diagnostics` depends on nothing in `Goro.Predicates`. `Goro.Messages`, which it uses, uses
+  only `Values`.
+  - `TypedNodes` and `PreparedRange` moved from `Lowering` to `Evaluation`: they are how the
+    evaluation tree is built from types held as data, and both the constants analysis and lowering
+    use them. `TypedNodes.Literal` now takes a token and a type rather than a `SemanticLiteral`, so
+    it no longer reaches into `Binding`. `Lowering` is left with `Lowerer` alone.
+  - `TextSpan` moved from `Syntax` to `Diagnostics`, since a span is where in the predicate's text a
+    diagnostic points. This leaves `Diagnostics` holding a span, the diagnostic itself and
+    `StageResult`, which might not all belong together. It is still a small namespace, and a move
+    that shows the question is better than a cycle that hides it. A candidate for splitting later.
+
+  `Binding` uses `Evaluation` only for `Quantifier`, which `SemanticOperand` carries. That edge is
+  in the right direction but a little odd, and `Quantifier` could live lower down.
+
+  Checked: the suite passes, 2051 tests, and the comparison against `main` still matches exactly.
+  The analyzer for unnecessary usings (IDE0005), run with documentation generation and style
+  enforcement on, finds none left.
+
+  Next step: review, then merge into `main`.

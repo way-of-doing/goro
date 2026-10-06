@@ -1,4 +1,5 @@
 using Goro.Messages;
+using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 

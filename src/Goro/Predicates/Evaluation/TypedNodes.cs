@@ -1,12 +1,10 @@
 using System.Diagnostics;
-using Goro.Predicates.Binding;
-using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Text;
 using Goro.Predicates.Values;
 
-namespace Goro.Predicates.Lowering;
+namespace Goro.Predicates.Evaluation;
 
 /// <summary>
 /// The bridge from Goro's types, which static analysis knows only as values of <see cref="GoroType"/>,
@@ -15,7 +13,7 @@ namespace Goro.Predicates.Lowering;
 /// <remarks>
 /// Where a node is generic over its operand's datum type, <see cref="Expression.Apply{TResult}"/>
 /// hands the operand back with its type as a type argument, and every other operand of the same
-/// node is cast to match; the binder has checked that the types agree before lowering asks. Where both
+/// node is cast to match; the binder has checked that the types agree before anything asks. Where both
 /// types are concrete, as for literals, conversions and identifier references, a switch says it directly.
 /// </remarks>
 internal static class TypedNodes
@@ -31,9 +29,14 @@ internal static class TypedNodes
         _ => throw new UnreachableException($"{declaration.Type} has no datum type."),
     };
 
-    /// <summary>A literal, standing for what the binder decided it stands for.</summary>
-    public static Expression Literal(SemanticLiteral literal) =>
-        literal.StandsIn ? UnitLiteral(literal.Type!.Value, ((NumberToken)literal.Token).Value) : Literal(literal.Token);
+    /// <summary>
+    /// A literal of <paramref name="type"/>: its token's own type, or a bytecount or a duration that a
+    /// number literal stands for, by the numeric literal exception.
+    /// </summary>
+    public static Expression Literal(Token literal, GoroType type) =>
+        literal is NumberToken number && type is GoroType.ByteCount or GoroType.Duration
+            ? UnitLiteral(type, number.Value)
+            : Literal(literal);
 
     public static Expression Literal(Token literal) => literal switch
     {

@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Goro.Predicates.Binding;
 using Goro.Predicates.Diagnostics;
-using Goro.Predicates.Lowering;
+using Goro.Predicates.Evaluation;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 
@@ -73,7 +73,8 @@ public static class Constants
             return null;
         }
 
-        return TypedNodes.PrepareRange(TypedNodes.Literal(minimum), TypedNodes.Literal(maximum), range.Mode);
+        return TypedNodes.PrepareRange(
+            TypedNodes.Literal(minimum.Token, minimum.Type!.Value), TypedNodes.Literal(maximum.Token, maximum.Type!.Value), range.Mode);
     }
 
     private static bool HoldsItsValue(SemanticLiteral literal) => Fit(literal) == UnitFit.Fits;
