@@ -1,26 +1,51 @@
-// Owned by the binder group (G4) of the predicate-runtime-architecture line.
+using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using Goro.Messages;
+using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Text;
 
 namespace Goro.Predicates.Binding;
 
-/// <summary>Compiles the pattern of <c>=~</c>, the one thing that cannot wait for a file.</summary>
+/// <summary>
+/// Compiles the pattern of every <c>=~</c>, the one thing that cannot wait for a file, reporting a
+/// pattern that is malformed or uses a construct Goro does not support. Lowering takes the compiled
+/// pattern from here.
+/// </summary>
 /// <remarks>
 /// The non-backtracking engine reports a malformed pattern as <see cref="RegexParseException"/>,
 /// with an offset into the pattern, and each construct it does not support as a
 /// <see cref="NotSupportedException"/>, so both errors come straight from the engine. The canary
 /// tests watch for a later .NET that starts accepting one of those constructs.
 /// </remarks>
-internal static class Patterns
+public static class Patterns
 {
+    public static PatternsAnalysis Analyse(SemanticTree tree)
+    {
+        var report = new PatternDiagnostics(tree.Text);
+        var diagnostics = new List<Diagnostic>();
+        var patterns = new Dictionary<SemanticMatch, Regex>();
+        foreach (var match in tree.Nodes.OfType<SemanticMatch>())
+        {
+            if (Compile(match.Pattern.Value, match.Mode, out var failure) is { } pattern)
+            {
+                patterns.Add(match, pattern);
+            }
+            else
+            {
+                diagnostics.Add(report.Pattern(match.Pattern, failure!));
+            }
+        }
+
+        return new PatternsAnalysis(patterns, [.. diagnostics]);
+    }
+
     /// <summary>Non-backtracking and culture-invariant always; case-insensitive in normalized mode.</summary>
     public static RegexOptions OptionsFor(ComparisonMode mode) =>
         RegexOptions.NonBacktracking | RegexOptions.CultureInvariant
             | (mode == ComparisonMode.Normalized ? RegexOptions.IgnoreCase : RegexOptions.None);
 
     /// <returns>The compiled pattern, or null with what went wrong in <paramref name="failure"/>.</returns>
-    public static Regex? Compile(string pattern, ComparisonMode mode, out PatternFailure? failure)
+    internal static Regex? Compile(string pattern, ComparisonMode mode, out PatternFailure? failure)
     {
         failure = null;
         try
@@ -72,4 +97,21 @@ internal abstract record PatternFailure
 
     /// <param name="Family">The construct, as the specification groups them.</param>
     public sealed record Unsupported(PatternFamily Family) : PatternFailure;
+}
+
+/// <summary>The compiled pattern of every <c>=~</c> of a semantic tree whose pattern is sound, and the errors about the others.</summary>
+public sealed class PatternsAnalysis
+{
+    private readonly IReadOnlyDictionary<SemanticMatch, Regex> patterns;
+
+    internal PatternsAnalysis(IReadOnlyDictionary<SemanticMatch, Regex> patterns, ImmutableArray<Diagnostic> diagnostics)
+    {
+        this.patterns = patterns;
+        Diagnostics = diagnostics;
+    }
+
+    public ImmutableArray<Diagnostic> Diagnostics { get; }
+
+    /// <summary>The pattern of <paramref name="match"/>, compiled in its operator's mode, if it is sound.</summary>
+    public Regex? PatternOf(SemanticMatch match) => patterns.GetValueOrDefault(match);
 }

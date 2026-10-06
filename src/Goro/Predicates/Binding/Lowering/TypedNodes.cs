@@ -1,4 +1,3 @@
-// Owned by the binder group (G4) of the predicate-runtime-architecture line.
 using System.Diagnostics;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Text;
@@ -7,26 +6,20 @@ using Goro.Predicates.Values;
 namespace Goro.Predicates.Binding;
 
 /// <summary>
-/// The bridge from Goro's types, which the binder knows only as values of <see cref="GoroType"/>,
+/// The bridge from Goro's types, which static analysis knows only as values of <see cref="GoroType"/>,
 /// to the C# type parameters of the bound nodes. This is the one place where that happens.
 /// </summary>
 /// <remarks>
 /// Where a node is generic over its operand's datum type, <see cref="BoundExpression.Apply{TResult}"/>
 /// hands the operand back with its type as a type argument, and every other operand of the same
-/// node is cast to match; the binder has checked that the types agree before it asks. Where both
+/// node is cast to match; the binder has checked that the types agree before lowering asks. Where both
 /// types are concrete, as for literals and conversions, a switch says it directly.
 /// </remarks>
 internal static class TypedNodes
 {
-    public static GoroType TypeOf(Token literal) => literal switch
-    {
-        StringToken => GoroType.String,
-        NumberToken => GoroType.Number,
-        ByteCountToken => GoroType.ByteCount,
-        DurationToken => GoroType.Duration,
-        { Kind: TokenKind.True or TokenKind.False } => GoroType.Boolean,
-        _ => throw new ArgumentOutOfRangeException(nameof(literal), literal.Kind, "Not a literal."),
-    };
+    /// <summary>A literal, standing for what the binder decided it stands for.</summary>
+    public static BoundExpression Literal(SemanticLiteral literal) =>
+        literal.StandsIn ? UnitLiteral(literal.Type!.Value, ((NumberToken)literal.Token).Value) : Literal(literal.Token);
 
     public static BoundExpression Literal(Token literal) => literal switch
     {
@@ -137,8 +130,12 @@ internal static class TypedNodes
 }
 
 /// <summary>The ends of a range, prepared, waiting for the subject that makes them a range test.</summary>
-internal abstract class PreparedRange
+public abstract class PreparedRange
 {
+    private protected PreparedRange()
+    {
+    }
+
     /// <summary>
     /// Whether the range holds nothing: the minimum, compared with the maximum as a datum would be,
     /// lies above it. For strings, <c>"mi".."m"</c> is not reversed, since every string beginning

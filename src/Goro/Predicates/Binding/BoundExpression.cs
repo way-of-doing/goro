@@ -8,8 +8,8 @@ namespace Goro.Predicates.Binding;
 /// tree serves every concurrent evaluation for the whole run.
 /// </summary>
 /// <remarks>
-/// The non-generic base is what the binder works with while it is still discovering types; the
-/// typed subclasses are what it builds. <see cref="Apply{TResult}"/> is the bridge between the two:
+/// The non-generic base is what lowering works with, since it knows each node's type only as data;
+/// the typed subclasses are what it builds. <see cref="Apply{TResult}"/> is the bridge between the two:
 /// it hands the expression back to a generic method with its datum type as a type argument.
 /// </remarks>
 public abstract class BoundExpression

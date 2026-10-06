@@ -9,7 +9,7 @@ namespace Goro.Predicates.Binding;
 
 /// <summary>
 /// <c>subject =~ pattern</c>. The subject is prepared in <see cref="Mode"/>; the pattern never is.
-/// The binder compiles <see cref="Pattern"/> with the non-backtracking engine, culture-invariant,
+/// The patterns analysis compiles <see cref="Pattern"/> with the non-backtracking engine, culture-invariant,
 /// and case-insensitive in normalized mode.
 /// </summary>
 public sealed class RegexMatch(BoundOperand<string> subject, Regex pattern, ComparisonMode mode) : BoundCondition

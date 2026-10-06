@@ -1,7 +1,7 @@
 using Goro.Predicates.Binding;
 using Goro.Predicates.Values;
 using static Goro.Tests.Predicates.Binding.Support.BindAssert;
-using Codes = Goro.Predicates.Binding.BinderDiagnosticCodes;
+using Codes = Goro.Predicates.Binding.SemanticDiagnosticCodes;
 
 namespace Goro.Tests.Predicates.Binding;
 

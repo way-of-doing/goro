@@ -4,7 +4,7 @@ using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Binding.Support;
 using static Goro.Tests.Predicates.Binding.Support.BindAssert;
-using Codes = Goro.Predicates.Binding.BinderDiagnosticCodes;
+using Codes = Goro.Predicates.Binding.SemanticDiagnosticCodes;
 
 namespace Goro.Tests.Predicates.Binding;
 
@@ -67,7 +67,7 @@ public class ErrorReportingTests
     [Test]
     public void EveryCode_IsKebabCase()
     {
-        var codes = typeof(BinderDiagnosticCodes).GetFields().Select(field => (string)field.GetValue(null)!);
+        var codes = typeof(SemanticDiagnosticCodes).GetFields().Select(field => (string)field.GetValue(null)!);
 
         Assert.That(codes, Is.All.Match("^[a-z]+(-[a-z]+)*$"));
         Assert.That(codes, Is.Unique);

@@ -23,8 +23,8 @@ public abstract class IdentifierDeclaration
     public abstract GoroType Type { get; }
 
     /// <summary>
-    /// A reference to this identifier. The declaration knows its own datum type, so this is how the
-    /// binder gets a typed node from a name it looked up.
+    /// A reference to this identifier. The declaration knows its own datum type, so this is how
+    /// lowering gets a typed node from a name the binder looked up.
     /// </summary>
     public abstract BoundExpression Bind(Origin origin);
 }

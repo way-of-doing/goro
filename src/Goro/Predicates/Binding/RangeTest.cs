@@ -6,8 +6,8 @@ using Goro.Predicates.Values;
 namespace Goro.Predicates.Binding;
 
 /// <summary>
-/// <c>subject BETWEEN min..max</c>, tested once per occurrence. The binder hands over the endpoints
-/// already prepared by <see cref="Order"/>, having checked that the range is not reversed. Each
+/// <c>subject BETWEEN min..max</c>, tested once per occurrence. The endpoints arrive already prepared
+/// by <see cref="Order"/>, by the constants analysis, which has checked that the range is not reversed. Each
 /// endpoint is compared with a datum by <see cref="DatumOrder{T}.CompareWithEndpoint"/>, which for
 /// strings makes the bounds prefixes.
 /// </summary>

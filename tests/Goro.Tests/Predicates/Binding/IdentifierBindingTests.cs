@@ -53,7 +53,7 @@ public class IdentifierBindingTests
     {
         var error = Error(text);
 
-        Assert.That(error.Code, Is.EqualTo(BinderDiagnosticCodes.UnknownIdentifier));
+        Assert.That(error.Code, Is.EqualTo(SemanticDiagnosticCodes.UnknownIdentifier));
         Assert.That(Rewrites(text, error), Is.EqualTo(new[] { rewrite }));
     }
 
@@ -62,7 +62,7 @@ public class IdentifierBindingTests
     {
         var error = Error("id3v1::bpm == 1");
 
-        Assert.That(error.Code, Is.EqualTo(BinderDiagnosticCodes.UnknownIdentifier));
+        Assert.That(error.Code, Is.EqualTo(SemanticDiagnosticCodes.UnknownIdentifier));
         Assert.That(error.Message, Is.EqualTo(new ErrorMessage.UnknownIdentifierInNamespace(new Code("id3v1"), new Code("bpm"))));
         Assert.That(Marked("id3v1::bpm == 1", error), Is.EqualTo("id3v1::bpm"));
     }
@@ -73,7 +73,7 @@ public class IdentifierBindingTests
     {
         var error = Error(text);
 
-        Assert.That(error.Code, Is.EqualTo(BinderDiagnosticCodes.UnknownIdentifier));
+        Assert.That(error.Code, Is.EqualTo(SemanticDiagnosticCodes.UnknownIdentifier));
         Assert.That(error.Suggestions, Is.Empty);
     }
 
@@ -84,7 +84,7 @@ public class IdentifierBindingTests
     {
         var error = Error(text);
 
-        Assert.That(error.Code, Is.EqualTo(BinderDiagnosticCodes.UnknownNamespace));
+        Assert.That(error.Code, Is.EqualTo(SemanticDiagnosticCodes.UnknownNamespace));
         Assert.That(Rewrites(text, error), Is.EqualTo(new[] { rewrite }));
     }
 
@@ -93,7 +93,7 @@ public class IdentifierBindingTests
     {
         var error = Error("musicbrainz::id == \"x\"");
 
-        Assert.That(error.Code, Is.EqualTo(BinderDiagnosticCodes.UnknownNamespace));
+        Assert.That(error.Code, Is.EqualTo(SemanticDiagnosticCodes.UnknownNamespace));
         Assert.That(error.Message, Is.EqualTo(new ErrorMessage.UnknownNamespace(new Code("musicbrainz"))));
         Assert.That(error.Suggestions, Is.Empty);
     }
@@ -106,7 +106,7 @@ public class IdentifierBindingTests
         var errors = Errors(text);
 
         Assert.That(errors.Select(e => Marked(text, e)), Is.EqualTo(new[] { "artst", "yer" }));
-        Assert.That(errors.Select(e => e.Code), Is.All.EqualTo(BinderDiagnosticCodes.UnknownIdentifier));
+        Assert.That(errors.Select(e => e.Code), Is.All.EqualTo(SemanticDiagnosticCodes.UnknownIdentifier));
     }
 
     // The error type: an identifier that names nothing has no type, so nothing it meets complains.
@@ -122,6 +122,6 @@ public class IdentifierBindingTests
     [TestCase("FALLBACK(artst, 0) == \"x\"")]
     public void UnknownIdentifier_SetsOffNoFurtherErrors(string text)
     {
-        Assert.That(Codes(text), Is.EqualTo(new[] { BinderDiagnosticCodes.UnknownIdentifier }));
+        Assert.That(Codes(text), Is.EqualTo(new[] { SemanticDiagnosticCodes.UnknownIdentifier }));
     }
 }

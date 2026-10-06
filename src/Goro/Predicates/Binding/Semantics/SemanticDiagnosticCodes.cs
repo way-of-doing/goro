@@ -1,11 +1,10 @@
-// Owned by the binder group (G4) of the predicate-runtime-architecture line.
 namespace Goro.Predicates.Binding;
 
 /// <summary>
 /// The codes of the errors static analysis reports: everything the grammar accepts that the
 /// specification still rejects. A code names the mistake rather than where it was found.
 /// </summary>
-public static class BinderDiagnosticCodes
+public static class SemanticDiagnosticCodes
 {
     // Names that resolve to nothing.
     public const string UnknownNamespace = "unknown-namespace";

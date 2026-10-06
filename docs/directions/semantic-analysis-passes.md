@@ -32,7 +32,7 @@ The stages become:
 | Parser | unchanged | syntax tree |
 | Binder | resolve names; assign types, including the numeric literal exception, which needs only the syntactic fact that a literal is a number; fold parentheses and modifiers away into each operand's quantifier and each operator's mode, reporting misplaced, contradictory or mistyped modifiers | semantic tree: one non-generic node family, Goro types held as data |
 | Analyses | each owns one property and the rules that read it | properties and diagnostics |
-| Lowering | semantic tree to the typed evaluation tree, compiling patterns and preparing range endpoints | `CompiledPredicate` |
+| Lowering | semantic tree to the typed evaluation tree, taking each compiled pattern and prepared range from the analysis that made it | `CompiledPredicate` |
 
 The analyses, as of today's specification:
 
@@ -84,3 +84,44 @@ account of the predicate compiler describes the binder, the analyses and lowerin
   cardinality kept beside the type rather than in it, XQuery-style occurrence indicators having
   been weighed and found too heavy for five simple types. Next step: pick up the line, ideally
   before as-operator and sources-and-fields, so that both land in the new structure.
+- 2026-10-06 -- Implemented on `line/semantic-analysis-passes`, all four analyses and lowering in
+  one change rather than one step at a time, since the binder could not emit a semantic tree while
+  any analysis still lived inside it. The brief's questions, as decided:
+  - **Properties live in side tables.** Semantic nodes are immutable classes compared by identity.
+    Each analysis returns a result object holding its tables and its diagnostics, which its tests
+    inspect directly: `CardinalityAnalysis.IsDefinite`, `ConstantsAnalysis.RangeOf`,
+    `PatternsAnalysis.PatternOf`, `SourcesAnalysis.OriginOf`.
+  - **Diagnostics split by owner**: `BinderDiagnostics`, `CardinalityDiagnostics`,
+    `ConstantDiagnostics` and `PatternDiagnostics`, over a small base that quotes the user's text.
+    The codes stay one register, renamed `SemanticDiagnosticCodes`.
+  - **Tests.** The existing binding tests were left untouched apart from that rename, as the
+    independent check that nothing changed. The new tests, in `Binding/Analyses`, assert each
+    stage's property directly.
+
+  Further decisions:
+  - The patterns analysis compiles each pattern, and the constants analysis prepares each range's
+    ends, since judging reversal needs them prepared. Lowering takes both rather than doing the
+    work again, so the table above was corrected.
+  - Negative and fractional unit literals belong to constants, as rules about a literal's value.
+    The binder still decides that a number stands for a unit, since that needs only the syntactic
+    fact that it is a number.
+  - The binder skips the `FALLBACK` type check when the default is not a literal, which keeps the
+    old rule that one mistake is reported once.
+  - A malformed `FALLBACK` call stays as definite as its first argument, as before.
+  - Errors are ordered by where they start, then by where they end, so that of two errors starting
+    at the same character, the one about the smaller part comes first. The old single pass produced
+    exactly that order by finding the inner one first. With separate stages it has to be stated.
+  - The semantic nodes are named `Semantic*`, since "bound" belongs to the evaluation tree.
+
+  Checked, beyond the suite: a harness compiled about 215,000 predicates with this branch and with
+  `main` and compared every diagnostic, message, suggestion, source table and lowered evaluation
+  tree. That covered every string and code span in the tests and docs, plus generated predicates,
+  8,105 of which compiled. Nothing differed.
+
+  Still open:
+  - Whether to rename the evaluation tree away from "Bound" so that Roslyn's vocabulary lines up,
+    with the binder producing the bound (semantic) tree.
+  - Whether to regroup the existing `*BindingTests` by the stage that now owns each rule.
+
+  Next step: review. Then merge, so that as-operator and sources-and-fields start from this
+  structure.

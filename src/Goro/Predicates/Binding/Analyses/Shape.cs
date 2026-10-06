@@ -1,32 +1,9 @@
-// Owned by the binder group (G4) of the predicate-runtime-architecture line.
 using System.Globalization;
 using System.Text;
 using Goro.Predicates.Syntax;
 using Goro.Predicates.Values;
 
 namespace Goro.Predicates.Binding;
-
-/// <summary>
-/// What the binder knows about one sub-expression once it has been analysed.
-/// </summary>
-/// <param name="Type">Its Goro type, or null for the error type: something below it was wrong in a
-/// way that leaves its type unknown, and every check that would involve it is skipped, so that one
-/// mistake is reported once rather than at every operator it reaches.</param>
-/// <param name="IsDefinite">Whether it has exactly one occurrence for every file. The error type
-/// counts as definite, which silences the checks that need definiteness.</param>
-/// <param name="Node">The bound node, or null when some error below it, reported already, left
-/// nothing to build it from. A tree with an error in it is never handed on, so null is harmless.</param>
-/// <param name="Literal">The literal it was written as, looking through parentheses, if it was one.</param>
-/// <param name="Shape">Its canonical form, which is what warning sources are interned by.</param>
-internal sealed record Bound(GoroType? Type, bool IsDefinite, BoundExpression? Node, LiteralSyntax? Literal, Shape Shape)
-{
-    public bool IsError => Type is null;
-
-    public static Bound Error { get; } = new(null, true, null, null, Shape.Unknown);
-
-    /// <summary>A number literal, which is what may stand for a bytecount or a duration.</summary>
-    public bool IsNumberLiteral => Type == GoroType.Number && Literal?.Token is NumberToken;
-}
 
 /// <summary>
 /// The structure of a sub-expression with everything about how it was written erased: whitespace,
@@ -37,8 +14,6 @@ internal sealed record Bound(GoroType? Type, bool IsDefinite, BoundExpression? N
 /// <param name="Form">The same structure for a reader, as the source table lists it.</param>
 internal readonly record struct Shape(string Key, string Form)
 {
-    public static Shape Unknown { get; } = new("?", "?");
-
     /// <summary>A function applied to arguments, such as <c>NUMBER(x)</c>.</summary>
     public static Shape Call(string function, params Shape[] arguments) =>
         new($"{function}({string.Join(",", arguments.Select(a => a.Key))})",
