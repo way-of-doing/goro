@@ -287,7 +287,7 @@ public class FileDiscoveryServiceTests
             Assert.That(results, Is.EquivalentTo(new[] { before, sibling, nested }));
             var warning = _warnings.Warnings.Single();
             Assert.That(warning, Is.TypeOf<FileWarning>());
-            Assert.That(warning.Path, Is.EqualTo(Path.GetFullPath(locked)));
+            Assert.That(((FileWarning)warning).Path, Is.EqualTo(Path.GetFullPath(locked)));
         }
         finally
         {

@@ -22,7 +22,11 @@ By default, every file discovered from the pathspecs is listed. When `--filter` 
 
 A file that the predicate needs to read and that cannot be read is not listed. One warning is emitted for that file and the run continues; see [Warnings](../concepts/warnings.md). This differs from `goro hash`, which reports such a file rather than leaving it out.
 
-A file whose predicate evaluates to unusable, because the answer depended on tag data that could not be interpreted, is not listed either. The data warnings emitted while evaluating the predicate say what could not be read.
+A file whose predicate evaluates to unusable, because the answer depended on tag data that could not be interpreted, is not listed either. The data warnings emitted while evaluating the predicate say what could not be read, and once every file has been processed, one warning of the `unanswered` category says how many files were left out this way, such as:
+
+```
+goro: warning: the predicate could not be answered for 3 of the 120 files examined, which were not listed
+```
 
 # Options
 

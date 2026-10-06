@@ -58,6 +58,30 @@ public class PredicateStageTests
         Assert.That(outcome.Disposition, Is.EqualTo(FileDisposition.Unmatched));
         Assert.That(outcome.Output, Is.Null);
         Assert.That(outcome.Warnings, Is.EqualTo(new[] { new DataWarning("/music/track.mp3", "number( file::NAME )") }));
+        Assert.That(outcome.IsUnanswered, Is.True);
+    }
+
+    // True and false are answers; only unusable is not.
+    [TestCase("/music/5", FileDisposition.Matched)]
+    [TestCase("/music/1", FileDisposition.Unmatched)]
+    public async Task AnAnsweredPredicate_IsNotUnanswered(string path, FileDisposition disposition)
+    {
+        var outcome = await Run(NumberOfNameGreaterThanOne(), path);
+
+        Assert.That(outcome.Disposition, Is.EqualTo(disposition));
+        Assert.That(outcome.IsUnanswered, Is.False);
+    }
+
+    [TestCase(1, 1, "the predicate could not be answered for the one file examined, which was not listed")]
+    [TestCase(1, 120, "the predicate could not be answered for 1 of the 120 files examined, which was not listed")]
+    [TestCase(5, 5, "the predicate could not be answered for any of the 5 files examined, which were not listed")]
+    [TestCase(3, 120, "the predicate could not be answered for 3 of the 120 files examined, which were not listed")]
+    public void Unanswered_SaysHowManyOfHowManyExamined_AndThatTheyWereNotListed(int unanswered, int examined, string message)
+    {
+        var warning = PredicateStage.Unanswered(unanswered, examined);
+
+        Assert.That(warning.Category, Is.EqualTo(WarningCategory.Unanswered));
+        Assert.That(warning.ToString(), Is.EqualTo($"goro: warning: {message}"));
     }
 
     // The warning is emitted where the data was used, whether or not the answer depended on it.
@@ -140,7 +164,7 @@ public class PredicateStageTests
         Assert.That(outcome.Disposition, Is.EqualTo(FileDisposition.Unreadable));
         Assert.That(outcome.Output, Is.Null);
         Assert.That(outcome.Warnings, Has.Length.EqualTo(1));
-        Assert.That(outcome.Warnings[0], Is.InstanceOf<FileWarning>().And.Property(nameof(Warning.Path)).EqualTo(notAudio));
+        Assert.That(outcome.Warnings[0], Is.InstanceOf<FileWarning>().And.Property(nameof(PathWarning.Path)).EqualTo(notAudio));
     }
 
     [Test]

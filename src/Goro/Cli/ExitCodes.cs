@@ -20,8 +20,11 @@ public static class ExitCodes
     /// <summary>Strict only: at least one data warning was emitted.</summary>
     public const int DataWarnings = 10;
 
+    /// <summary>Strict only: the predicate could not be answered for at least one file, and the warning saying so was emitted.</summary>
+    public const int UnansweredPredicates = 11;
+
     /// <summary>Strict only: at least one file warning was emitted.</summary>
-    public const int FileWarnings = 11;
+    public const int FileWarnings = 12;
 
     /// <summary>Strict only: files were examined, but none of them matched.</summary>
     public const int NothingMatched = 20;
@@ -46,6 +49,11 @@ public static class ExitCodes
         if (outcome.Warned.Contains(WarningCategory.File))
         {
             return FileWarnings;
+        }
+
+        if (outcome.Warned.Contains(WarningCategory.Unanswered))
+        {
+            return UnansweredPredicates;
         }
 
         if (outcome.Warned.Contains(WarningCategory.Data))

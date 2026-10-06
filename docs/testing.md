@@ -454,12 +454,16 @@ single-condition test exercises.
 | `goro list` with no filter, over a file that cannot be opened | Must list it and must not warn, the command having needed nothing but the path |
 | `goro hash` over an unreadable file, in both output formats | The row must appear, with `-` in plain and `null` in JSON. Omitting the row is precisely the failure this scenario exists to catch |
 | `goro list --filter` over an unreadable file | The file must not be listed |
-| `goro list --filter` over a file whose predicate evaluates to unusable | The file must not be listed, and the data warnings that made it unusable must be on standard error |
-| The same file under the same predicate wrapped as `FALLBACK(..., TRUE)` | The file must be listed: the predicate, not the command, decides here |
-| One unreadable file among many readable ones, with `--strict-exit-code` | Code `11` |
-| An unreadable file together with a tag that could not be interpreted | Code `11`, not `10`: within a group the higher-numbered code wins |
-| An unreadable file in a run where nothing matched | Code `11`, not `20`, an unreadable file not counting as examined |
+| `goro list --filter` over a file whose predicate evaluates to unusable | The file must not be listed, the data warnings that made it unusable must be on standard error, and the run must end with one `unanswered` warning counting it, after every other warning |
+| The same file under the same predicate wrapped as `FALLBACK(..., TRUE)` | The file must be listed, and there must be no `unanswered` warning: the predicate, not the command, decides here |
+| Several files whose predicates evaluate to unusable | One `unanswered` warning for the run, not one per file, with the count and the number examined right |
+| One unreadable file among many readable ones, with `--strict-exit-code` | Code `12` |
+| An unreadable file together with a tag that could not be interpreted | Code `12`, not `10`: within a group the higher-numbered code wins |
+| An unreadable file in a run where nothing matched | Code `12`, not `20`, an unreadable file not counting as examined |
 | A data warning and an empty result, with no unreadable file | Code `10`, not `20`: the `1`x group takes precedence over the `2`x group |
+| A file whose predicate evaluates to unusable, with `--strict-exit-code` | Code `11`, which outranks the `10` its data warnings would give |
+| An unanswered predicate together with an unreadable file | Code `12`, and the unreadable file not counted in the `unanswered` warning |
+| An unanswered predicate in a run where nothing else matched | Code `11`, not `20`: the file was examined, and the `1`x group takes precedence |
 | All of the above without `--strict-exit-code` | Code `0` in every case; the option must be the only thing that surfaces any of this |
 | A pathspec naming a file that does not exist | An error before anything is processed, code `2`, and no output at all |
 | A pathspec naming a directory that cannot be listed at all | The same, since it is equally knowable before the run starts |
@@ -496,7 +500,7 @@ code. That is the assertion, and it is a good deal stronger than "standard error
 **Suppression reaches the exit code.** A suppressed category cannot produce its code, which is
 what makes the `2`x codes reachable at all on a collection that warns routinely.
 
-**The categories are independent.** Suppressing one must leave the other entirely alone, in both
+**The categories are independent.** Suppressing one must leave the others entirely alone, in both
 channels.
 
 ### Scenarios to cover
@@ -505,10 +509,12 @@ channels.
 |---|---|
 | A run over data that warns under `--no-warn=data`, against the same run over clean data | Standard output, standard error and exit code must all agree. A test checking only standard error would pass an implementation that still returned `10` |
 | `--no-warn=data` where a data warning would have fired and nothing matched | Code `20`, which is the outcome the option exists to make reachable |
-| `--no-warn=data` where the only file's predicate evaluated to unusable | Code `20`: the file was examined and not listed, and nothing reports why, the caller having said uninterpretable data is not a problem |
-| `--no-warn=data` where a file also could not be read | Code `11` regardless: the other category is untouched |
+| `--no-warn=data` where the only file's predicate evaluated to unusable | Code `11`, with the `unanswered` warning the only line on standard error: suppressing data warnings must not hide a file whose answer the command decided |
+| `--no-warn=unanswered` where a predicate evaluated to unusable | Code `10`: the data warnings remain, and the summary is gone |
+| `--no-warn=data,unanswered` where the only file's predicate evaluated to unusable | Code `20`: the file was examined and not listed, and nothing reports why, the caller having said neither is a problem |
+| `--no-warn=data` where a file also could not be read | Code `12` regardless: the other categories are untouched |
 | `--no-warn=file` where a file could not be read and a data warning fired | Code `10`, with the file warning absent from standard error |
-| `--no-warn=all`, `--no-warn all` and `--no-warn=data,file` | All three identical in every channel |
+| `--no-warn=all`, `--no-warn all` and `--no-warn=data,unanswered,file` | All three identical in every channel |
 | `--no-warn` given no categories, at the end of the line or followed by another option | Rejected as a command line error with code `2`, before anything is processed: a bare option must not quietly silence the warnings about files that cannot be read |
 | `--no-warn=data` on a run with no unusable data at all | Identical to the same run without the option: suppressing something that did not happen must change nothing |
 | An unrecognised category name | Rejected as a command line error with code `2`, before anything is processed |

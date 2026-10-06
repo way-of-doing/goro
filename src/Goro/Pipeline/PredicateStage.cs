@@ -12,6 +12,8 @@ namespace Goro.Pipeline;
 ///
 /// The predicate keeps true, false and unusable apart, and this is where <c>list</c> decides what
 /// each means: a true file is listed, a false or unusable one is not, and all three were examined.
+/// An unusable one is also counted as unanswered, and <see cref="Unanswered"/> is how <c>list</c>
+/// reports those at the end of the run.
 /// A file found unreadable while the predicate was being evaluated is not listed, is not counted as
 /// examined, and reports its one file warning and nothing else, any data warning met on the way
 /// being dropped (decision D3 of docs/design/predicate-runtime.md).
@@ -53,8 +55,22 @@ public sealed class PredicateStage(CompiledPredicate predicate) : IPipelineStage
         var warnings = context.Reported.Select(origin => new DataWarning(filePath, origin.Text));
         return truth == Truth.True
             ? FileOutcome<ListResult>.Matched(new ListResult(filePath), warnings)
-            : FileOutcome<ListResult>.Unmatched(warnings);
+            : FileOutcome<ListResult>.Unmatched(warnings, unanswered: truth == Truth.Unusable);
     }
+
+    /// <summary>
+    /// The warning <c>goro list</c> ends a run with when its predicate could not be answered for some
+    /// of the files it examined, saying how many and that they were not listed.
+    /// </summary>
+    /// <param name="unanswered">How many files the predicate could not be answered for; at least one.</param>
+    /// <param name="examined">How many files were examined, those included.</param>
+    public static UnansweredWarning Unanswered(int unanswered, int examined) => new((unanswered, examined) switch
+    {
+        (1, 1) => "the predicate could not be answered for the one file examined, which was not listed",
+        (1, _) => $"the predicate could not be answered for 1 of the {examined} files examined, which was not listed",
+        _ when unanswered == examined => $"the predicate could not be answered for any of the {examined} files examined, which were not listed",
+        _ => $"the predicate could not be answered for {unanswered} of the {examined} files examined, which were not listed",
+    });
 
     // The cause is described from what the file system or the tag library threw, where there is
     // such a thing, so that a file gone or refused reads the same here as under goro hash.
