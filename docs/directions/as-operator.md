@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: focused
 touches: concepts/predicates.md, concepts/evaluation.md, design/rationale.md, design/deferred.md, testing.md, src/Goro/Predicates, tests/Goro.Tests
 after: semantic-analysis-passes, cardinality-and-constants
@@ -138,3 +138,6 @@ the code and tests are changed to match.
     - 2317 tests pass.
 
     Next step: PJ's review, then commit and land.
+- 2026-10-07 -- Landed: PJ approved, so it is marked `landed` and merged into main. Nothing is left
+  open. The mechanism admits targets that are interpretations, such as `AS YEAR` and `AS TRACK`,
+  which belong to sources-and-fields, next on the recommended queue.
