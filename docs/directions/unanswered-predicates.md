@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: focused
 touches: concepts/warnings.md, concepts/exit-codes.md, commands/list.md, design/rationale.md, design/deferred.md, architecture.md, faq.md, testing.md, src/Goro/Warnings, src/Goro/Pipeline, src/Goro/Execution, src/Goro/Messages, src/Goro/Cli, tests/Goro.Tests
 after:
@@ -128,3 +128,6 @@ tested, including a run under `--no-warn=data` whose only file was defaulted ret
   - **Open.** The brief's question on data warnings being on by default in commands other than a
     future `goro audit` remains for when such a command exists. Next step: PJ's review, then commit
     and land.
+- 2026-10-06 -- Landed: PJ approved, so it is marked `landed` and merged into main. Left for
+  later: the open question on data warnings being on by default, until a command such as
+  `goro audit` exists. Next on the recommended queue: cardinality-and-constants.
