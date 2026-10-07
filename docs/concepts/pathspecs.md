@@ -45,7 +45,7 @@ Goro considers only the formats it can hash reliably, so that a file's hash
 changes if and only if its audio does. Today that means **MP3 files**: files
 whose extension is `mp3`, compared without regard to case. The extension is
 the one
-[`file::extension`](../features/builtins/identifiers.md#namespace-file)
+[`file::extension`](../features/builtins/identifiers.md#source-file)
 reports, so a file named just `.mp3` has none. Every other file is passed
 over silently, whichever kind of pathspec reached it, a file named directly
 included. Passing over a file is neither an error nor a warning.

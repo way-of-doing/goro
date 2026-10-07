@@ -7,9 +7,11 @@ namespace Goro.Predicates.Binding;
 public static class SemanticDiagnosticCodes
 {
     // Names that resolve to nothing.
-    public const string UnknownNamespace = "unknown-namespace";
+    public const string UnknownSource = "unknown-source";
     public const string UnknownIdentifier = "unknown-identifier";
+    public const string NeedsSource = "needs-source";
     public const string UnknownFunction = "unknown-function";
+    public const string SourceFunctionNeedsArguments = "source-function-needs-arguments";
     public const string NullValue = "null-value";
 
     // Types.
@@ -22,6 +24,7 @@ public static class SemanticDiagnosticCodes
     public const string UnknownTarget = "unknown-target";
     public const string ConversionCalled = "conversion-called";
     public const string MatchSubjectNotString = "match-subject-not-string";
+    public const string BlobNotUsable = "blob-not-usable";
 
     // Exactly one.
     public const string NotACondition = "not-a-condition";
@@ -37,6 +40,8 @@ public static class SemanticDiagnosticCodes
 
     // Functions.
     public const string WrongArgumentCount = "wrong-argument-count";
+    public const string ArgumentNotLiteral = "argument-not-literal";
+    public const string ArgumentRejected = "argument-rejected";
     public const string FallbackDefaultNotConstant = "fallback-default-not-constant";
     public const string ConstantDoesNotConvert = "constant-does-not-convert";
 

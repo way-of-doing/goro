@@ -57,7 +57,7 @@ file.
 Which files this can happen to depends on what the command needs from each one. A predicate
 mentioning only `file::path`, `file::name`, `file::extension` or `file::size` needs nothing but the
 file's metadata; one mentioning `file::duration` needs the audio's properties read; one mentioning
-a tag identifier needs the tags read; `goro hash` needs the audio itself. A file that a run never
+a tag concept or a source function needs the tags read; `goro hash` needs the audio itself. A file that a run never
 had to open cannot fail to be read. A file whose tags cannot be parsed, even if only one of them
 is damaged, is a file that cannot be read, and so is a file whose audio properties cannot be
 parsed when `file::duration` needs them.

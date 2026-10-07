@@ -24,6 +24,16 @@ public class LoweringTests
     }
 
     [Test]
+    public void SourceCall_BecomesAReferenceToWhatItReads()
+    {
+        var test = (StateTest<Blob>)Lower("id3v2::bytes(\"APIC\") IS ABSENT").Root;
+
+        var reference = (IdentifierReference<Blob>)test.Operand;
+        Assert.That(reference.Declaration.Name.ToString(), Is.EqualTo("id3v2::bytes(\"APIC\")"));
+        Assert.That(reference.Bounds, Is.EqualTo(Bounds.Any));
+    }
+
+    [Test]
     public void NumberStandingForAUnit_BecomesALiteralOfThatUnit()
     {
         var comparison = (ComparisonTest<ByteCount>)Lower("file::size > 10").Root;

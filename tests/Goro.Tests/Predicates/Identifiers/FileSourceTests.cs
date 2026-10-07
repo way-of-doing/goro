@@ -5,10 +5,10 @@ using Goro.Tests.TestSupport;
 namespace Goro.Tests.Predicates.Identifiers;
 
 /// <summary>
-/// The identifiers of the <c>file</c> namespace, resolved through the built-in catalog as the
+/// The concepts of the <c>file</c> source, resolved through the built-in catalog as the
 /// evaluator resolves them.
 /// </summary>
-public class FileNamespaceTests
+public class FileSourceTests
 {
     private DirectoryInfo _tempDir = null!;
 
@@ -30,7 +30,7 @@ public class FileNamespaceTests
 
     private static Value<T> Resolve<T>(string identifier, FileData file) where T : notnull
     {
-        var lookup = BuiltInCatalog.Instance.Lookup(new IdentifierName(["file"], identifier));
+        var lookup = BuiltInCatalog.Instance.Lookup(new IdentifierName("file", identifier));
         var declaration = (IdentifierDeclaration<T>)((IdentifierLookup.Found)lookup).Declaration;
         return declaration.Binding.Resolve(file, new Origin(new SourceId(0), $"file::{identifier}", 0));
     }

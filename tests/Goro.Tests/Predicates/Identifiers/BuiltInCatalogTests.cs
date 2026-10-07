@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
@@ -8,69 +9,49 @@ namespace Goro.Tests.Predicates.Identifiers;
 
 public class BuiltInCatalogTests
 {
-    private static readonly string[] KnownNamespaces =
-        ["ape", "ape::raw", "file", "id3v1", "id3v1::raw", "id3v2", "id3v2::raw", "vorbis", "vorbis::raw"];
+    private static readonly string[] KnownSources = ["ape", "file", "id3v1", "id3v2", "vorbis"];
 
-    // Every identifier the tables of docs/features/builtins/identifiers.md list, written out
-    // independently of the catalog's own tables so that each checks the other.
-    private static readonly (string Namespace, string[] Names)[] ClosedNamespaces =
+    private static readonly string[] TagSources = ["vorbis", "ape", "id3v2", "id3v1"];
+
+    // The table of concepts in docs/features/builtins/identifiers.md, written out independently of the
+    // catalog's own so that each checks the other.
+    private static readonly (string Concept, GoroType Type)[] Concepts =
     [
-        ("", ["artist", "album", "genre", "title", "year"]),
-        ("file", ["duration", "extension", "name", "path", "size"]),
-        ("id3v1", ["artist", "album", "comment", "genre", "title", "track", "year"]),
-        ("id3v1::raw", ["artist", "album", "comment", "genre", "title", "track", "year"]),
+        ("artist", GoroType.String),
+        ("album", GoroType.String),
+        ("genre", GoroType.String),
+        ("title", GoroType.String),
+        ("track", GoroType.Number),
+        ("year", GoroType.Number),
     ];
+
+    private static readonly string[] FileConcepts = ["duration", "extension", "name", "path", "size"];
 
     private static IEnumerable<TestCaseData> DeclaredIdentifiers()
     {
-        TestCaseData Row(string identifier, GoroType type, Bounds? bounds = null) =>
-            new TestCaseData(identifier, type, bounds ?? Bounds.Any).SetArgDisplayNames(identifier);
+        TestCaseData Row(string identifier, GoroType type, Bounds bounds) =>
+            new TestCaseData(identifier, type, bounds).SetArgDisplayNames(identifier);
 
-        yield return Row("artist", GoroType.String);
-        yield return Row("album", GoroType.String);
-        yield return Row("genre", GoroType.String);
-        yield return Row("title", GoroType.String);
-        yield return Row("year", GoroType.Number);
+        foreach (var (concept, type) in Concepts)
+        {
+            yield return Row(concept, type, Bounds.Any);
+            foreach (var source in TagSources)
+            {
+                yield return Row($"{source}::{concept}", type, source == "id3v1" ? Bounds.AtMostOne : Bounds.Any);
+            }
+        }
 
         yield return Row("file::duration", GoroType.Duration, Bounds.ExactlyOne);
         yield return Row("file::extension", GoroType.String, Bounds.AtMostOne);
         yield return Row("file::name", GoroType.String, Bounds.ExactlyOne);
         yield return Row("file::path", GoroType.String, Bounds.ExactlyOne);
         yield return Row("file::size", GoroType.ByteCount, Bounds.ExactlyOne);
-
-        foreach (var @namespace in new[] { "id3v1", "id3v1::raw" })
-        {
-            yield return Row($"{@namespace}::artist", GoroType.String, Bounds.AtMostOne);
-            yield return Row($"{@namespace}::album", GoroType.String, Bounds.AtMostOne);
-            yield return Row($"{@namespace}::comment", GoroType.String, Bounds.AtMostOne);
-            yield return Row($"{@namespace}::title", GoroType.String, Bounds.AtMostOne);
-            yield return Row($"{@namespace}::track", GoroType.Number, Bounds.AtMostOne);
-        }
-
-        yield return Row("id3v1::genre", GoroType.String, Bounds.AtMostOne);
-        yield return Row("id3v1::year", GoroType.Number, Bounds.AtMostOne);
-        yield return Row("id3v1::raw::genre", GoroType.Number, Bounds.AtMostOne);
-        yield return Row("id3v1::raw::year", GoroType.String, Bounds.AtMostOne);
-
-        foreach (var @namespace in new[] { "ape", "id3v2", "vorbis" })
-        {
-            yield return Row($"{@namespace}::artist", GoroType.String);
-            yield return Row($"{@namespace}::album", GoroType.String);
-            yield return Row($"{@namespace}::genre", GoroType.String);
-            yield return Row($"{@namespace}::title", GoroType.String);
-            yield return Row($"{@namespace}::track", GoroType.Number);
-            yield return Row($"{@namespace}::year", GoroType.Number);
-        }
-
-        yield return Row("ape::comment", GoroType.String);
-        yield return Row("id3v2::comment", GoroType.String);
-        yield return Row("vorbis::description", GoroType.String);
     }
 
     private static IdentifierName Parse(string written)
     {
         var parts = written.Split("::");
-        return new IdentifierName(parts[..^1], parts[^1]);
+        return parts.Length == 2 ? new IdentifierName(parts[0], parts[1]) : IdentifierName.Plain(written);
     }
 
     private static IdentifierLookup Lookup(string written) => BuiltInCatalog.Instance.Lookup(Parse(written));
@@ -103,88 +84,131 @@ public class BuiltInCatalogTests
     [Test]
     public void Lookup_DeclaredIdentifier_IsSpelledAsTheTableSpellsIt()
     {
-        var declaration = Found(Lookup("ID3V1::RAW::GENRE"));
-
-        Assert.That(declaration.Name.ToString(), Is.EqualTo("id3v1::raw::genre"));
+        Assert.That(Found(Lookup("ID3V1::GENRE")).Name.ToString(), Is.EqualTo("id3v1::genre"));
     }
 
     [TestCase("foo::artist")]
     [TestCase("raw::artist")]
-    [TestCase("file::raw::path")]
-    [TestCase("id3v1::raw::raw::artist")]
-    [TestCase("id3v2::raw::TIT2::x")]
-    [TestCase("vorbis::raw::raw::artist")]
-    public void Lookup_UnknownNamespace_ListsTheKnownOnes(string identifier)
+    [TestCase("global::artist")]
+    public void Lookup_UnknownSource_ListsTheKnownOnes(string identifier)
     {
         var lookup = Lookup(identifier);
 
-        Assert.That(lookup, Is.InstanceOf<IdentifierLookup.UnknownNamespace>());
-        Assert.That(((IdentifierLookup.UnknownNamespace)lookup).KnownNamespaces, Is.EquivalentTo(KnownNamespaces));
+        Assert.That(lookup, Is.InstanceOf<IdentifierLookup.UnknownSource>());
+        Assert.That(((IdentifierLookup.UnknownSource)lookup).KnownSources, Is.EqualTo(KnownSources));
     }
 
-    [Test]
-    public void Lookup_QuotedNamespacePartContainingColons_IsNotTheNestedNamespace()
+    [TestCase("bogus")]
+    [TestCase("comment")]
+    [TestCase("description")]
+    public void Lookup_UnknownConcept_OffersTheConceptsWrittenWithoutASource(string identifier)
     {
-        var lookup = BuiltInCatalog.Instance.Lookup(new IdentifierName(["ape::raw"], "artist"));
-
-        Assert.That(lookup, Is.InstanceOf<IdentifierLookup.UnknownNamespace>());
-    }
-
-    [TestCase("bogus", "")]
-    [TestCase("and", "")]
-    [TestCase("file::nmae", "file")]
-    [TestCase("file::raw", "file")]
-    [TestCase("id3v1::TIT2", "id3v1")]
-    [TestCase("id3v1::raw", "id3v1")]
-    [TestCase("id3v1::raw::raw", "id3v1::raw")]
-    [TestCase("id3v1::raw::date", "id3v1::raw")]
-    public void Lookup_UnknownNameInClosedNamespace_OffersThatNamespacesIdentifiers(string identifier, string @namespace)
-    {
-        var expected = ClosedNamespaces.Single(entry => entry.Namespace == @namespace).Names
-            .Select(name => @namespace.Length == 0 ? name : $"{@namespace}::{name}");
-
         var lookup = Lookup(identifier);
 
         Assert.That(lookup, Is.InstanceOf<IdentifierLookup.UnknownIdentifier>());
-        var candidates = ((IdentifierLookup.UnknownIdentifier)lookup).Candidates.Select(candidate => candidate.ToString());
-        Assert.That(candidates, Is.EqualTo(expected));
+        Assert.That(((IdentifierLookup.UnknownIdentifier)lookup).Candidates, Is.EqualTo(Concepts.Select(row => row.Concept)));
     }
 
-    [TestCase(new[] { "ape" }, "Album Artist")]
-    [TestCase(new[] { "ape" }, "raw")]
-    [TestCase(new[] { "ape", "raw" }, "track")]
-    [TestCase(new[] { "ape", "raw" }, "Cover Art (Front)")]
-    [TestCase(new[] { "id3v2" }, "TRCK")]
-    [TestCase(new[] { "id3v2" }, "TIT3")]
-    [TestCase(new[] { "id3v2" }, "raw")]
-    [TestCase(new[] { "id3v2", "raw" }, "TCON")]
-    [TestCase(new[] { "vorbis" }, "date")]
-    [TestCase(new[] { "vorbis" }, "raw")]
-    [TestCase(new[] { "vorbis", "raw" }, "year")]
-    [TestCase(new[] { "vorbis", "raw" }, "tracknumber")]
-    public void Lookup_AnyOtherNameInOpenNamespace_IsAStringThatCanBeAbsentOrSeveral(string[] @namespace, string name)
+    [TestCase("id3v1::comment", "id3v1")]
+    [TestCase("id3v1::size", "id3v1")]
+    [TestCase("vorbis::description", "vorbis")]
+    [TestCase("vorbis::bpm", "vorbis")]
+    [TestCase("id3v2::TIT2", "id3v2")]
+    [TestCase("ape::raw", "ape")]
+    public void Lookup_ConceptTheSourceCannotSupply_OffersTheSourcesOwn(string identifier, string source)
     {
-        var identifier = new IdentifierName(@namespace, name);
+        var lookup = Lookup(identifier);
 
-        var declaration = Found(BuiltInCatalog.Instance.Lookup(identifier));
+        Assert.That(lookup, Is.InstanceOf<IdentifierLookup.UnknownIdentifier>());
+        Assert.That(((IdentifierLookup.UnknownIdentifier)lookup).Candidates, Is.EqualTo(Concepts.Select(row => row.Concept)), source);
+    }
 
-        Assert.That(declaration.Name, Is.EqualTo(identifier));
-        Assert.That(declaration.Type, Is.EqualTo(GoroType.String));
-        Assert.That(declaration.Bounds, Is.EqualTo(Bounds.Any));
+    [TestCase("file::artist")]
+    [TestCase("file::nmae")]
+    public void Lookup_UnknownFileConcept_OffersTheFileSourcesOwn(string identifier)
+    {
+        var lookup = Lookup(identifier);
+
+        Assert.That(lookup, Is.InstanceOf<IdentifierLookup.UnknownIdentifier>());
+        Assert.That(((IdentifierLookup.UnknownIdentifier)lookup).Candidates, Is.EqualTo(FileConcepts));
+    }
+
+    [TestCaseSource(nameof(FileConcepts))]
+    public void Lookup_FileConceptWithoutItsSource_NeedsIt(string concept)
+    {
+        Assert.That(Lookup(concept), Is.EqualTo(new IdentifierLookup.NeedsSource("file")));
+    }
+
+    [TestCase("vorbis::field")]
+    [TestCase("ID3V2::BYTES")]
+    [TestCase("ape::field")]
+    public void Lookup_SourceFunctionWithoutArguments_IsRecognised(string identifier)
+    {
+        Assert.That(Lookup(identifier), Is.InstanceOf<IdentifierLookup.IsSourceFunction>());
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Source functions
+
+    [TestCase("ape", "field", GoroType.String, 1, 1, false)]
+    [TestCase("ape", "bytes", GoroType.Blob, 1, 1, true)]
+    [TestCase("id3v2", "field", GoroType.String, 1, 2, false)]
+    [TestCase("id3v2", "bytes", GoroType.Blob, 1, 1, false)]
+    [TestCase("vorbis", "field", GoroType.String, 1, 1, false)]
+    [TestCase("vorbis", "bytes", GoroType.Blob, 1, 1, false)]
+    public void LookupFunction_SourceFunction_HasItsTypeArgumentsAndBounds(
+        string source, string function, GoroType type, int minimum, int maximum, bool atMostOne)
+    {
+        var lookup = BuiltInCatalog.Instance.LookupFunction(source.ToUpperInvariant(), function.ToUpperInvariant());
+
+        Assert.That(lookup, Is.InstanceOf<SourceFunctionLookup.Found>());
+        var found = ((SourceFunctionLookup.Found)lookup).Function;
+        Assert.That(found.Type, Is.EqualTo(type));
+        Assert.That((found.MinimumArguments, found.MaximumArguments), Is.EqualTo((minimum, maximum)));
+
+        var arguments = maximum == 1 ? ["TPE1"] : ImmutableArray.Create("TXXX", "MOOD");
+        var resolved = found.Resolve([.. arguments]);
+        Assert.That(resolved, Is.InstanceOf<SourceFunctionResolution.Found>());
+        var declaration = ((SourceFunctionResolution.Found)resolved).Declaration;
+        Assert.That(declaration.Type, Is.EqualTo(type));
+        Assert.That(declaration.Bounds, Is.EqualTo(atMostOne ? Bounds.AtMostOne : Bounds.Any));
+        Assert.That(declaration.Name, Is.EqualTo(new SourceCallName(source, function, [.. arguments])));
+    }
+
+    [TestCase("id3v1", "field")]
+    [TestCase("file", "field")]
+    [TestCase("vorbis", "count")]
+    public void LookupFunction_NoSuchFunctionInTheSource_ListsItsOwn(string source, string function)
+    {
+        var lookup = BuiltInCatalog.Instance.LookupFunction(source, function);
+
+        Assert.That(lookup, Is.InstanceOf<SourceFunctionLookup.UnknownFunction>());
+        var expected = source is "id3v1" or "file" ? Array.Empty<string>() : ["field", "bytes"];
+        Assert.That(((SourceFunctionLookup.UnknownFunction)lookup).Candidates, Is.EqualTo(expected));
     }
 
     [Test]
-    public void Lookup_WellKnownNameInOpenNamespace_TakesPrecedenceOverTheFieldOfThatName()
+    public void LookupFunction_UnknownSource_ListsTheKnownOnes()
     {
-        Assert.That(Found(Lookup("vorbis::year")).Type, Is.EqualTo(GoroType.Number));
-        Assert.That(Found(Lookup("vorbis::raw::year")).Type, Is.EqualTo(GoroType.String));
+        var lookup = BuiltInCatalog.Instance.LookupFunction("flac", "field");
+
+        Assert.That(lookup, Is.InstanceOf<SourceFunctionLookup.UnknownSource>());
+        Assert.That(((SourceFunctionLookup.UnknownSource)lookup).KnownSources, Is.EqualTo(KnownSources));
+    }
+
+    [Test]
+    public void ResolvingAKeyedSourceFunction_KeepsTheNameAsWritten_AndChecksNothing()
+    {
+        var field = ((SourceFunctionLookup.Found)BuiltInCatalog.Instance.LookupFunction("ape", "field")).Function;
+
+        var resolved = (SourceFunctionResolution.Found)field.Resolve(["Album Artist"]);
+
+        Assert.That(((SourceCallName)resolved.Declaration.Name).Arguments, Is.EqualTo(new[] { "Album Artist" }));
     }
 
     [TestCase("artist")]
-    [TestCase("id3v1::raw::genre")]
+    [TestCase("id3v1::genre")]
     [TestCase("ape::year")]
-    [TestCase("id3v2::TIT3")]
-    [TestCase("vorbis::raw::custom")]
     public void Resolve_TagIdentifier_IsNotImplementedYet(string identifier)
     {
         var declaration = Found(Lookup(identifier));
@@ -201,13 +225,25 @@ public class BuiltInCatalogTests
         Assert.That(resolve, Throws.TypeOf<NotSupportedException>().With.Message.Contains("not implemented yet"));
     }
 
+    [Test]
+    public void Resolve_SourceFunction_IsNotImplementedYet()
+    {
+        var bytes = ((SourceFunctionLookup.Found)BuiltInCatalog.Instance.LookupFunction("id3v2", "bytes")).Function;
+        var declaration = (IdentifierDeclaration<Blob>)((SourceFunctionResolution.Found)bytes.Resolve(["APIC"])).Declaration;
+
+        TestDelegate resolve = () => declaration.Binding.Resolve(new FileData("/music/track.mp3"), new Origin(new SourceId(0), "x", 0));
+
+        Assert.That(resolve, Throws.TypeOf<NotSupportedException>().With.Message.Contains("not implemented yet"));
+    }
+
     // The expansions identifiers.md gives, written out independently of the catalog's tables.
     [TestCase("artist", "vorbis::artist", "ape::artist", "id3v2::artist", "id3v1::artist")]
     [TestCase("album", "vorbis::album", "ape::album", "id3v2::album", "id3v1::album")]
     [TestCase("genre", "vorbis::genre", "ape::genre", "id3v2::genre", "id3v1::genre")]
     [TestCase("title", "vorbis::title", "ape::title", "id3v2::title", "id3v1::title")]
+    [TestCase("track", "vorbis::track", "ape::track", "id3v2::track", "id3v1::track")]
     [TestCase("year", "vorbis::year", "ape::year", "id3v2::year", "id3v1::year")]
-    public void GlobalIdentifier_IsThePreferredOfItsExpansion_InTheDocumentedOrder(string global, params string[] expansion)
+    public void ConceptWithoutASource_IsThePreferredOfItsCells_InTheDocumentedOrder(string global, params string[] expansion)
     {
         var declaration = Found(Lookup(global));
 

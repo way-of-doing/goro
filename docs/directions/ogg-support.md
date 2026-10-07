@@ -37,7 +37,7 @@ number and CRC are inside the range.
 - How the packets are read: through TagLib's Ogg classes, if they expose enough, or by a reader
   of our own.
 - Damaged tag data, which is definitely part of this line. Whatever
-  [sources-and-fields](sources-and-fields.md) settles about what a damaged tag resolves to has to
+  [mp3-support](mp3-support.md) settles about what a damaged tag resolves to has to
   hold for Ogg too: repeat its probe on damaged comment packets, for both codecs and including a
   comment spread over several pages, and confirm that each yields what the specification says.
 

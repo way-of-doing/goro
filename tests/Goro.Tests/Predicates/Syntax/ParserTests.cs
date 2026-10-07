@@ -37,7 +37,6 @@ public class ParserTests
     [TestCase("CAST(x AS NUMBER) > 5", "(> (call CAST (AS x NUMBER)) 5)")]
     [TestCase("x as foo > 5", "(> (AS x foo) 5)")]
     [TestCase("x AS NUMBER IS USABLE", "(IS (AS x NUMBER) USABLE)")]
-    [TestCase("::as AS STRING == \"a\"", "(== (AS ::as STRING) \"a\")")]
     public void As_BindsTighterThanEveryOperator_AndChains(string text, string tree)
     {
         Assert.That(Tree(text), Is.EqualTo(tree));
@@ -148,7 +147,9 @@ public class ParserTests
     [TestCase("FALLBACK(year < 2000, TRUE)", "(call FALLBACK (< year 2000) TRUE)")]
     [TestCase("f(a, b OR c, NOT d)", "(call f a (OR b c) (NOT d))")]
     [TestCase("count", "count")]
-    [TestCase("::count", "::count")]
+    [TestCase("vorbis::field(\"MOOD\")", "(call vorbis::field \"MOOD\")")]
+    [TestCase("id3v2::field(\"TXXX\", r\"MOOD\")", "(call id3v2::field \"TXXX\" r\"MOOD\")")]
+    [TestCase("foo::count(x)", "(call foo::count x)")]
     [TestCase("number(\"1\") == 1", "(== (call number \"1\") 1)")]
     public void FunctionCall_IsANameFollowedByAParenthesis(string text, string tree)
     {
@@ -156,31 +157,12 @@ public class ParserTests
     }
 
     [TestCase("artist", "artist")]
-    [TestCase("::artist", "::artist")]
     [TestCase("id3v2::TIT2", "id3v2::TIT2")]
-    [TestCase("foo::bar::baz", "foo::bar::baz")]
-    [TestCase("::and", "::and")]
-    [TestCase("ape::and", "ape::and")]
-    [TestCase("::true", "::true")]
-    [TestCase("ape::\"album artist\"", "ape::\"album artist\"")]
-    [TestCase("ape::r\"album \"\"artist\"\"\"", "ape::\"album \\\"artist\\\"\"")]
-    [TestCase("ape::\"a\\\\b\"", "ape::\"a\\\\b\"")]
-    [TestCase("x::\"y\"::z", "x::\"y\"::z")]
-    [TestCase("::\"artist\"", "::\"artist\"")]
-    [TestCase("::r\"album artist\"", "::\"album artist\"")]
-    [TestCase("NOT ::x", "(NOT ::x)")]
-    public void Identifier_PartsAsWritten(string text, string tree)
+    [TestCase("File::Size", "File::Size")]
+    [TestCase("foo::bar", "foo::bar")]
+    public void Identifier_AsWritten(string text, string tree)
     {
         Assert.That(Tree(text), Is.EqualTo(tree));
-    }
-
-    [Test]
-    public void Identifier_QuotedPartKeepsItsDecodedText()
-    {
-        var identifier = (IdentifierSyntax)Parses(@"ape::""Album\tArtist""::NOT").Root;
-        Assert.That(identifier.IsRooted, Is.False);
-        Assert.That(identifier.Parts.Select(p => (p.Text, p.IsQuoted)),
-            Is.EqualTo(new[] { ("ape", false), ("Album\tArtist", true), ("NOT", false) }));
     }
 
     [TestCase("r == 1", "(== r 1)")]
@@ -192,12 +174,6 @@ public class ParserTests
         Assert.That(Tree(text), Is.EqualTo(tree));
     }
 
-    // docs/testing.md: NOT::x == 1 is NOT applied to ::x == 1.
-    [Test]
-    public void Not_FollowedByDoubleColon_AppliesToARootedIdentifier()
-    {
-        Assert.That(Tree("NOT::x == 1"), Is.EqualTo("(NOT (== ::x 1))"));
-    }
 
     [TestCase("TRUE", "TRUE")]
     [TestCase("true", "TRUE")]
@@ -320,13 +296,23 @@ public class ParserTests
     }
 
     [Test]
-    public void Identifier_PartsKeepTheirSpans()
+    public void Identifier_KeepsItsSourceAndName_WithTheirSpans()
     {
-        const string text = "::ape::\"album artist\"";
+        const string text = "Ape::Artist";
         var identifier = (IdentifierSyntax)Parses(text).Root;
-        Assert.That(identifier.IsRooted, Is.True);
         Assert.That(identifier.Span.Of(text), Is.EqualTo(text));
-        Assert.That(identifier.Parts.Select(p => p.Span.Of(text)), Is.EqualTo(new[] { "ape", "\"album artist\"" }));
+        Assert.That(identifier.Source!.Span.Of(text), Is.EqualTo("Ape"));
+        Assert.That(identifier.Name.Span.Of(text), Is.EqualTo("Artist"));
+    }
+
+    [Test]
+    public void FunctionCall_WithASource_KeepsItAndSpansFromIt()
+    {
+        const string text = "vorbis::field(\"MOOD\")";
+        var call = (FunctionCallSyntax)Parses(text).Root;
+        Assert.That(call.Span.Of(text), Is.EqualTo(text));
+        Assert.That(call.Source!.Text, Is.EqualTo("vorbis"));
+        Assert.That(call.Name.Text, Is.EqualTo("field"));
     }
 
     [Test]

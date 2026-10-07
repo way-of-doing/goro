@@ -27,6 +27,7 @@ internal static class TypedNodes
         IdentifierDeclaration<ByteCount> typed => new IdentifierReference<ByteCount>(typed, origin),
         IdentifierDeclaration<Duration> typed => new IdentifierReference<Duration>(typed, origin),
         IdentifierDeclaration<bool> typed => new IdentifierReference<bool>(typed, origin),
+        IdentifierDeclaration<Blob> typed => new IdentifierReference<Blob>(typed, origin),
         _ => throw new UnreachableException($"{declaration.Type} has no datum type."),
     };
 

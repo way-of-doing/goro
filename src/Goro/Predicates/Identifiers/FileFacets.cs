@@ -36,7 +36,7 @@ internal sealed record AudioProperties(TimeSpan Duration);
 /// TagLibSharp reads the tags while it locates the audio, so this facet parses them too, and could
 /// in principle find a file unreadable for <c>file::duration</c> on account of its tags. Damaged
 /// Id3v2 tags of many shapes were tried and TagLibSharp tolerated all of them, so no such file is
-/// known. Whether this facet and the tag facets share one read is for the tag namespaces' line.
+/// known. Whether this facet and the tag facets share one read is for the line that reads tags.
 /// </remarks>
 internal sealed class AudioPropertiesFacet : FileFacet<AudioProperties>
 {

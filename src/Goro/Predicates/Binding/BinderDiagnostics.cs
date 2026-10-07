@@ -19,33 +19,88 @@ internal sealed partial class BinderDiagnostics(string text) : SemanticDiagnosti
     // ---------------------------------------------------------------------------------------------
     // Names
 
-    public Diagnostic UnknownNamespace(IdentifierSyntax identifier, IEnumerable<string> known)
+    /// <summary>A source Goro does not define, before an identifier or a call; offers the closest.</summary>
+    public Diagnostic UnknownSource(NameToken source, IEnumerable<string> known)
     {
-        var namespaceParts = identifier.Parts[..^1];
-        var written = string.Join("::", namespaceParts.Select(part => part.Text));
-        var closest = Spelling.Closest(written, known);
-        ImmutableArray<Suggestion> suggestions = closest is null
-            ? []
-            : [new Suggestion(identifier.Span,
-                Text(TextSpan.FromBounds(identifier.Span.Start, namespaceParts[0].Span.Start))
-                + closest
-                + Text(TextSpan.FromBounds(namespaceParts[^1].Span.End, identifier.Span.End)))];
-        return new Diagnostic(Codes.UnknownNamespace, identifier.Span, new ErrorMessage.UnknownNamespace(new Code(written)), suggestions);
+        var closest = Spelling.Closest(source.Text, known);
+        ImmutableArray<Suggestion> suggestions = closest is null ? [] : [new Suggestion(source.Span, closest)];
+        return new Diagnostic(Codes.UnknownSource, source.Span, new ErrorMessage.UnknownSource(new Code(source.Text)), suggestions);
     }
 
-    public Diagnostic UnknownIdentifier(IdentifierSyntax identifier, IEnumerable<IdentifierName> candidates)
+    /// <summary>A concept that does not exist, or that the identifier's source cannot supply; offers the closest there is.</summary>
+    public Diagnostic UnknownIdentifier(IdentifierSyntax identifier, IEnumerable<string> candidates)
     {
-        var name = identifier.Parts[^1];
-        var closest = Spelling.Closest(name.Text, candidates.Select(candidate => candidate.Name));
-        ImmutableArray<Suggestion> suggestions = closest is null
-            ? []
-            : [new Suggestion(identifier.Span,
-                Text(TextSpan.FromBounds(identifier.Span.Start, name.Span.Start)) + IdentifierName.Global(closest))];
-        var message = identifier.Parts.Length == 1
-            ? (ErrorMessage)new ErrorMessage.UnknownIdentifier(new Code(name.Text))
-            : new ErrorMessage.UnknownIdentifierInNamespace(Code(TextSpan.FromBounds(identifier.Parts[0].Span.Start, identifier.Parts[^2].Span.End)), new Code(name.Text));
+        var closest = Spelling.Closest(identifier.Name.Text, candidates);
+        ImmutableArray<Suggestion> suggestions = closest is null ? [] : [new Suggestion(identifier.Name.Span, closest)];
+        var message = identifier.Source is { } source
+            ? (ErrorMessage)new ErrorMessage.UnknownIdentifierInSource(new Code(source.Text), new Code(identifier.Name.Text))
+            : new ErrorMessage.UnknownIdentifier(new Code(identifier.Name.Text));
         return new Diagnostic(Codes.UnknownIdentifier, identifier.Span, message, suggestions);
     }
+
+    /// <summary>A concept of the <c>file</c> source, written without it.</summary>
+    public Diagnostic NeedsSource(IdentifierSyntax identifier, string source) =>
+        new(Codes.NeedsSource, identifier.Span, new ErrorMessage.ConceptNeedsSource(Code(identifier), new Code(source)),
+            [new Suggestion(identifier.Span, $"{source}::{Text(identifier)}")]);
+
+    /// <summary><c>vorbis::field</c>, a source function without the arguments that would make it a call.</summary>
+    public Diagnostic SourceFunctionNeedsArguments(IdentifierSyntax identifier) =>
+        new(Codes.SourceFunctionNeedsArguments, identifier.Span, new ErrorMessage.SourceFunctionNeedsArguments(Code(identifier)));
+
+    /// <summary><c>field("MOOD")</c>, a source function written without a source, which it cannot do without.</summary>
+    public Diagnostic SourceFunctionNeedsSource(FunctionCallSyntax call) =>
+        new(Codes.NeedsSource, call.Span, new ErrorMessage.SourceFunctionNeedsSource(new Code(call.Name.Text)));
+
+    /// <summary>
+    /// A qualified call of something that is not a source function of that source. A function written
+    /// with a source, as <c>ape::count(x)</c>, is offered without it; anything else, the closest
+    /// source function.
+    /// </summary>
+    public Diagnostic UnknownSourceFunction(FunctionCallSyntax call, IEnumerable<string> candidates)
+    {
+        var source = call.Source!;
+        ImmutableArray<Suggestion> suggestions;
+        if (Functions.Contains(call.Name.Text, StringComparer.OrdinalIgnoreCase))
+        {
+            suggestions = [new Suggestion(call.Span, Text(TextSpan.FromBounds(call.Name.Span.Start, call.Span.End)))];
+        }
+        else
+        {
+            var closest = Spelling.Closest(call.Name.Text, candidates);
+            suggestions = closest is null ? [] : [new Suggestion(call.Name.Span, closest)];
+        }
+
+        return new Diagnostic(Codes.UnknownFunction, TextSpan.Covering(source.Span, call.Name.Span),
+            new ErrorMessage.UnknownSourceFunction(new Code(source.Text), new Code(call.Name.Text)), suggestions);
+    }
+
+    /// <summary>An argument of a source function that is not a string literal.</summary>
+    public Diagnostic ArgumentNotLiteral(FunctionCallSyntax call, ExpressionSyntax argument) =>
+        new(Codes.ArgumentNotLiteral, argument.Span, new ErrorMessage.SourceFunctionArgumentNotLiteral(Code(Callee(call)), Code(argument)));
+
+    /// <summary>An argument a source function rejected, with the rewrite that would make it acceptable, where there is one.</summary>
+    public Diagnostic ArgumentRejected(FunctionCallSyntax call, int index, ArgumentRejection rejection)
+    {
+        var argument = call.Arguments[index];
+        var (message, suggestions) = Rejection(call, argument, rejection);
+        return new Diagnostic(Codes.ArgumentRejected, argument.Span, message, suggestions);
+    }
+
+    private (ErrorMessage Message, ImmutableArray<Suggestion> Suggestions) Rejection(
+        FunctionCallSyntax call, ExpressionSyntax argument, ArgumentRejection rejection) =>
+        rejection switch
+        {
+            ArgumentRejection.MalformedFrame(var written) =>
+                (new ErrorMessage.MalformedFrame(new Code(written)), []),
+            ArgumentRejection.FrameRenamed(var written, var renamed) =>
+                (new ErrorMessage.FrameRenamed(new Code(written), new Code(renamed)), [new Suggestion(argument.Span, $"\"{renamed}\"")]),
+            ArgumentRejection.FrameNotText(var frame) =>
+                (new ErrorMessage.FrameNotText(new Code(frame)), call.Arguments.Length == 1 ? [new Suggestion(call.Name.Span, "bytes")] : []),
+            ArgumentRejection.DescriptionNotTaken(var frame) =>
+                (new ErrorMessage.DescriptionNotTaken(new Code(frame)),
+                    [new Suggestion(call.Span, $"{Text(TextSpan.FromBounds(call.Span.Start, call.Arguments[0].Span.End))})")]),
+            _ => throw new ArgumentOutOfRangeException(nameof(rejection), rejection, "Not a rejection the binder knows."),
+        };
 
     public Diagnostic UnknownFunction(NameToken name)
     {
@@ -128,6 +183,20 @@ internal sealed partial class BinderDiagnostics(string text) : SemanticDiagnosti
 
     public Diagnostic BooleanNotConvertible(ExpressionSyntax operand) =>
         new(Codes.BooleanNotConvertible, operand.Span, new ErrorMessage.BooleanNotConvertible(Code(operand)));
+
+    /// <summary>
+    /// A blob as the operand of an operator that would have to look inside it: a comparison, whose
+    /// operator is at <paramref name="comparison"/>, or <c>BETWEEN</c> where that is null.
+    /// </summary>
+    public Diagnostic BlobOperand(ExpressionSyntax operand, TextSpan? comparison) =>
+        new(Codes.BlobNotUsable, operand.Span,
+            new ErrorMessage.BlobOperand(Code(operand), comparison is { } span ? Code(span) : new Code("BETWEEN")));
+
+    public Diagnostic BlobNotConvertible(ExpressionSyntax operand) =>
+        new(Codes.BlobNotUsable, operand.Span, new ErrorMessage.BlobNotConvertible(Code(operand)));
+
+    public Diagnostic BlobInFallback(ExpressionSyntax argument) =>
+        new(Codes.BlobNotUsable, argument.Span, new ErrorMessage.BlobInFallback(Code(argument)));
 
     public Diagnostic UnitsDoNotConvert(ExpressionSyntax operand, GoroType from) =>
         new(Codes.UnitsDoNotConvert, operand.Span, new ErrorMessage.UnitsDoNotConvert(Code(operand), UnitOf(from)));
@@ -221,6 +290,16 @@ internal sealed partial class BinderDiagnostics(string text) : SemanticDiagnosti
 
     public Diagnostic TooFewArguments(FunctionCallSyntax call, int minimum) =>
         new(Codes.WrongArgumentCount, call.Span, new ErrorMessage.TooFewArguments(new Code(call.Name.Text), minimum, call.Arguments.Length));
+
+    /// <summary>A source function given a number of arguments outside what it takes.</summary>
+    public Diagnostic WrongArgumentCount(FunctionCallSyntax call, int minimum, int maximum) =>
+        new(Codes.WrongArgumentCount, call.Span, minimum == maximum
+            ? new ErrorMessage.WrongArgumentCount(Code(Callee(call)), minimum, call.Arguments.Length)
+            : new ErrorMessage.WrongArgumentCountBetween(Code(Callee(call)), minimum, maximum, call.Arguments.Length));
+
+    /// <summary>The function a call names, with its source where it was written with one.</summary>
+    private static TextSpan Callee(FunctionCallSyntax call) =>
+        TextSpan.Covering(call.Source?.Span ?? call.Name.Span, call.Name.Span);
 
     // ---------------------------------------------------------------------------------------------
     // Ranges

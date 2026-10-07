@@ -1,7 +1,7 @@
 namespace Goro.Predicates.Values;
 
 /// <summary>
-/// The choice <c>PREFERRED()</c> makes, and the global namespace with it: the first candidate
+/// The choice <c>PREFERRED()</c> makes, and every concept written without a source with it: the first candidate
 /// holding a usable occurrence, taken entire; failing that, the first that is not absent; failing
 /// that, absent.
 /// </summary>

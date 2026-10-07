@@ -8,6 +8,7 @@ public enum GoroType
     ByteCount,
     Duration,
     Boolean,
+    Blob,
 }
 
 /// <summary>
@@ -26,6 +27,7 @@ public static class GoroTypes
         GoroType.ByteCount => "bytecount",
         GoroType.Duration => "duration",
         GoroType.Boolean => "boolean",
+        GoroType.Blob => "blob",
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
     };
 
@@ -38,6 +40,7 @@ public static class GoroTypes
             var t when t == typeof(ByteCount) => GoroType.ByteCount,
             var t when t == typeof(Duration) => GoroType.Duration,
             var t when t == typeof(bool) => GoroType.Boolean,
+            var t when t == typeof(Blob) => GoroType.Blob,
             var t => throw new NotSupportedException($"{t} is not the datum type of any Goro type."),
         };
     }

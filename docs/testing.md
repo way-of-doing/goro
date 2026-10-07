@@ -28,13 +28,14 @@ worst failure mode available.
 
 ### What the tests must establish
 
-**Version independence.** For each identifier Goro defines, tag content that is semantically
-identical must produce an identical value whether it was stored as Id3v2.2, v2.3 or v2.4. This
+**Version independence.** For each concept Goro defines, and each frame a source function names
+by its v2.4 identifier, tag content that is semantically identical must produce an identical value
+whether it was stored as Id3v2.2, v2.3 or v2.4. This
 is the property that the documentation promises, so it is the property that must be tested
 directly rather than inferred from the parts.
 
-**Faithfulness of the raw namespaces.** An identifier in a `::raw` namespace must yield the datum
-as recorded, uninterpreted, in the type that datum natively has. Where that is not achievable, the
+**Faithfulness of the source functions.** `field()` must yield the datum as recorded, as text and
+uninterpreted, and `bytes()` the datum as recorded, as a blob. Where that is not achievable, the
 test must pin the exact discrepancy so that it is a known and documented deviation rather than a
 surprise.
 
@@ -76,8 +77,8 @@ assumptions that a real-world file does not: a value written through the library
 looking correct even when the same bytes produced by another tagger would not. The test project
 already builds Id3v2 tag bytes by hand for other purposes, and that is the approach to extend.
 
-Every scenario below is to be exercised for **each of Id3v2.2, v2.3 and v2.4**, and for both the
-interpreted and the raw namespace.
+Every scenario below is to be exercised for **each of Id3v2.2, v2.3 and v2.4**, both through
+concepts and through source functions.
 
 | Scenario | What it is there to catch |
 |---|---|
@@ -92,29 +93,41 @@ interpreted and the raw namespace.
 | A track number written `3/12` | Must yield the track and not be mistaken for two values |
 | A date in each accepted timestamp form, and one in no accepted form | The latter must produce an unusable occurrence, not a wrong date |
 | A date-shaped field holding `0000` | Must be unusable; there is no year zero, and resolving it to the number zero would match a great many files silently |
-| A string-typed field that is present but empty, and one present but only whitespace | Both must be **absent** through the interpreted identifier, a file whose frame holds three spaces having no artist by any reading a person would recognise |
-| The same two fields through the raw namespace | A usable empty string and a usable three-space string respectively: raw trims nothing, and this is where the information the interpreted namespace set aside is still visible |
-| A value with whitespace at one end, through both namespaces | Trimmed through the interpreted identifier and untouched through the raw one |
+| A string-typed field that is present but empty, and one present but only whitespace | Both must be **absent** through the concept, a file whose frame holds three spaces having no artist by any reading a person would recognise |
+| The same two fields through `field()` | A usable empty string and a usable three-space string respectively: a source function trims nothing, and this is where the information the concept set aside is still visible |
+| A value with whitespace at one end, through a concept and through `field()` | Trimmed through the concept and untouched through `field()` |
 | A value with whitespace *inside* it, such as `" AC / DC "` | Must yield `AC / DC`: trimming takes the ends and never the middle |
 | A number-typed field, such as the one behind `id3v2::year`, present but empty or only whitespace | Must yield an unusable occurrence: the frame was written and holds no year |
 | The same frame repeated, with and without distinguishing descriptions | Must yield a multivalue of the expected cardinality |
 | A single v2.4 text frame holding several NUL-separated values | The only spec-sanctioned source of multiple values in one frame |
-| A frame the library has no class for, holding text | Must be readable through the raw namespace |
-| An `APIC` frame holding a picture | Must be an unusable occurrence and not an absent one, so that a predicate can tell a file that has cover art from one that does not |
+| A frame the library has no class for, holding text | Must be readable through `field()` |
+| An `APIC` frame holding a picture | Must be a usable blob through `bytes()`, holding the frame's content as recorded, so that a predicate can tell a file that has cover art from one that does not; `id3v2::field("APIC")` must be an error |
+| A `TYER` frame, in a v2.3 tag and in a v2.4 tag | Read as `TDRC` in both: the name depends on the frame and never on the revision the tag declares |
+| A v2.3 tag holding `TYER`, `TDAT` and `TIME` | `id3v2::field("TDRC")` must be the year alone, and `TDAT` and `TIME` readable under their own names; TagLibSharp 2.3.0 merges the three into one `TDRC` |
+| `TXXX`, `COMM` and `USLT` frames with several descriptions, differing in letter case | `field()` with a description must read only the frames whose description matches it without regard to case, and without one must read them all |
 | A v2.2 frame whose identifier the dependency maps to the wrong v2.4 name | Canary: Goro corrects the mapping internally, so the test asserts the underlying defect is still there |
-| A `TCON` frame on v2.3 whose genres are separated by a forward slash, and one holding `(RX)` | Skipped: the recorded text is reported with a semicolon in place of the slash, and without the parentheses. Affects the raw namespace only |
+| A `TCON` frame on v2.3 whose genres are separated by a forward slash, and one holding `(RX)` | Skipped: the recorded text is reported with a semicolon in place of the slash, and without the parentheses. Affects `field()` only |
 
-### Global namespace resolution
+For APE, which has one revision worth testing and no frames:
 
-An identifier in the global namespace is resolved across up to four tag formats in order of
-preference, as a `PREFERRED()` of the format-specific identifiers, and which format supplies the answer is decided by whether a format produced a *usable* occurrence
+| Scenario | What it is there to catch |
+|---|---|
+| A text item holding two values | Two occurrences through `field()`, and one through `bytes()`, which never splits |
+| A binary item | One unusable occurrence through `field()`, and one usable blob through `bytes()` |
+| Two items whose keys differ only in case | Only the last is seen, through every concept and source function alike |
+| A text item that is not valid UTF-8 | Pinned by whichever line reads APE tags; TagLibSharp 2.3.0 hands back U+FFFD and keeps nothing else |
+
+### Concepts written without a source
+
+A concept written without a source is resolved across up to four tag formats in order of
+preference, as a `PREFERRED()` of its cells, and which format supplies the answer is decided by whether a format produced a *usable* occurrence
 rather than merely a present one. Getting that wrong returns a value from the wrong tag without
 any visible symptom, which is the same failure mode as the rest of this class and earns the same
 treatment. The scenarios are few and they are exhaustive, so they should all be written.
 
 These require a file carrying more than one tag format, so the fixtures differ from those above.
-The same scenarios are asserted of `PREFERRED()` itself, over identifiers that need no file, and the
-global identifiers are asserted to be built from the format-specific ones in the documented order.
+The same scenarios are asserted of `PREFERRED()` itself, over identifiers that need no file, and
+each concept written without a source is asserted to be built from its cells in the documented order.
 
 | Scenario | What it is there to catch |
 |---|---|
@@ -128,9 +141,9 @@ global identifiers are asserted to be built from the format-specific ones in the
 
 ### Scenarios deliberately not covered
 
-Recovering the *content* of a genuinely binary frame is out of scope: no identifier hands back
-bytes, and none is planned. What is in scope, and is listed above, is that such a frame resolves
-to an unusable occurrence rather than to an absent value, since that distinction is what lets a
+Interpreting the *content* of a binary frame is out of scope: nothing in the language reads a
+blob's content yet. What is in scope, and is listed above, is that `bytes()` gives that content as
+recorded, and that a frame is a blob rather than absent, since that distinction is what lets a
 predicate ask whether a file carries cover art at all.
 
 ## Predicate semantics
@@ -186,7 +199,7 @@ where ordinary set semantics would make it true.
 **The operators never answer from unusable data.** Where a comparison, range, regex or logical
 operator gives true or false, it must give the same answer whatever the unreadable data had held.
 This is a property of the operators rather than of predicates: state tests, `FALLBACK()`,
-`PREFERRED()` and the global namespace make a result depend on unreadable data by design, and so
+`PREFERRED()` and concepts written without a source make a result depend on unreadable data by design, and so
 does comparing a condition with a boolean. Two properties together establish it over predicates
 built from the operators alone, and both are suited to generated predicates rather than
 hand-picked ones: such a predicate without `NOT` selects exactly the same files whether unusable
@@ -220,7 +233,8 @@ diacritic in the pattern matches nothing, and that the same pattern under `LITER
 subject that still has one.
 
 **Warning identity is structural.** The interning rules hold: differences of whitespace, letter
-case, explicit namespace qualification and modifier wrapping do not produce distinct sources,
+case, string form, the case of a name a source function matches without regard to case, and
+modifier wrapping do not produce distinct sources,
 while a difference anywhere below the top level does. The set of sources a predicate can produce
 is computable from the predicate alone.
 
@@ -340,17 +354,20 @@ string written directly after the operator.
 | `5mb` against `5m`, and `1h10m` against `10 kb` and `1h 10m` | The longest token must win, and whitespace must not appear inside a literal |
 | `1..100`, `1.5..2`, and `1.` | The range operator must survive the lexer, and a trailing period must be rejected |
 | A no-break space and an ideographic space between two tokens | Both are whitespace, and the predicate parses as if a plain space had been written |
-| `ape :: artist`, `ape:: artist` and `:: artist` | Each a syntax error, an identifier being written without whitespace around its `::`; the diagnostic offers the identifier without it. `NOT ::x` is still `NOT` applied to `::x` |
-| `::"artist"` | The identifier `::artist`: a quoted part may follow any `::`, including a leading one |
-| `::file::size` and `file::size` in one predicate | One identifier and one warning source: a leading `::` starts the name at the global namespace, where every namespace sits. Each warning still quotes the spelling that produced it |
-| `NOT::x == 1`, and `and::x` | The first is `NOT` applied to `::x == 1`; the second is an error, a reserved word never beginning an identifier unless it follows a leading `::` |
+| `ape :: artist` and `ape:: artist` | Each a syntax error, an identifier being written without whitespace around its `::`; the diagnostic offers the identifier without it |
+| `::artist`, `::file::size` and `ape::"artist"` | Each an error: there is no leading `::` and no quoted part. The diagnostics offer `artist`, `file::size` and `ape::field("artist")` |
+| `id3v2::track::x` | An error, a source being one level deep |
+| `and::x`, `ape::and` and `NOT::x == 1` | Errors: the first two because nothing is named after a reserved word, the third because there is no leading `::`, the diagnostic offering `NOT x == 1` |
+| `vorbis::field`, `field("MOOD")`, `ape::count(genre)` and `id3v1::field("x")` | Errors: a source function needs its arguments and its source, `COUNT()` belongs to no source, and Id3v1 has no source functions |
+| `id3v2::field("TYER")`, `id3v2::field("APIC")`, `id3v2::field("TIT2", "x")` and `id3v2::field("TI")` | Errors: a renamed frame, offering `TDRC`; a frame that does not hold text, offering `bytes()`; a description given to a frame that has none; and an identifier of the wrong shape |
+| `id3v1::size`, `file::artist`, `artistt` and `size` | Errors: a concept qualified by a source that cannot supply it, a misspelled concept with a suggestion, and a `file` concept written without its source |
 | `(ALL(genre)) == "x"` and `COUNT((ALL(genre)))` | The first is valid, the same predicate as `ALL(genre) == "x"`; the second is rejected exactly as `COUNT(ALL(genre))` is. Parentheses only group, around a modifier as anywhere else |
 | `genre != "x"`, `LITERALLY(genre) != "x"`, `FALLBACK(genre, "") != "x"` and `ALL(a) != b` | Each is an error: `LITERALLY` is not a quantifier, `FALLBACK()` settles absence but not several occurrences, and every operand that is not exactly one needs a quantifier of its own. The diagnostic for the first must offer both `NOT genre == "x"` and `ALL(genre) != "x"` |
 | `file::extension != "mp3"`, `id3v1::genre != "blues"` and `id3v1::year != 1991` | Each is an error, its operand able to be absent but never several. The diagnostic must say that the operand may be absent and offer `NOT file::extension == "mp3"` and `FALLBACK(file::extension, "") != "mp3"`, with `0` as the default for a number; offering a quantifier here is the defect this row exists to catch |
 | `ANY(genre) != "x"`, `LITERALLY(ALL(genre)) != "x"`, `COUNT(genre) != 1`, `file::size != 0`, `file::duration != 3m` and `(a == b) != (c == d)` | All valid: a quantifier anywhere in a stack of modifiers satisfies the rule, and an operand that is exactly one needs none |
 | `FALLBACK(file::extension, "") != "mp3"`, `FALLBACK(id3v1::genre, "") != "blues"`, `PREFERRED(id3v1::genre, "x") != "y"` and `ANY(id3v1::genre) != "blues"` | All valid: the first three are exactly one, `FALLBACK()` and `PREFERRED()` removing absence from an operand that never holds several, and the last carries a quantifier, which still satisfies the rule though it was not needed |
 | `FALLBACK(year, "5" AS NUMBER)`, `FALLBACK(artist, 5 AS STRING)`, `FALLBACK(year, "x" AS NUMBER)`, `FALLBACK(year, COUNT(genre))` and `FALLBACK(file::size, "5" AS NUMBER)` | The first two are valid, a conversion of a constant being a constant; the third is an error when the predicate is read, the conversion failing; the fourth is an error, `COUNT()` not being a constant; the fifth is a type mismatch, only a number literal standing for a bytecount |
-| `TRUE`, `true` and `False` as literals, `::true` as an identifier, and `year == NULL` | The boolean literals are case-insensitive keywords and qualifying one makes it an identifier; `NULL` names nothing and must be rejected with a diagnostic saying what to write instead |
+| `TRUE`, `true` and `False` as literals, and `year == NULL` | The boolean literals are case-insensitive keywords; `NULL` names nothing and must be rejected with a diagnostic saying what to write instead |
 | `artist =~ "^a"`, `title =~ artist`, `artist =~ (r"^a")`, `artist =~ LITERALLY(r"^a")` and `artist =~ ALL(r"^a")` | Each is a syntax error, the pattern being a raw string that is part of the operator. The diagnostic for the first must offer `r"^a"`, and the one for `LITERALLY` must offer `LITERALLY(artist) =~ r"^a"` |
 | `artist ~= r"^a"`, `artist ~= "a"` and `artist !~ r"^a"` | Each is a syntax error, `~=` and `!~` being spellings borrowed from other languages. The diagnostic for each `~=` must offer both `=~` and `!=`, since either may have been meant, and the one for the second must offer `artist =~ r"a"` rather than `artist =~ "a"`; the one for `!~` must offer `NOT artist =~ r"^a"` |
 | `FALLBACK(year, (0))`, `file::duration > (90)` and `("x") AS NUMBER` | A literal in parentheses is a literal: the first is valid, the second compares with ninety seconds, and the third is the same static error as `"x" AS NUMBER` |
@@ -463,7 +480,7 @@ single-condition test exercises.
 | A file that is not audio at all, and one whose audio is truncated | Must warn and continue, not propagate an exception from the tag library |
 | A predicate mentioning only `file::path`, `file::name` or `file::extension`, against a file that cannot be opened at all | Must **not** warn, and must evaluate: nothing was read |
 | A predicate mentioning only `file::size`, against a file whose tags cannot be read | Must **not** warn: nothing needed the tags, so nothing failed |
-| The same file under a predicate mentioning a tag identifier | Must warn, and the file must not be listed |
+| The same file under a predicate mentioning a tag concept | Must warn, and the file must not be listed |
 | A predicate that meets uninterpretable data in a file and then finds the file cannot be read, such as `file::name AS NUMBER > 1 OR artist == "x"` | One file warning and no data warning: a file that was not processed has nothing to say about its data |
 | `goro list` with no filter, over a file that cannot be opened | Must list it and must not warn, the command having needed nothing but the path |
 | `goro hash` over an unreadable file, in both output formats | The row must appear, with `-` in plain and `null` in JSON. Omitting the row is precisely the failure this scenario exists to catch |

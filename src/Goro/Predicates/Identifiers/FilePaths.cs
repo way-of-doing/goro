@@ -3,7 +3,7 @@ namespace Goro.Predicates.Identifiers;
 /// <summary>
 /// How a path is written when a predicate sees it as <c>file::path</c>: exactly as discovered, but
 /// with <c>/</c> as the separator on every platform, so that one predicate means the same thing
-/// everywhere. See the <c>file</c> namespace in docs/features/builtins/identifiers.md.
+/// everywhere. See the <c>file</c> source in docs/features/builtins/identifiers.md.
 /// </summary>
 public static class FilePaths
 {

@@ -20,9 +20,8 @@ public static class SyntaxPrinter
     {
         LiteralSyntax literal => Literal(literal.Token),
         NullSyntax => "NULL",
-        IdentifierSyntax identifier => Identifier(identifier),
-        NamePartSyntax part => part.IsQuoted ? Quoted(part.Text) : part.Text,
-        FunctionCallSyntax call => List(["call", call.Name.Text, .. call.Arguments.Select(Print)]),
+        IdentifierSyntax identifier => Qualified(identifier.Source, identifier.Name),
+        FunctionCallSyntax call => List(["call", Qualified(call.Source, call.Name), .. call.Arguments.Select(Print)]),
         ParenthesizedSyntax parentheses => List("paren", Print(parentheses.Expression)),
         ModifierSyntax modifier => List(modifier.Modifier.ToString().ToUpperInvariant(), Print(modifier.Operand)),
         AsSyntax conversion => List("AS", Print(conversion.Operand), conversion.Target.Text),
@@ -37,8 +36,7 @@ public static class SyntaxPrinter
 
     private static string List(params string[] items) => $"({string.Join(' ', items)})";
 
-    private static string Identifier(IdentifierSyntax identifier) =>
-        (identifier.IsRooted ? "::" : "") + string.Join("::", identifier.Parts.Select(Print));
+    private static string Qualified(NameToken? source, NameToken name) => source is null ? name.Text : $"{source.Text}::{name.Text}";
 
     private static string Operator(ComparisonOperator op) => op switch
     {

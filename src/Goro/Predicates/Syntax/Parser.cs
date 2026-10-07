@@ -293,68 +293,70 @@ public static class Parser
             }
         }
 
-        // identifier = ( name | "::" name_part ) { "::" name_part } ;  function_call = name "(" [ expression { "," expression } ] ")" ;
+        // identifier = [ name "::" ] name ;  function_call = [ name "::" ] name "(" [ expression { "," expression } ] ")" ;
         private ExpressionSyntax IdentifierOrCall()
         {
-            var first = Current;
-            var isRooted = first.Kind == TokenKind.DoubleColon;
-            var tokens = new List<TextSpan>();
-            if (isRooted)
+            if (Current.Kind == TokenKind.DoubleColon)
             {
-                tokens.Add(Advance().Span);
+                throw Error(diagnostics.RootedIdentifier(index));
             }
 
-            var parts = ImmutableArray.CreateBuilder<NamePartSyntax>();
-            parts.Add(NamePart(allowQuoted: isRooted));
-            tokens.Add(parts[^1].Span);
-            while (Current.Kind == TokenKind.DoubleColon)
+            var first = (NameToken)Advance();
+            NameToken? source = null;
+            var name = first;
+            if (Current.Kind == TokenKind.DoubleColon)
             {
-                tokens.Add(Advance().Span);
-                parts.Add(NamePart(allowQuoted: true));
-                tokens.Add(parts[^1].Span);
-            }
+                var colons = Advance();
+                name = NameAfterSource(first);
+                source = first;
 
-            var identifier = new IdentifierSyntax(TextSpan.Covering(first.Span, parts[^1].Span), isRooted, parts.ToImmutable());
+                // An identifier is three tokens, but it is written as one: no whitespace on either side of its "::".
+                TextSpan[] tokens = [first.Span, colons.Span, name.Span];
+                if (tokens.Zip(tokens.Skip(1)).Any(pair => pair.First.End != pair.Second.Start))
+                {
+                    throw Error(diagnostics.WhitespaceInIdentifier(TextSpan.Covering(first.Span, name.Span), tokens));
+                }
 
-            // An identifier is several tokens, but it is written as one: no whitespace on either side
-            // of any of its "::".
-            if (tokens.Zip(tokens.Skip(1)).Any(pair => pair.First.End != pair.Second.Start))
-            {
-                throw Error(diagnostics.WhitespaceInIdentifier(identifier, tokens));
+                if (Current.Kind == TokenKind.DoubleColon)
+                {
+                    throw Error(diagnostics.NestedIdentifier(first, index));
+                }
             }
 
             if (Current.Kind != TokenKind.OpenParen)
             {
-                return identifier;
+                return new IdentifierSyntax(TextSpan.Covering(first.Span, name.Span), source, name);
             }
 
-            if (isRooted || parts.Count > 1)
-            {
-                throw Error(diagnostics.QualifiedFunctionCall(identifier));
-            }
-
-            return FunctionCall((NameToken)first);
+            return FunctionCall(first, source, name);
         }
 
-        // name_part = name | string ;  after "::" a reserved word is a name like any other.
-        private NamePartSyntax NamePart(bool allowQuoted)
+        /// <summary>
+        /// What follows a source and its "::": a name, which a reserved word never is. A string there is
+        /// a name the source records under, which is a source function's to read.
+        /// </summary>
+        private NameToken NameAfterSource(NameToken source)
         {
-            if (Current.Kind == TokenKind.Name || TokenFacts.IsReservedWord(Current.Kind))
-            {
-                var name = Advance();
-                return new NamePartSyntax(name.Span, name.Span.Of(text), IsQuoted: false);
-            }
-
-            if (allowQuoted && Current is StringToken quoted)
+            if (Current is NameToken name)
             {
                 Advance();
-                return new NamePartSyntax(quoted.Span, quoted.Value, IsQuoted: true);
+                return name;
             }
 
-            throw Error(diagnostics.Unexpected(index, allowQuoted ? Expectation.NameOrQuotedName : Expectation.Name));
+            if (TokenFacts.IsReservedWord(Current.Kind))
+            {
+                throw Error(diagnostics.ReservedWordInIdentifier(Current));
+            }
+
+            if (Current is StringToken quoted)
+            {
+                throw Error(diagnostics.QuotedName(source, quoted));
+            }
+
+            throw Error(diagnostics.Unexpected(index, Expectation.Name));
         }
 
-        private FunctionCallSyntax FunctionCall(NameToken name)
+        private FunctionCallSyntax FunctionCall(NameToken first, NameToken? source, NameToken name)
         {
             Advance();
             var arguments = ImmutableArray.CreateBuilder<ExpressionSyntax>();
@@ -369,7 +371,7 @@ public static class Parser
             }
 
             var close = Expect(TokenKind.CloseParen, arguments.Count == 0 ? Expectation.CloseParen : Expectation.CommaOrCloseParen);
-            return new FunctionCallSyntax(TextSpan.Covering(name.Span, close.Span), name, arguments.ToImmutable());
+            return new FunctionCallSyntax(TextSpan.Covering(first.Span, close.Span), source, name, arguments.ToImmutable());
         }
 
         // ------------------------------------------------------------------------------------------

@@ -9,8 +9,8 @@ namespace Goro.Predicates.Analyses;
 /// The structure of a sub-expression with everything about how it was written erased: whitespace,
 /// case, parentheses, modifiers, and which string form wrote a literal.
 /// </summary>
-/// <param name="Key">What identity is decided by. Identifiers appear in it as the number the
-/// interner gave them, so it is exactly as fine as <c>IdentifierName</c>'s own equality.</param>
+/// <param name="Key">What identity is decided by. What is read from the file appears in it as the number the
+/// interner gave it, so it is exactly as fine as <c>DeclaredName</c>'s own equality.</param>
 /// <param name="Form">The same structure for a reader, as the source table lists it.</param>
 internal readonly record struct Shape(string Key, string Form)
 {

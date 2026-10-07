@@ -33,7 +33,9 @@ public static class SyntaxDiagnosticCodes
     public const string ReservedWord = "reserved-word";
     public const string ReservedWordInIdentifier = "reserved-word-in-identifier";
     public const string WhitespaceInIdentifier = "whitespace-in-identifier";
-    public const string QualifiedFunctionCall = "qualified-function-call";
+    public const string RootedIdentifier = "rooted-identifier";
+    public const string NestedIdentifier = "nested-identifier";
+    public const string QuotedName = "quoted-name";
     public const string RangeEndpointNotLiteral = "range-endpoint-not-literal";
     public const string QuotedPattern = "quoted-pattern";
     public const string ParenthesizedPattern = "parenthesized-pattern";

@@ -59,8 +59,8 @@ tagged both "metal" and "rock"; if that really is the question, `ANY(genre) != "
 Put the cheap conditions first. `AND` and `OR` evaluate their operands left to right, stop as soon
 as the result is settled, and are never reordered. `file::path`, `file::name` and
 `file::extension` need nothing read at all, `file::size` needs nothing but file system metadata, a
-tag identifier needs its tag read, and a global identifier such as `artist` may consult several tag
-formats before it answers. So
+concept qualified by a tag source needs that tag read, and a concept written without a source,
+such as `artist`, may consult several tag formats before it answers. So
 
 ```
 file::size > 10mb AND artist == "metallica"
@@ -94,27 +94,28 @@ and warned.
 If you have accepted the junk across the whole collection, `--no-warn=data` silences all such
 warnings at once.
 
-### The global `artist` (or `year`, ...) picked a value I did not want. What now?
+### `artist` (or `year`, ...) picked a value I did not want. What now?
 
-Do not fight it. The global namespace guesses well for most files and will occasionally guess
-against what you want. Address the tag you mean instead, through a format-specific namespace such
-as `vorbis::artist`, or through its `raw` counterpart if you want the datum exactly as recorded.
+Do not fight it. A concept written without a source guesses well for most files and will
+occasionally guess against what you want. Address the tag you mean instead, as in
+`vorbis::artist`, or through a source function such as `vorbis::field("ARTIST")` if you want the
+datum exactly as recorded.
 
-If what you want is a different order of preference, write one: every global identifier is a
-`PREFERRED()` of the format-specific ones, and `PREFERRED(id3v2::artist, vorbis::artist)` is the
-same idea with Id3v2 trusted first. The same goes for anything the global namespace does not cover,
-such as `PREFERRED(ape::"album artist", vorbis::albumartist)`.
+If what you want is a different order of preference, write one: every concept written without a
+source is a `PREFERRED()` of the same concept from each source, and
+`PREFERRED(id3v2::artist, vorbis::artist)` is the same idea with Id3v2 trusted first. The same goes
+for anything no concept covers, such as
+`PREFERRED(vorbis::field("ALBUMARTIST"), ape::field("Album Artist"))`.
 
-The global namespace also skips silently over a preferred format whose data cannot be read, when a
+A concept written without a source also skips silently over a preferred format whose data cannot be read, when a
 lesser one holds something usable, so no warning tells you about the junk it routed around. To
 find it, ask the format directly: `ANY(vorbis::year) IS UNUSABLE` finds the files whose Vorbis
 date fields need attention.
 
 ### How do I find Id3v1 tags with a junk genre?
 
-Ask for the byte rather than the name. `id3v1::raw::genre BETWEEN 148..254` finds the files using
-an index the genre table never defined, and `id3v1::raw::genre == 0` finds those whose genre byte
-was never set away from the first entry.
+`id3v1::genre IS UNUSABLE` finds the files whose genre byte is an index the genre table never
+defined.
 
 ### How do I tell a genuine Blues file from a zero-filled Id3v1 tag?
 

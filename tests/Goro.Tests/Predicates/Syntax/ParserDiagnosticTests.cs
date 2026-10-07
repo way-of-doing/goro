@@ -189,7 +189,9 @@ public class ParserDiagnosticTests
     [TestCase("NULL::x == 1", "NULL")]
     [TestCase("ALL::x == 1", "ALL")]
     [TestCase("x == IS::y", "IS")]
-    public void ReservedWord_BeginningAnIdentifier_IsAnError(string text, string word)
+    [TestCase("ape::and == 1", "and")]
+    [TestCase("vorbis::NULL == 1", "NULL")]
+    public void ReservedWord_InAnIdentifier_IsAnError(string text, string word)
     {
         var error = Error(text);
         Assert.That(error.Code, Is.EqualTo(Codes.ReservedWordInIdentifier));
@@ -199,30 +201,43 @@ public class ParserDiagnosticTests
     // ---------------------------------------------------------------------------------------------
     // Identifiers and function calls
 
-    [TestCase("foo::count(x)", "count(x)")]
-    [TestCase("::count(x) > 1", "count(x) > 1")]
-    [TestCase("a::b::fallback(x, 1)", "fallback(x, 1)")]
-    public void QualifiedFunctionCall_OffersTheUnqualifiedCall(string text, string rewrite)
+    [TestCase("::artist == 1", "::artist", "artist == 1")]
+    [TestCase("::file::size > 1", "::file::size", "file::size > 1")]
+    [TestCase("::count(x) > 1", "::count", "count(x) > 1")]
+    [TestCase("NOT ::x", "::x", "NOT x")]
+    public void LeadingDoubleColon_OffersTheNameWithoutIt(string text, string marked, string rewrite)
     {
         var error = Error(text);
-        Assert.That(error.Code, Is.EqualTo(Codes.QualifiedFunctionCall));
+        Assert.That(error.Code, Is.EqualTo(Codes.RootedIdentifier));
+        Assert.That(error.Span.Of(text), Is.EqualTo(marked));
         Assert.That(Rewrites(text, error), Is.EqualTo(new[] { rewrite }));
     }
 
-    [Test]
-    public void QualifiedFunctionCall_WithAQuotedName_OffersNothing()
+    [TestCase("foo::bar::baz", "foo::bar::baz")]
+    [TestCase("id3v1::raw::genre == 1", "id3v1::raw::genre")]
+    [TestCase("a::b::fallback(x, 1)", "a::b::fallback")]
+    public void ASecondDoubleColon_IsAnError_ASourceBeingOneLevelDeep(string text, string marked)
     {
-        var error = Error("ape::\"count\"(x)");
-        Assert.That(error.Code, Is.EqualTo(Codes.QualifiedFunctionCall));
+        var error = Error(text);
+        Assert.That(error.Code, Is.EqualTo(Codes.NestedIdentifier));
+        Assert.That(error.Span.Of(text), Is.EqualTo(marked));
         Assert.That(error.Suggestions, Is.Empty);
+    }
+
+    [TestCase("ape::\"Album Artist\" == \"x\"", "ape::field(\"Album Artist\") == \"x\"")]
+    [TestCase("ape::r\"Album Artist\" == \"x\"", "ape::field(r\"Album Artist\") == \"x\"")]
+    [TestCase("vorbis::\"mood\"::x", "vorbis::field(\"mood\")::x")]
+    public void AQuotedName_OffersField(string text, string rewrite)
+    {
+        var error = Error(text);
+        Assert.That(error.Code, Is.EqualTo(Codes.QuotedName));
+        Assert.That(Rewrites(text, error), Is.EqualTo(new[] { rewrite }));
     }
 
     [TestCase("ape :: artist == 1", "ape::artist == 1")]
     [TestCase("ape:: artist == 1", "ape::artist == 1")]
     [TestCase("ape ::artist == 1", "ape::artist == 1")]
-    [TestCase(":: artist == 1", "::artist == 1")]
-    [TestCase("ape ::  \"album artist\" == 1", "ape::\"album artist\" == 1")]
-    [TestCase("id3v1::raw :: genre == 1", "id3v1::raw::genre == 1")]
+    [TestCase("vorbis :: field(\"x\") == 1", "vorbis::field(\"x\") == 1")]
     public void WhitespaceAroundDoubleColon_IsAnError_AndOffersTheIdentifierWithout(string text, string rewrite)
     {
         var error = Error(text);
@@ -232,7 +247,7 @@ public class ParserDiagnosticTests
 
     [TestCase("ape:: == 1", Codes.UnexpectedToken)]
     [TestCase("ape::", Codes.UnexpectedEnd)]
-    [TestCase(":: == 1", Codes.UnexpectedToken)]
+    [TestCase(":: == 1", Codes.RootedIdentifier)]
     [TestCase("ape::5", Codes.UnexpectedToken)]
     public void Identifier_WithoutANameAfterDoubleColon_IsAnError(string text, string code)
     {
