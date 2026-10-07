@@ -126,3 +126,141 @@ leaving the reading of tag data to its own line.
   and functions qualified by a source were agreed in discussion; everything under Questions is
   open. Next step: settle the questions, starting with the function's name and frame addressing,
   then write the rationale entry.
+- 2026-10-07 -- Line started. Proposed a model for typing what files record, built around an
+  opaque type, `blob`, suggested in discussion. Fields are typed by what the format records:
+  string for text, blob for anything else, and `id3v2::field()` typed statically by its frame
+  identifier. Concepts are typed by their meaning. A blob is accepted only by `IS`, `COUNT()` and
+  as the operand of `AS`, with no targets yet, so a blob concept can later be promoted to a richer
+  type without making any valid predicate invalid or changing its result, provided the promotion
+  keeps every occurrence's cardinality and state and agrees with the conversions from blob. A
+  concept whose type is not blob never changes type. Not yet agreed; open within it are the
+  type's name, keeping blobs out of `PREFERRED()`, and whether an APE binary item read through
+  `ape::field()` is an unusable string. Next step: settle the proposal, record it in the
+  rationale, and decide whether this line absorbs non-text-tag-data.
+- 2026-10-07 -- Pressing on APE binary items found a flaw in the proposal: any conversion out of a
+  promotable type binds every future promotion to keep it, so a blob that converts cannot be
+  promoted freely. Proposed splitting it in two: `opaque`, the type of a concept whose type is
+  not decided yet, accepted only by `IS` and `COUNT()` and promotable; and `blob`, recorded bytes,
+  the type of fields that are not text, never promoted, and therefore free to gain conversions
+  such as `AS STRING("iso-8859-1")`. Leanings: the accessor a predicate writes chooses the type,
+  and what kind of item the file holds decides only usability. APE gets `ape::bytes()` beside
+  `ape::field()`. Conversion targets take literal parameters, `AS STRING("latin1")`, and a
+  parameter supplies only what the data cannot tell, so `AS IMAGE(png)` is discouraged. Not yet
+  agreed. Next step: settle the split and the names, then continue with the remaining questions.
+- 2026-10-07 -- Decided: two types, `opaque` and `blob`, with those names. Weighed parameters on
+  conversion targets. Every predicate valid today keeps its meaning with them, since `AS target (`
+  is a syntax error today and a blob is never promoted, so they need not land with this line;
+  nothing produces a blob until the tag sources are read. Leaning for their spelling: unquoted
+  words, `AS STRING(iso-8859-3)`, made possible by one context-dependent token rule. Inside the
+  parentheses after a conversion target, a word may also contain hyphens. The lexer already looks
+  back at the previous token for clock-form durations. Hyphens in names everywhere were rejected:
+  `a-b` would then be a name, which costs any future arithmetic its minus. Next step: confirm
+  that spelling and when parameters land, then continue with the remaining questions.
+- 2026-10-07 -- Wrote up conversion parameters as a brief of their own,
+  [conversion-parameters](conversion-parameters.md). On APE: the format allows one item per key,
+  keys compared without regard to case, and an item is text, binary or a locator, so one key never
+  holds both kinds in a tag. A probe against TagLibSharp 2.3.0, with two items under one key, one
+  text and one binary, in either order, and with keys differing in case, found the last item kept
+  every time, as identifiers.md already says. The kind varies only from file to file, which the
+  two views handle. Leaning: `ape::bytes()` gives one occurrence per value of a text or locator
+  item and one for a binary item, so it always has the same number of occurrences as
+  `ape::field()` with the same key, and the two differ only in type and in which occurrences are
+  usable. The probe also found that TagLibSharp decodes a text item as UTF-8 as it reads it and
+  keeps nothing else: `Mot\xF6rhead` comes back with U+FFFD in place of the `ö`, and its
+  `Render()` writes the replacement character. So the bytes of a text item can only be had by
+  reading the APE tag ourselves. If the tag-reading line does that, invalid UTF-8 could become
+  unusable rather than quietly garbled, and an older APE tag could be decoded as ISO-8859-1;
+  both feed the damaged-data question. Next step: confirm the cardinality rule for
+  `ape::bytes()`, then continue with the remaining questions.
+- 2026-10-07 -- Agreed: `bytes()` gives one occurrence per item or frame and never splits a
+  value. Splitting text on NUL would be Goro guessing in the one place meant to offer the most
+  control, and nothing in the language could do more with split bytes than with strings. So
+  `ape::bytes(k)` never holds more than one occurrence, APE keys being unique in a tag. Proposed:
+  `field()` is a string and `bytes()` a blob for every source that has keys -- `id3v2`, `ape`,
+  `vorbis` -- so a type depends on the function alone and never on an argument. `id3v2::field()`
+  on a frame that is not text is then an error offering `id3v2::bytes()`; APE cannot know an
+  item's kind before reading, so a binary item read through `ape::field()` stays unusable.
+  `PREFERRED()` takes blobs, which are never promoted. Proposed for opaque values: each opaque
+  concept has a type of its own, the same only within that concept, so `PREFERRED()` over cells
+  of one concept is valid and stays valid after promotion, and no construct needs to leave opaque
+  out. Proposed calling `field()` and `bytes()` _source functions_ in prose. Still open: frame
+  addressing, trimming, interpretations as `AS` targets, the checks on arguments, the `file`
+  source written unqualified, the leading `::`, Id3v1's byte-valued concepts, and the
+  damaged-data probe. Next step: frame addressing and the checks on arguments, which are
+  coupled.
+- 2026-10-07 -- A type of its own for each opaque concept withdrawn: it would make the list of
+  types an open family rather than a closed list. Back to one `opaque` type, accepted only by
+  constructs that take any type on its own (`IS`, `COUNT()`), so it is kept out of `PREFERRED()`;
+  that costs only reordering the cells of one concept. The types are then string, number,
+  bytecount, duration, boolean, blob and opaque. Decided: frames are addressed by their v2.4
+  identifier; the `file` source is never written unqualified. Deferred: interpretations as `AS`
+  targets. A probe of TagLibSharp 2.3.0 shows why addressing by v2.4 identifier felt shaky:
+  - In a v2.4 tag, `TYER` and `TDAT` are left as they are.
+  - In a v2.3 tag, `TYER`, `TDAT` and `TIME` are merged into a `TDRC` of `1991-01-02T12:00`,
+    which contradicts identifiers.md. `TORY` becomes `TDOR`, `RVAD` disappears, and an `IPLS`
+    holding `producer` and `Someone` comes back as `producer` alone.
+  - In a v2.2 tag, `PIC` becomes an `APIC` with its content converted.
+
+  Proposed rule: a frame is addressed by a fixed table keyed on its own identifier, whatever the
+  tag's revision, and is renamed to its v2.4 identifier only where v2.4 holds the same data in the
+  same form: `TYER` and `TORY` are, `TDAT`, `RVAD` and `PIC` keep their own names. Writing a
+  renamed identifier is an error offering the v2.4 one. This holds only if Goro lists the frames
+  itself rather than taking TagLibSharp's converted view, as APE text items already needed.
+  Proposed checks on arguments: a frame identifier's shape and the rename table, `field()`
+  refused for frames that are not text, and a description as the second argument of `TXXX`,
+  `WXXX`, `COMM` and `USLT`, optional and matched case-insensitively; no language argument and no
+  tables of well-known names. Trimming in normalized comparison: examples that would break it
+  were gathered. The largest is `field() AS NUMBER` failing on `"120 "`, which reopens the
+  as-operator rule that text converts only when it is the literal and nothing else. Leanings:
+  remove the leading `::`; Id3v1 needs one new concept, the genre byte, and loses only untrimmed
+  text and the year as text. Next step: settle trimming and `AS` together, then confirm the
+  addressing rule.
+- 2026-10-07 -- Addressing by a table keyed on each frame's own identifier is accepted as a first
+  attempt. Whether to keep TagLibSharp is to be reconsidered once its handling of Vorbis is
+  looked at as closely as APE and Id3v2 have been. Decided: the checks on arguments as proposed,
+  and removing the leading `::`. Trimming split out to its own brief, [trimming](trimming.md),
+  for a decision made from the facts; this line settles only that `field()` reads the text as
+  recorded. Proposed: no concept for Id3v1's genre byte. `id3v1::genre` is a string, being a cell
+  of `genre`, so the byte would need a name of its own. All it adds over `id3v1::genre IS
+  UNUSABLE` is the exact index of a byte the table does not define, so Id3v1 needs no further
+  concepts. Next step: probe TagLibSharp's Vorbis reading, then decide whether Goro reads tags
+  itself.
+- 2026-10-07 -- Decided: no concept for Id3v1's genre byte for now; it is easy to add if it is
+  ever wanted.
+- 2026-10-07 -- Agreed:
+  - `field` and `bytes` as the names;
+  - "source functions" in prose;
+  - a source function written without a source is an error;
+  - `vorbis::bytes()` exists;
+  - an APE binary item read through `ape::field()` is unusable.
+
+  The promise that source functions give the data as recorded is kept, even if that means Goro
+  reads some formats without TagLibSharp. That decision, the damaged-data question and the
+  growth of the concept table moved to a new brief, [concept-table](concept-table.md), since they
+  rest on the same discovery. No `picture` concept: nothing concrete is wanted of one yet, and
+  asking anything of a picture would need values with properties and syntax of their own. This
+  line keeps the bare minimum of concepts. Proposed minimum: today's `artist`, `album`, `title`,
+  `genre`, `year`, `track` and `comment`, reading the fields they read today, except that:
+  - the Id3v2 cell of `comment` reads only the `COMM` frame with an empty description, so
+    iTunes's `iTunNORM` is not a comment;
+  - `comment` has no Vorbis cell yet;
+  - Vorbis's `description` goes, `vorbis::field("DESCRIPTION")` reaching it.
+
+  With no opaque concept, `opaque` would have no values, so it is proposed to enter the
+  specification with its first concept and to live in the rationale until then. Next step:
+  confirm the minimum, then write the rationale entry.
+- 2026-10-07 -- The reader and damaged-data questions moved to a brief of their own,
+  [mp3-support](mp3-support.md), named after flac-support: the same kind of questions for the one
+  format Goro hashes today, whose tags nothing reads yet. flac-support and ogg-support now refer
+  to it for damaged data, and concept-table keeps only the growth of the table, after
+  mp3-support. Decided: `comment` leaves the minimum, not being global today, until it has had
+  more homework, which concept-table records. `opaque` stays out of the specification until a
+  concept needs it; the idea is kept in this Log and goes to the rationale with that concept. The
+  minimum is now `artist`, `album`, `title`, `genre` and `year`, with `track` to confirm: it is
+  not global today either, but its interpretation is fully specified. Next step: settle `track`,
+  then write the rationale entry.
+- 2026-10-07 -- Decided: `track` stays. The minimum concept table is `artist`, `album`, `title`,
+  `genre`, `year` and `track`, each reading what it reads today. The four new briefs land on main
+  with this line. Every design question is now settled here or moved to a brief of its own. Next
+  step: the writing phase -- the rationale, then the normative documents, then the catalog, parser
+  and binder -- proposed as a plan before it starts.
