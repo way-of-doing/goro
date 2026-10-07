@@ -25,6 +25,8 @@ public sealed class GoroApp
         _app = new CommandApp(new TypeRegistrar(services));
         _app.Configure(config =>
         {
+            config.SetApplicationName("goro");
+
             config.AddCommand<HashCommand>("hash");
             config.AddCommand<ListCommand>("list");
 
