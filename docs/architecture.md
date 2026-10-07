@@ -43,7 +43,7 @@ The object graph this component produces is immutable and holds no per-file stat
 
 ## Identifier catalog
 
-This component owns every namespace and identifier a predicate can name. For each identifier it declares a type, its bounds, and a binding that resolves it for one file. A closed namespace knows its identifiers in advance; an open one declares a string-typed identifier for whatever name it is asked about. The compiler is given a catalog rather than reaching for the built-in one, which is what lets a test declare identifiers holding whatever a scenario needs.
+This component owns every source, concept and source function a predicate can name. For each concept a source supplies, and for each source function, it declares a type, its bounds, and a binding that resolves it for one file; a source function also checks the arguments it is given, which are literals and so can be checked when the predicate is read. A concept written without a source is bound to the preference among its cells. The compiler is given a catalog rather than reaching for the built-in one, which is what lets a test declare identifiers holding whatever a scenario needs.
 
 What a binding reads comes from the file's data, which is loaded only as far as an evaluation asks for it: nothing at all for the path and name, file system metadata for the size, the audio properties for the duration, the tags for a tag identifier. Each kind of data is loaded at most once per file. Failing to load one makes the file unreadable, which abandons its evaluation.
 

@@ -28,57 +28,49 @@ A predicate is read as a sequence of _tokens_: literals, identifiers, operators 
 
 ### Case sensitivity
 
-Predicate syntax is case-insensitive throughout, using invariant culture rules. The keyword operators (`AND`, `OR`, `NOT`, `BETWEEN`, `IS`, `AS`), the state names (`USABLE`, `UNUSABLE`, `ABSENT`), the conversion targets (`NUMBER`, `STRING`, `DURATION`, `BYTECOUNT`), the reserved words `NULL`, `TRUE` and `FALSE`, function names, identifiers, namespaces, and the unit suffixes of bytecount and duration literals are all matched without regard to case. `artist`, `Artist` and `ARTIST` are the same identifier, and similarly `id3v2::tit2` and `ID3V2::TIT2` are the same identifier.
+Predicate syntax is case-insensitive throughout, using invariant culture rules. The keyword operators (`AND`, `OR`, `NOT`, `BETWEEN`, `IS`, `AS`), the state names (`USABLE`, `UNUSABLE`, `ABSENT`), the conversion targets (`NUMBER`, `STRING`, `DURATION`, `BYTECOUNT`), the reserved words `NULL`, `TRUE` and `FALSE`, function names, sources, identifiers, and the unit suffixes of bytecount and duration literals are all matched without regard to case. `artist`, `Artist` and `ARTIST` are the same identifier, and similarly `id3v2::artist` and `ID3V2::Artist` are the same identifier.
 
-The only case-sensitive text in a predicate is the contents of a string value -- and even those are compared without regard to case unless `LITERALLY()` is used; see [Normalization](normalization.md). The letters of a string escape are a second and smaller exception: the escapes are the ones listed under [Values](#values) and no others, so `\n` is a line feed while `\N` is not an escape at all and is therefore an error. The hexadecimal digits of `\x` and `\u` may be written in either case, and the `r` prefixing a raw string may be either `r` or `R`, both being notation around a string rather than part of its contents. A quoted part of an identifier is not a string value in this sense and is matched without regard to case like any other part of an identifier, so `ape::"album artist"` and `ape::"Album Artist"` are the same identifier.
+The only case-sensitive text in a predicate is the contents of a string value -- and even those are compared without regard to case unless `LITERALLY()` is used; see [Normalization](normalization.md). The letters of a string escape are a second and smaller exception: the escapes are the ones listed under [Values](#values) and no others, so `\n` is a line feed while `\N` is not an escape at all and is therefore an error. The hexadecimal digits of `\x` and `\u` may be written in either case, and the `r` prefixing a raw string may be either `r` or `R`, both being notation around a string rather than part of its contents. The arguments of a [source function](#functions) are strings, and each source says how it matches them: `vorbis::field("mood")` reads a field recorded as `MOOD`, Vorbis field names being matched without regard to case.
 
-### Identifiers and namespaces
+### Identifiers and sources
 
-Identifiers are unquoted sequences that start with an ASCII letter and may contain ASCII letters, digits, and underscores. For example, `artist` and `year` are both simple identifiers. Characters outside this set, including accented letters and any other non-ASCII character, may not appear in an identifier; encountering one is a syntax error rather than a reference to an undefined identifier.
+Identifiers are unquoted sequences that start with an ASCII letter and may contain ASCII letters, digits, and underscores. For example, `artist` and `year` are both identifiers. Characters outside this set, including accented letters and any other non-ASCII character, may not appear in an identifier; encountering one is a syntax error rather than a reference to an undefined identifier.
 
-Each identifier may also be preceded by a _namespace_. Namespaces follow the same rules as identifiers: they start with an ASCII letter and may contain ASCII letters, digits, and underscores. Namespaces are part of the identifier, and are separated from it by a double colon. For example, `id3v2::TIT2` is a _qualified_ identifier where `id3v2` is the namespace.
-
-In actuality, all identifiers have a namespace. If the namespace is not explicitly provided (i.e. no double colon in the identifier), the identifier is _unqualified_ and considered to be inside the _global namespace_. The global namespace can also be explicitly specified by using `::` without a namespace in front. For example, `artist` is an unqualified identifier implicitly in the global namespace, `::artist` is a functionally equivalent (but qualified) identifier but with the namespace explicitly provided, and `id3v1::artist` is a qualified identifier in the namespace `id3v1`.
-
-Namespaces can also be hierarchically nested. For example, `foo::bar::baz` is a qualified identifier referring to `baz` in the namespace `foo::bar`.
-
-A leading `::` starts a name at the global namespace, where every namespace sits, so `::id3v2::TIT2` and `id3v2::TIT2` are the same identifier.
+An identifier names a _concept_: one of Goro's names for something a file can record, such as `artist`, `year` or `size`. It may be preceded by a _source_, which says where the concept is read from, separated from it by a double colon: `id3v2::year` is a _qualified_ identifier, and reads the year from the Id3v2 tag alone. The sources are `file` and the tag formats `id3v1`, `id3v2`, `ape` and `vorbis`, and a source is one level deep: nothing nests under one. An identifier written without a source, such as `year`, reads the tag sources in order of preference, while the concepts of the `file` source are always written with it, as in `file::size`.
 
 An identifier is written without whitespace around its `::`, so `ape :: artist` is an error.
 
-Some of the names an identifier has to reach are not Goro's to choose. An [open namespace](../features/builtins/identifiers.md) derives the name it looks for from the identifier itself, and tag formats allow names that the rules above cannot spell -- an APE item key may contain spaces, as `Album Artist` does, and other formats permit further punctuation. For these, a part of an identifier may instead be written **as a quoted string**, in which case its contents are the name and the restrictions on identifier characters do not apply:
+Goro knows every source and every concept there is. Naming a source or a concept that Goro does not define is an error, and so is qualifying a concept by a source that cannot supply it. What a tag records under names of its own choosing -- a Vorbis field called `MOOD`, an APE item called `Album Artist` -- is reached through a [source function](#functions) instead, which takes the name as a string:
 
 ```
-ape::"album artist" == "Various Artists"
+ape::field("Album Artist") == "Various Artists"
 ```
 
-A quoted part must be preceded by `::`, so a string at the start of an expression is always a string value. Quoting is available wherever it is useful rather than only where it is necessary, so `ape::"artist"` is permitted and means exactly the same as `ape::artist`: the two are one identifier written two ways, not two identifiers. Escapes inside a quoted part follow the same rules as in any other string, so a name containing a double quote or a backslash can be written by preceding it with a backslash.
-
-For a list of predefined namespaces and identifiers within them together with a description of each one, see [built-in identifiers](../features/builtins/identifiers.md). A namespace is either _closed_, meaning that the identifiers it contains are known in advance, or _open_, meaning that it additionally admits identifiers whose names are derived from the tag data of the file being examined. Naming a namespace that Goro does not define is an error, and so is referring to an identifier that is not defined in a closed namespace; an identifier in an open namespace is always accepted, and simply resolves to an absent value when the file holds no data for it.
+For the sources, the concepts each one supplies, and what the source functions of each one take, see [built-in identifiers](../features/builtins/identifiers.md).
 
 ### Reserved words
 
-The keyword operators `AND`, `OR`, `NOT`, `BETWEEN`, `IS` and `AS` (case-insensitive) are reserved and cannot be used as a bare identifier in the global namespace. For example, `and` alone is always interpreted as the logical `AND` operator, never as an identifier named "and".
+The keyword operators `AND`, `OR`, `NOT`, `BETWEEN`, `IS` and `AS` (case-insensitive) are reserved and cannot be used as an identifier. For example, `and` alone is always interpreted as the logical `AND` operator, never as an identifier named "and".
 
 The state names `USABLE`, `UNUSABLE`, and `ABSENT` (case-insensitive) are reserved on the same terms.
 
 The keywords `TRUE` and `FALSE` (case-insensitive) are the two boolean literals, and are reserved on the same terms. The keyword `NULL` (case-insensitive) is reserved as well, although it names nothing that exists: Goro has no null value.
 
-A reserved word may still appear in an identifier, but never as its first part unless the identifier begins with `::`: `::and` and `ape::and` are identifiers, while `and::x` is not. So `NOT::x` is the `NOT` operator applied to `::x`.
-
 The modifiers `ALL`, `ANY`, and `LITERALLY` (case-insensitive) are reserved on the same terms.
+
+No source, concept or function is given the name of a reserved word.
 
 Function names (such as `COUNT`, `FALLBACK` and `PREFERRED`) are not reserved words in this sense, and neither are the targets of a conversion, which only ever follow `AS`.
 
-Although the grammar does not require it, no built-in identifier in the global namespace has the same name as a function, and no function is given the name of a built-in global identifier. This is a constraint on what Goro defines rather than on what a predicate may write.
+Although the grammar does not require it, no concept has the same name as a function, and no function is given the name of a concept. This is a constraint on what Goro defines rather than on what a predicate may write.
 
 ### Values
 
-Values in predicates come from _identifiers_ (preagreed names to refer to various types of data specific to each file) and _literals_ (values specified directly when writing a predicate). For example, in the predicate `year == 2000`, `year` is an identifier and `2000` is a literal value. A literal enclosed in parentheses is still a literal, so wherever a rule calls for one, `(0)` serves exactly as `0` does.
+Values in predicates come from the file, through _identifiers_ (preagreed names to refer to various types of data specific to each file) and [source functions](#functions), and from _literals_ (values specified directly when writing a predicate). For example, in the predicate `year == 2000`, `year` is an identifier and `2000` is a literal value. A literal enclosed in parentheses is still a literal, so wherever a rule calls for one, `(0)` serves exactly as `0` does.
 
 Every value has three aspects. The first is always decided by the text of the predicate; the other two are decided by the file, except that the text of some expressions guarantees their cardinality (see [Exactly one](#exactly-one) below).
 
-**Type** : A value's type dictates what operations may be performed on it and how their results are calculated. The types are `string`, `number`, `bytecount`, `duration` and `boolean`, and they are described below. A value's type never depends on the file being examined: identifiers have a declared type, each function and operator has a fixed result type, and literals are typed by their syntax.
+**Type** : A value's type dictates what operations may be performed on it and how their results are calculated. The types are `string`, `number`, `bytecount`, `duration`, `boolean` and `blob`, and they are described below. A value's type never depends on the file being examined: identifiers have a declared type, each function and operator has a fixed result type, and literals are typed by their syntax.
 
 **Cardinality** : A value is either **absent**, meaning that the file records nothing for it, or a bag of one or more _occurrences_. A bag is unordered and its occurrences are not deduplicated, so the same datum recorded twice in the underlying tags occurs twice in the bag. A bag of exactly one occurrence is indistinguishable from a simple value: no construct in the language can tell the two apart, and everything this document says about simple values holds unchanged for a bag of cardinality one. Absent is the value of cardinality zero, and it is the only one -- there is no empty bag distinct from absence.
 
@@ -115,7 +107,7 @@ A backslash followed by anything else is an error rather than a literal backslas
 
 A **raw string** carries the prefix `r` and processes nothing whatsoever: every character between the quotes is part of the value, and a backslash is simply a backslash, so `r"\d{4}"` and `"\\d{4}"` denote the same text. A double quote inside a raw string is written by doubling it, so `r"say ""hi"""` is the value `say "hi"`.
 
-The two forms differ in nothing but how the text between the quotes is read. A raw string has string type like any other, may appear anywhere a quoted string may, including as a quoted part of an identifier, and two literals denoting the same characters are indistinguishable regardless of which form wrote them. The pattern of the [regular expression match operator](#regular-expression-match-operator) is the one place that accepts a raw string alone.
+The two forms differ in nothing but how the text between the quotes is read. A raw string has string type like any other, may appear anywhere a quoted string may, including as an argument of a source function, and two literals denoting the same characters are indistinguishable regardless of which form wrote them. The pattern of the [regular expression match operator](#regular-expression-match-operator) is the one place that accepts a raw string alone.
 
 **number**
 : real dimensionless numbers, such as `2000`, `-1`, and `-.55`. Number literals are optionally preceded by one + or - sign character, followed by either an integer or a floating point number where the integer part is separated from the fractional part by a period. If the number has a fractional part, the integer part is optional and considered to be zero when it does not appear. The period must always be followed by at least one digit, so `1`, `1.5` and `.5` are all valid number literals while `1.` is not.
@@ -148,6 +140,11 @@ Valid duration literals can take two forms:
 
 Whitespace may not appear inside a duration literal: `1h10m` is a valid literal and `1h 10m` is not.
 
+**blob**
+: data recorded in a file that is not text, such as an attached picture. Blobs are read by [source functions](#functions), and there are no blob literals.
+
+A blob may be tested with a state test, and passed to `COUNT()` and `PREFERRED()`, none of which asks anything of its content. It is an error to use one as an operand of any other operator, to convert one with `AS`, or to pass one to `FALLBACK()`.
+
 #### Ranges and multivalues
 
 Two further concepts are closely related to types, but are not types themselves:
@@ -177,7 +174,7 @@ Some expressions are guaranteed by their form to produce exactly one occurrence,
 - the identifiers `file::path`, `file::name`, `file::size` and `file::duration`, which every file a predicate is evaluated against has exactly one of;
 - a parenthesized expression that is exactly one.
 
-No other identifier is exactly one, whatever its namespace. [Built-in identifiers](../features/builtins/identifiers.md) says of each identifier whether it can be absent and whether it can hold more than one occurrence.
+No other identifier is exactly one, whatever its source, and no source function is. [Built-in identifiers](../features/builtins/identifiers.md) says of each identifier whether it can be absent and whether it can hold more than one occurrence.
 
 Being exactly one is a property of an expression, known when the predicate is read, and never a property of a value. An identifier that happens to resolve to a single occurrence for a particular file is not thereby exactly one, and nothing in the language can tell such a value from the result of an expression that is; the guarantee is about every file, not about this one. An expression that is exactly one is never absent, but it can still be unusable: a comparison that met data it could not interpret is exactly one occurrence, and an unusable one.
 
@@ -201,7 +198,7 @@ There are some **fundamental rules which apply globally** to any operator sub-ex
 
 3. If an operator has multiple operands, it is an error for the operands to have different types. For example, `file::duration > "01:00"` is an error because `file::duration` has duration type and `"01:00"` is a literal of type string. Instead, `file::duration > 01:00` is correct because `01:00` without quotes is a valid duration literal as described earlier.
 
-4. There is a very important exception to the previous rule: _a numeric literal, though not a non-literal numeric value, may stand for a bytecount or a duration_, and is converted to whichever of the two the other operand is. For duration the converted value is that number of seconds, which must be a whole number, as the seconds of a duration literal must be: `file::duration > 90` compares with ninety seconds, while `file::duration > 1.5` is an error. For bytecount it is that number of bytes, so `file::size > 1000` selects the files larger than a thousand bytes rather than a thousand kilobytes, and `file::size > 1kb` is how to say the latter. The same holds for range literals: `file::size BETWEEN 60..120` compares `file::size` with a range of 60 to 120 bytes. A numeric literal that would convert to a bytecount or a duration may not be negative, neither of those having negative values. A numeric literal does **not** stand for a string, and a string literal does not stand for a number: `id3v2::raw::TRCK > 9` and `year == "2000"` are both errors.
+4. There is a very important exception to the previous rule: _a numeric literal, though not a non-literal numeric value, may stand for a bytecount or a duration_, and is converted to whichever of the two the other operand is. For duration the converted value is that number of seconds, which must be a whole number, as the seconds of a duration literal must be: `file::duration > 90` compares with ninety seconds, while `file::duration > 1.5` is an error. For bytecount it is that number of bytes, so `file::size > 1000` selects the files larger than a thousand bytes rather than a thousand kilobytes, and `file::size > 1kb` is how to say the latter. The same holds for range literals: `file::size BETWEEN 60..120` compares `file::size` with a range of 60 to 120 bytes. A numeric literal that would convert to a bytecount or a duration may not be negative, neither of those having negative values. A numeric literal does **not** stand for a string, and a string literal does not stand for a number: `id3v2::field("TRCK") > 9` and `year == "2000"` are both errors.
 
 5. When comparing string values, an operator _normalizes_ them by default, so that differences of case, of accents on Latin and Greek letters, and of a few kinds of character form do not matter: `artist == "motorhead"` matches when the artist is recorded as "Motörhead". Normalization is a **mode of the operator** rather than a property of either value, so it is switched off for the whole comparison by a `LITERALLY()` modifier on either operand; see [Comparison modes](#comparison-modes). [Normalization](normalization.md) defines precisely how strings are prepared in either mode.
 
@@ -300,8 +297,8 @@ There is no `IS NOT`; a negated state test is written with the boolean negation 
 
 Examples:
 
-- `ALL(vorbis::bpm AS NUMBER) IS USABLE AND vorbis::bpm AS NUMBER > 120` is the conservative guard: it admits only files where every `BPM` field converted, so the comparison never meets one that did not and nothing warns. A file holding one good `BPM` field and one piece of junk is passed over, silently.
-- `ANY(vorbis::bpm AS NUMBER) IS USABLE AND vorbis::bpm AS NUMBER > 120` is the optimistic counterpart: it proceeds when at least one field converted, can still find a match among those, and warns about the rest.
+- `ALL(vorbis::field("BPM") AS NUMBER) IS USABLE AND vorbis::field("BPM") AS NUMBER > 120` is the conservative guard: it admits only files where every `BPM` field converted, so the comparison never meets one that did not and nothing warns. A file holding one good `BPM` field and one piece of junk is passed over, silently.
+- `ANY(vorbis::field("BPM") AS NUMBER) IS USABLE AND vorbis::field("BPM") AS NUMBER > 120` is the optimistic counterpart: it proceeds when at least one field converted, can still find a match among those, and warns about the rest.
 - `year IS ABSENT` selects the files that record no year at all, which no comparison can express, since every comparison against an absent value is false whichever operator it uses
 - `ANY(vorbis::year) IS UNUSABLE` selects the files whose Vorbis date fields need attention, and is the predicate to reach for when a run has reported warnings and the data behind them has to be found
 
@@ -428,7 +425,7 @@ For an ordering operator the same rule reads as a comparison of aggregates, whic
 
 ### Value conversions
 
-With the exception of numeric literals, operators that have multiple operands require the operands to have the same type and produce an error if not. This means that a comparison such as `id3v2::track > vorbis::raw::tracknumber`, which attempts to compare a number with a string, is rejected with an error. To prevent this error a conversion of one of the values to the type of the other is required. Converting `id3v2::track` to a string might result in a comparison such as `"2" > "10"` -- this comparison result is, perhaps surprisingly, true, and it would be correct to instead write `id3v2::track > vorbis::raw::tracknumber AS NUMBER` to avoid this problem and compare numerically. However, `vorbis::raw::tracknumber` might not hold a valid numeric string, and in that case the conversion yields an unusable occurrence and the comparison is unusable rather than true or false, by general operator rule 2. The warning that consuming an unusable occurrence emits is what keeps this from happening silently, and a [state test](#state-test-operator) is how a predicate can decide for itself what to do about it.
+With the exception of numeric literals, operators that have multiple operands require the operands to have the same type and produce an error if not. This means that a comparison such as `id3v2::track > vorbis::field("TRACKNUMBER")`, which attempts to compare a number with a string, is rejected with an error. To prevent this error a conversion of one of the values to the type of the other is required. Converting `id3v2::track` to a string might result in a comparison such as `"2" > "10"` -- this comparison result is, perhaps surprisingly, true, and it would be correct to instead write `id3v2::track > vorbis::field("TRACKNUMBER") AS NUMBER` to avoid this problem and compare numerically. However, `vorbis::field("TRACKNUMBER")` might not hold a valid numeric string, and in that case the conversion yields an unusable occurrence and the comparison is unusable rather than true or false, by general operator rule 2. The warning that consuming an unusable occurrence emits is what keeps this from happening silently, and a [state test](#state-test-operator) is how a predicate can decide for itself what to do about it.
 
 #### The conversion operator
 
@@ -451,7 +448,7 @@ What an occurrence converts to:
 
 A number taken as seconds or bytes is subject to the same terms as the numeric literal exception: it is never negative, and a number of seconds is always whole. Text converts only when it is the literal and nothing else, so `" 5"` and `"5 "` do not convert to a number. `"4:05"`, `"4m5s"` and `"245"` all convert to the same duration.
 
-An occurrence that does not convert becomes an unusable occurrence whose source is the conversion: text that is not such a literal, a negative number of bytes, or a fraction of a second. An occurrence that was unusable already stays so and keeps its source. A conversion asks nothing of an unusable occurrence's content, so it never consumes one and never warns, and it has the [bounds](#exactly-one) of its operand. A duration and a bytecount do not convert into each other, and a boolean converts to nothing and from nothing; each of those is an error.
+An occurrence that does not convert becomes an unusable occurrence whose source is the conversion: text that is not such a literal, a negative number of bytes, or a fraction of a second. An occurrence that was unusable already stays so and keeps its source. A conversion asks nothing of an unusable occurrence's content, so it never consumes one and never warns, and it has the [bounds](#exactly-one) of its operand. A duration and a bytecount do not convert into each other, a boolean converts to nothing and from nothing, and a blob converts to nothing; each of those is an error.
 
 **The canonical literal.** Converted to a string, a number, duration or bytecount becomes the literal of its own type that denotes it, in one canonical form. That is always an integer part, a sign only for a negative number, no negative zero, no thousands separator, no exponent, and no trailing zeros in the fractional part; a duration is written in seconds with the suffix `s`, and a bytecount in bytes with the suffix `b`. So `1.50 AS STRING` and `1.5 AS STRING` are both `"1.5"`, `.5 AS STRING` is `"0.5"`, `+5 AS STRING` is `"5"` and `-0 AS STRING` is `"0"`, while `4m5s AS STRING` is `"245s"` and `1.4kib AS STRING` is `"1433.6b"`. The text always converts back through its own type to the value it came from. It is not a way of presenting a value: the unit is always the base one, whatever the size of the value. The plain number of seconds or bytes is a conversion away, as in `file::duration AS NUMBER AS STRING`.
 
@@ -459,15 +456,15 @@ An occurrence that does not convert becomes an unusable occurrence whose source 
 
 Examples:
 
-- `vorbis::raw::tracknumber AS NUMBER > 9` compares track numbers as numbers rather than as text
-- `ape::"length" AS DURATION > 10m` reads an APE item holding a playing time, written as a duration or as a number of seconds
+- `vorbis::field("TRACKNUMBER") AS NUMBER > 9` compares track numbers as numbers rather than as text
+- `ape::field("Length") AS DURATION > 10m` reads an APE item holding a playing time, written as a duration or as a number of seconds
 - `file::size AS STRING` is `"5242880b"` for a file of 5 MiB
 
 #### Unusable occurrences
 
 Unusable occurrences arise in three ways:
 
-- from an identifier whose underlying tag data is present but cannot be interpreted as the identifier's declared type;
+- from an identifier whose underlying tag data is present but cannot be interpreted as the identifier's declared type, or from a source function reading data that is not of its type, such as `ape::field()` reading an APE item flagged as binary;
 - from a conversion whose input cannot be converted, such as `x AS NUMBER` where `x` holds text that is not a number;
 - from a comparison, range or regex operator that could not reach an answer because of an unusable occurrence among its operands; its result is an unusable boolean.
 
@@ -487,14 +484,16 @@ Reporting errors this early is possible because the type of every sub-expression
 
 The errors reported when a predicate is read include:
 
-- syntax errors of any kind, including a non-ASCII character in an identifier, a chained comparison such as `a == b == c`, a reserved word used as a bare identifier, and a qualified name used as a function call;
-- a reference to an identifier that is not defined, where the namespace it names is a closed one;
+- syntax errors of any kind, including a non-ASCII character in an identifier, a chained comparison such as `a == b == c`, and a reserved word used as an identifier;
+- a source or a concept that Goro does not define, and a concept qualified by a source that cannot supply it;
+- a source function written without its source, or given arguments its source does not accept, such as `id3v2::field("APIC")`, `APIC` not being a frame that holds text;
 - a type mismatch between the operands of an operator, outside the numeric literal exception;
 - an operand of `AND`, `OR` or `NOT`, or a predicate as a whole, that is not a boolean, or is not exactly one;
 - an operand of `!=` that is not exactly one and carries neither `ALL` nor `ANY`;
 - a boolean used as an operand of an ordering operator, of `BETWEEN`, or of `=~`, booleans being unordered;
+- a blob used anywhere but in a state test, `COUNT()` or `PREFERRED()`;
 - an argument of the wrong type to a function, such as a default of `FALLBACK()` whose type is not that of its first argument;
-- a conversion of a boolean, a conversion between a duration and a bytecount, and a target `AS` does not know;
+- a conversion of a boolean or a blob, a conversion between a duration and a bytecount, and a target `AS` does not know;
 - a modifier applied to the operand of `AS`;
 - a default of `FALLBACK()` that is not a constant, and a conversion of a constant that does not succeed, such as `"x" AS NUMBER`;
 - `LITERALLY()` applied to an operand that is not a string, or to the operand of a state test;
@@ -527,13 +526,13 @@ This is what allows the guard `ALL(x AS NUMBER) IS USABLE AND x AS NUMBER > 5` t
 
 #### Where a warning comes from
 
-An unusable occurrence has a _source_: the identifier or the conversion at which it arose. A construct that passes an occurrence through does not change its source. A warning is emitted at the point where the occurrence is consumed, but names its source: in `id3v1::year AS STRING == "1991"` applied to a file whose Id3v1 year field holds something that is not a year, the unusable occurrence arises at `id3v1::year`, is propagated through the conversion, and the warning is triggered by the consuming `==` but names `id3v1::year` as the source, which is where the problem actually is.
+An unusable occurrence has a _source_: the identifier, source function or conversion at which it arose. A construct that passes an occurrence through does not change its source. A warning is emitted at the point where the occurrence is consumed, but names its source: in `id3v1::year AS STRING == "1991"` applied to a file whose Id3v1 year field holds something that is not a year, the unusable occurrence arises at `id3v1::year`, is propagated through the conversion, and the warning is triggered by the consuming `==` but names `id3v1::year` as the source, which is where the problem actually is.
 
 #### Deduplication
 
 Warnings are deduplicated per file and per source. Evaluating a predicate against one file emits at most one warning for each distinct sub-expression that produced an unusable occurrence; the second and subsequent times the same source is reached while evaluating that same file, nothing further is emitted.
 
-Two sub-expressions are the same source when they apply the same functions, in the same shape, to the same identifiers and literals. How they are written does not matter -- whitespace, letter case, whether a namespace is given explicitly, and which of the two string forms wrote a literal are all irrelevant -- and neither does where in the predicate they appear. The modifiers `ALL()`, `ANY()` and `LITERALLY()` are transparent for this purpose: they never make two otherwise identical sub-expressions into different sources.
+Two sub-expressions are the same source when they apply the same functions, in the same shape, to the same identifiers and literals. How they are written does not matter -- whitespace, letter case, which of the two string forms wrote a literal, and the letter case of a name that a source function matches without regard to case are all irrelevant -- and neither does where in the predicate they appear. The modifiers `ALL()`, `ANY()` and `LITERALLY()` are transparent for this purpose: they never make two otherwise identical sub-expressions into different sources.
 
 In the following examples, `x` and `y` are identifiers that resolve to an unusable occurrence for the file being evaluated, `m` is a multivalue that includes at least one unusable occurrence, and `s` and `t` are identifiers holding strings that are not valid numbers.
 
@@ -621,7 +620,7 @@ Examples:
 
 There are a number of built-in functions that can be used inside predicate expressions. Functions are invoked by their name followed by a list of zero or more arguments in parentheses. For example, `FOO(x, y)` is a call to the function `foo` with arguments `x` and `y`.
 
-A function call is always an **unqualified** name followed by an opening parenthesis. Functions do not live in namespaces, so a qualified name is never a function call and `foo::count(x)` is a syntax error. This is what allows a single name to serve both as a function name and, in principle, as an identifier: `count` on its own is an identifier reference, `count(...)` is a call, and the qualified form `::count` always and unambiguously refers to the identifier.
+A name followed by an opening parenthesis is a function call. Written without a source, it calls one of the functions below; written with one, as in `vorbis::field("MOOD")`, it calls a [source function](#functions) of that source. A name is resolved in its source whether or not a parenthesis follows it, so `vorbis::field` without its arguments is an error that says so, as is `field("MOOD")`, a source function written without its source, and `ape::count(x)`, `COUNT()` belonging to no source.
 
 Function arguments follow the same type-matching discipline as operator operands, including the numeric-literal exception. Unless otherwise noted below, a function given an absent argument returns an absent value, and a function given an unusable occurrence returns an unusable occurrence.
 
@@ -630,7 +629,7 @@ The functions that can be used inside predicates are:
 **COUNT(expr)**
 : returns the number of occurrences of its argument: `0` if `expr` is absent, and otherwise the size of its bag. Unusable occurrences are counted like any other -- data that is there and cannot be read is still there -- and `COUNT()` never consumes one, so it never warns.
 
-The count is of the occurrences an identifier resolved to, which is not always the number of tags they came from. A single Id3v2 `TCON` frame holding `(17)Post-Rock` resolves to two genres, so `COUNT(id3v2::genre)` is 2 for such a file, while a raw namespace resolves one occurrence per tag.
+The count is of the occurrences an identifier resolved to, which is not always the number of tags they came from. A single Id3v2 `TCON` frame holding `(17)Post-Rock` resolves to two genres, so `COUNT(id3v2::genre)` is 2 for such a file, while `COUNT(id3v2::field("TCON"))` is 1, the frame recording a single value.
 
 Example:
 
@@ -666,12 +665,17 @@ Taking two arguments, each absent or holding the occurrences shown:
 | unusable            | absent      | `vorbis::year`'s value, all of it unusable; a defect is passed on rather than passed off as absence
 | absent              | absent      | absent
 
-Every identifier in the global namespace has the value of such a call; see [built-in identifiers](../features/builtins/identifiers.md).
+Every tag concept written without a source has the value of such a call; see [built-in identifiers](../features/builtins/identifiers.md).
 
 Examples:
 
 - `PREFERRED(vorbis::year, id3v2::year) < 2000` compares the Vorbis year of a file that has a usable one, and its Id3v2 year otherwise
-- `PREFERRED(ape::"album artist", vorbis::albumartist) == "various artists"` looks for an album artist where the global namespace does not
+- `PREFERRED(vorbis::field("ALBUMARTIST"), ape::field("Album Artist")) == "various artists"` looks for an album artist, which no concept does yet
+
+**Source functions**
+: `field()` and `bytes()` read a source's own data, by the name the source gives it, and interpret nothing. They are always written with their source, as in `vorbis::field("MOOD")`, since every format names its data in its own way, and their arguments are string literals: each source decides how many it takes and how a name is matched. `field()` is a string, holding the data as text exactly as recorded, and `bytes()` is a blob, holding the data as recorded. The sources `id3v2`, `ape` and `vorbis` have both; see [built-in identifiers](../features/builtins/identifiers.md) for what each takes.
+
+A source function returns an absent value when the file records nothing under the name it was given. Whether the data it reads can be unusable, and whether it can hold more than one occurrence, is said with each source.
 
 ## GRAMMAR
 
@@ -710,7 +714,7 @@ primary         = literal
                 | function_call
                 | "(" expression ")" ;
 
-function_call   = name "(" [ expression { "," expression } ] ")" ;
+function_call   = [ name "::" ] name "(" [ expression { "," expression } ] ")" ;
 ```
 
 The four levels of `or_expr`, `and_expr`, `not_expr` and `comparison_expr` are what give the operators the precedence listed under [Grouping, precedence, and associativity](#grouping-precedence-and-associativity). `comparison_tail` appears at most once and never recurses, which is what makes the comparison, range, regex and state test operators non-associative.
@@ -720,8 +724,7 @@ The grammar admits a modifier wherever an `operand` can occur, and since the tai
 ### Identifiers and names
 
 ```ebnf
-identifier      = ( name | "::" name_part ) { "::" name_part } ;
-name_part       = name | string ;
+identifier      = [ name "::" ] name ;
 name            = letter { letter | digit | "_" } ;
 
 letter          = "A" .. "Z" | "a" .. "z" ;
@@ -787,12 +790,12 @@ Not every rule in this document is grammatical, and a construct that this gramma
 - the operands of an operator must have the same type, subject to the numeric literal exception, and the operands of `AND`, `OR` and `NOT` must be booleans that are exactly one;
 - an `operand` of `!=` that is not exactly one must carry `ALL` or `ANY`;
 - booleans are unordered, so a boolean may not be an operand of `<`, `<=`, `>`, `>=`, `BETWEEN` or `=~`, nor an endpoint of a `range`;
+- a blob may be the operand of a state test and an argument of `COUNT()` or `PREFERRED()`, and nothing else;
 - the `operand` of `=~` must be a string, and its `pattern` must be a valid regular expression using only the constructs the matching engine supports;
 - the `operand` of a state test may be of any type, boolean included, since a state test asks about cardinality and state rather than about content;
-- an `identifier` must name a namespace Goro defines, an `identifier` in a closed namespace must be one the namespace defines, and an identifier's first `name` may be one of the reserved words only when the identifier begins with `::`;
-- a `name_part` written as a `string` names the same thing as the equivalent bare `name` when the name is one a bare `name` could have spelled, so the two forms are one identifier and not two;
-- a `function_call` names an existing function and supplies it with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a constant, and `PREFERRED()` takes at least two arguments, all of one type;
-- a `conversion` names one of the targets `NUMBER`, `STRING`, `DURATION` and `BYTECOUNT`, its operand is not a boolean, it does not convert a duration and a bytecount into each other, its operand carries no modifier, and a conversion of a constant must succeed, so `"x" AS NUMBER` is an error;
+- an `identifier` names a concept Goro defines and, where it has one, a source Goro defines that can supply that concept; a concept of the `file` source must be written with it, and neither part may be a reserved word;
+- a `function_call` written without a source names an existing function, and one written with a source names a source function of that source; either is supplied with the number and types of arguments it accepts; in particular the second argument of `FALLBACK()` must be a constant, `PREFERRED()` takes at least two arguments, all of one type, and the arguments of a source function are string literals that its source accepts;
+- a `conversion` names one of the targets `NUMBER`, `STRING`, `DURATION` and `BYTECOUNT`, its operand is not a boolean or a blob, it does not convert a duration and a bytecount into each other, its operand carries no modifier, and a conversion of a constant must succeed, so `"x" AS NUMBER` is an error;
 - the `operand` a `LITERALLY` modifier is applied to must be of type string, and must not be the operand of a state test;
 - `ALL` and `ANY` may not both be applied to the same operand, and neither may be applied to the operand of `IS ABSENT`;
 - the two endpoints of a `range` must be literals of the same type, and the range must be able to hold something: `min` must not lie above `max` when compared with it as an occurrence would be, which for strings means cut to the length of `max`, and compared the way the operator will compare them, so that a `LITERALLY` on the operator's other operand decides whether string endpoints are compared normalized;

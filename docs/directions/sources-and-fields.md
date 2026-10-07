@@ -264,3 +264,36 @@ leaving the reading of tag data to its own line.
   with this line. Every design question is now settled here or moved to a brief of its own. Next
   step: the writing phase -- the rationale, then the normative documents, then the catalog, parser
   and binder -- proposed as a plan before it starts.
+- 2026-10-07 -- Step 1 written: the rationale and the normative documents. `predicate-runtime.md`
+  is left alone, being the record of a landed line. Choices made while writing that had not been
+  discussed:
+  - `id3v2::bytes()` gives each frame's content without its frame header. What it gives for a
+    frame the tag unsynchronises, compresses or encrypts is added to mp3-support's questions,
+    with `testing.md`'s policy of recording a reader's known deviations as skipped tests.
+  - Frame identifiers are matched without regard to case.
+  - The arguments of source functions are string literals.
+  - Two calls differing only in the case of a name their source matches without regard to case
+    are one warning source.
+  - `FALLBACK()` is named as refusing blobs, though that already follows from there being no blob
+    constant.
+  - Removed from the rationale: the entries on Id3v1's raw genre and track typed as numbers, and
+    on quoted names. The PREFERRED() entry keeps "global identifiers" for the history it
+    tells.
+  - The FAQ's junk-genre answer becomes `id3v1::genre IS UNUSABLE`.
+  - `testing.md` gains rows for frame renaming, descriptions, the new errors, and a short table
+    for APE.
+
+  The code still implements namespaces. Next step: review of step 1, then a file-by-file plan
+  for the catalog, parser and binder.
+- 2026-10-07 -- Asked whether `field()` always being a string narrows how richer types can enter
+  the language. There are three ways in, not two: new concepts, new conversion targets, and new
+  source functions, each of which only makes valid what was an error. `bytes()` reaches every
+  item, frame or comment whole, so nothing a keyed source records is out of reach of a later
+  reader. The real limit is that a conversion knows the value and not where it came from: a blob
+  does not say whether it is an `APIC` body, an APE cover item or a FLAC picture block. A
+  conversion out of a blob can therefore decode only what is the same everywhere, such as text in
+  an encoding or base64, unless a parameter names the layout. Structure particular to a format,
+  under a name the predicate chooses, needs a construct that knows its source: a further source
+  function. Strings in an unordered bag also lose structure that spans values, such as the
+  role-and-person pairs of `TIPL`; `bytes()` keeps it. Nothing decided; the observation goes to
+  the rationale only if wanted.

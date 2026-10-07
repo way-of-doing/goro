@@ -29,6 +29,7 @@ The bounds of an expression are written `l..u`. Its lower bound `l` is `0` if it
 |---------------------------|--------------|-------------|---------|
 | literal                   | as written   | yes         | `1..1`
 | identifier                | as declared  | no          | as declared
+| source function call      | as declared  | no          | as declared
 | `COUNT(e)`                | number       | no          | `1..1`
 | `e AS T`                  | `T`          | when `e` is | those of `e`
 | `FALLBACK(e, d)`          | that of `e`  | no          | `1..u`, where `e` is `l..u`
@@ -37,7 +38,7 @@ The bounds of an expression are written `l..u`. Its lower bound `l` is `0` if it
 | `(e)`                     | that of `e`  | when `e` is | those of `e`
 | a modifier applied to `e` | that of `e`  | when `e` is | those of `e`
 
-`convert(d, T)` is `d` when `d` already has type `T`, and is otherwise as the table under [The conversion operator](predicates.md#the-conversion-operator) gives it; a duration and a bytecount do not convert into each other, and a boolean converts to nothing and from nothing, both being errors when the predicate is read.
+`convert(d, T)` is `d` when `d` already has type `T`, and is otherwise as the table under [The conversion operator](predicates.md#the-conversion-operator) gives it; a duration and a bytecount do not convert into each other, a boolean converts to nothing and from nothing, and a blob converts to nothing, each being an error when the predicate is read.
 
 A constant is evaluated when the predicate is read rather than for each file. A conversion of a constant that does not convert is therefore an error, reported then, and a constant always has exactly one usable occurrence, the same for every file.
 
@@ -48,6 +49,7 @@ The operands each construct accepts are given in the predicate documentation, an
 ```
 eval(literal)          = bag{ usable(its value) }
 eval(identifier)       = as resolved by identifiers.md; an unusable occurrence has the identifier as its source
+eval(s::f(a1 … an))    = as resolved by identifiers.md; an unusable occurrence has the call as its source
 eval((e))              = eval(e)
 eval(modifier(e))      = eval(e)              -- the modifier is read by the operator, not by eval
 
