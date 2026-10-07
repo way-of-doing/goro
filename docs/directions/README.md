@@ -93,6 +93,10 @@ The Log grows on the branch and reaches the trunk when the line lands. Parking a
 entry and a commit. An abandoned brief is kept, since the reasoning behind dropping something is
 exactly what would otherwise be lost.
 
+### Archival
+
+Landed and abandoned briefs should get moved into the `archive/` subdirectory for decluttering.
+
 ## Keeping long lines alive
 
 A line that runs for months survives only if its branch stays easy to rebase, and two habits keep

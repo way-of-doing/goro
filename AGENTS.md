@@ -13,6 +13,7 @@ goro/
 │   └── concepts/           # Docs that describe cross-cutting concerns etc; linked to by other docs
 │   └── design/             # Design rationale, plus deferred features and open questions
 │   └── directions/         # One brief per line of development: what it is for, its status, and a log of decisions
+│       └── archive/        # Archived briefs for completed or abandoned lines of development
 │   └── features/           # Explanatory text around Goro features 
 │   └── sessions/           # Archive of past coding agent sessions; for a line of development, follow the links in its brief rather than going by recency
 │   └── faq.md              # User-facing practical answers and tips that the specs deliberately leave out
