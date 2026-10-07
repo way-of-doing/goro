@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: broad
 touches: concepts/predicates.md, concepts/evaluation.md, features/builtins/identifiers.md, design/rationale.md, design/deferred.md, architecture.md, testing.md, faq.md, src/Goro/Predicates
 after: preferred, as-operator, semantic-analysis-passes, cardinality-and-constants
@@ -316,3 +316,7 @@ leaving the reading of tag data to its own line.
 
   Not done: the canned source function the plan offered the test catalog, since no test
   evaluates a source call. Next step: review of steps 1 and 2, then commit and land the line.
+- 2026-10-07 -- Landed: PJ approved, so the line is marked `landed` and merged into main. Nothing
+  is left open here. What it set aside is in four briefs: conversion-parameters, trimming,
+  concept-table and mp3-support. mp3-support is the natural next line, being what makes the
+  tag sources read anything at all.
