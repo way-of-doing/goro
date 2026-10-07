@@ -34,3 +34,6 @@ bld/
 
 # Claude Code worktrees for isolated sessions and subagents
 .claude/worktrees/
+
+# MacOS
+.DS_store
