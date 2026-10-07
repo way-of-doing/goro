@@ -297,3 +297,22 @@ leaving the reading of tag data to its own line.
   function. Strings in an unordered bag also lose structure that spans values, such as the
   role-and-person pairs of `TIPL`; `bytes()` keeps it. Nothing decided; the observation goes to
   the rationale only if wanted.
+- 2026-10-07 -- Step 2 built: the catalog, parser and binder follow the new specification, and
+  2460 tests pass, 143 more than when the line started. A call of a source function has only
+  literal arguments, so the binder resolves it whole, into a declaration like an identifier's.
+  From there on the two are one thing, `SemanticRead`, to every analysis and to the evaluator.
+  What changed:
+  - **Names.** `IdentifierName` is now a source and a name. `SourceCallName` is its counterpart
+    for calls. Both are `DeclaredName`s, compared without regard to case, which is what makes
+    `vorbis::field("mood")` and `vorbis::field("MOOD")` one warning source.
+  - **Catalog.** `BuiltInCatalog` holds the table of six concepts, with the field each cell reads
+    for the line that reads tags, and the source functions. `Id3v2Frames` holds the shape check,
+    the rename table (three v2.3 frames and 54 of v2.2), the v2.2 frames that keep their names,
+    the text-frame rule, and the four frames that take a description.
+  - **Bindings.** Tag bindings stay not implemented.
+  - **Removed.** Open and closed namespaces, quoted parts, nested names and the leading `::`.
+    Each of the old spellings is answered by a diagnostic with a suggestion where there is one.
+  - **Docs.** One `testing.md` row now says that `NOT::x == 1` is the leading-`::` error.
+
+  Not done: the canned source function the plan offered the test catalog, since no test
+  evaluates a source call. Next step: review of steps 1 and 2, then commit and land the line.

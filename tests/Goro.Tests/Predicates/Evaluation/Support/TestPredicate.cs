@@ -26,7 +26,7 @@ internal sealed class TestPredicate
 
     public IdentifierReference<T> Id<T>(string name, IdentifierBinding<T> binding) where T : notnull
     {
-        var declaration = new IdentifierDeclaration<T>(IdentifierName.Global(name), Bounds.Any, binding);
+        var declaration = new IdentifierDeclaration<T>(IdentifierName.Plain(name), Bounds.Any, binding);
         return Register(new IdentifierReference<T>(declaration, OriginOf(name.ToLowerInvariant(), name)), name.ToLowerInvariant());
     }
 

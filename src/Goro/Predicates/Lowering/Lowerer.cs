@@ -32,7 +32,7 @@ public static class Lowerer
         public Expression Lower(SemanticExpression node) => node switch
         {
             SemanticLiteral literal => TypedNodes.Literal(literal.Token, literal.Type!.Value),
-            SemanticIdentifier identifier => TypedNodes.Reference(identifier.Declaration, sources.OriginOf(identifier)),
+            SemanticRead read => TypedNodes.Reference(read.Declaration, sources.OriginOf(read)),
             SemanticConversion { IsConstant: true } conversion => Analysed(constants.ValueOf(conversion)),
             SemanticConversion { IsIdentity: true } conversion => Lower(conversion.Argument),
             SemanticConversion conversion => TypedNodes.Convert(Lower(conversion.Argument), conversion.Type!.Value, sources.OriginOf(conversion)),

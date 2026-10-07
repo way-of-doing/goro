@@ -46,7 +46,7 @@ public static class Cardinality
             Bounds[node] = node.IsError ? Values.Bounds.ExactlyOne : node switch
             {
                 SemanticLiteral => Values.Bounds.ExactlyOne,
-                SemanticIdentifier identifier => identifier.Declaration.Bounds,
+                SemanticRead read => read.Declaration.Bounds,
                 SemanticConversion conversion => Bounds[conversion.Argument],
                 SemanticCount => Values.Bounds.ExactlyOne,
                 SemanticFallback fallback => Bounds[fallback.Argument].Fallback(),

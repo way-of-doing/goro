@@ -5,9 +5,9 @@ using Goro.Tests.Predicates.Evaluation.Support;
 namespace Goro.Tests.Predicates.Support;
 
 /// <summary>
-/// A catalog for binder tests: a closed global namespace of identifiers holding canned bags, as the
-/// testing document's <c>x</c>, <c>m</c>, <c>s</c> and <c>t</c> do, with every other namespace
-/// answered by the built-in catalog, so that <c>file::size</c> and <c>vorbis::bpm</c> resolve too.
+/// A catalog for binder tests: concepts written without a source, holding canned bags, as the
+/// testing document's <c>x</c>, <c>m</c>, <c>s</c> and <c>t</c> do, with every real source answered
+/// by the built-in catalog, so that <c>file::size</c> and <c>vorbis::field("BPM")</c> resolve too.
 /// </summary>
 /// <remarks>
 /// <see cref="Standard"/> declares a fixed set of names, every one absent, which is all a test of
@@ -44,7 +44,7 @@ internal sealed class TestCatalog : IIdentifierCatalog
 
     /// <summary>
     /// Declares, or redeclares, an identifier that holds the given bag for every file. A name such as
-    /// <c>lab::q</c> declares it in a closed namespace of the test's own.
+    /// <c>lab::q</c> declares it in a source of the test's own.
     /// </summary>
     public TestCatalog With<T>(string name, params Occurrence<T>[] occurrences) where T : notnull =>
         Declare(name, Bounds.Any, new CannedBinding<T>([.. occurrences]));
@@ -65,16 +65,27 @@ internal sealed class TestCatalog : IIdentifierCatalog
             return new IdentifierLookup.Found(declaration);
         }
 
-        var sameNamespace = declarations.Keys.Where(declared => declared.Namespace.SequenceEqual(name.Namespace, StringComparer.OrdinalIgnoreCase)).ToList();
-        return sameNamespace.Count > 0 || name.IsGlobal
-            ? new IdentifierLookup.UnknownIdentifier([.. sameNamespace])
+        // A concept of the file source written without it is answered as the built-in catalog answers it.
+        if (!name.IsQualified && BuiltInCatalog.Instance.Lookup(name) is IdentifierLookup.NeedsSource needs)
+        {
+            return needs;
+        }
+
+        var sameSource = declarations.Keys
+            .Where(declared => string.Equals(declared.Source, name.Source, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        return sameSource.Count > 0 || !name.IsQualified
+            ? new IdentifierLookup.UnknownIdentifier([.. sameSource.Select(declared => declared.Name)])
             : BuiltInCatalog.Instance.Lookup(name);
     }
+
+    public SourceFunctionLookup LookupFunction(string source, string function) =>
+        BuiltInCatalog.Instance.LookupFunction(source, function);
 
     private TestCatalog Declare<T>(string name, Bounds bounds, CannedBinding<T> binding) where T : notnull
     {
         var parts = name.Split("::");
-        var identifier = new IdentifierName(parts[..^1], parts[^1]);
+        var identifier = parts.Length == 2 ? new IdentifierName(parts[0], parts[1]) : IdentifierName.Plain(name);
         declarations[identifier] = new IdentifierDeclaration<T>(identifier, bounds, binding);
         bindings[name] = binding;
         return this;

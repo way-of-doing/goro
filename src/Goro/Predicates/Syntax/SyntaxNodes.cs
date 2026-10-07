@@ -19,17 +19,14 @@ public sealed record LiteralSyntax(Token Token) : ExpressionSyntax(Token.Span);
 /// </summary>
 public sealed record NullSyntax(TextSpan Span) : ExpressionSyntax(Span);
 
+/// <summary>An identifier: the name of a concept, and the source it is read from where one is written.</summary>
+public sealed record IdentifierSyntax(TextSpan Span, NameToken? Source, NameToken Name) : ExpressionSyntax(Span);
+
 /// <summary>
-/// An identifier. <paramref name="IsRooted"/> records a leading <c>::</c>; the last part is the
-/// name and any others are its namespace.
+/// A function call. A call written with a source, as in <c>vorbis::field("MOOD")</c>, calls a
+/// source function of that source; one written without calls a function.
 /// </summary>
-public sealed record IdentifierSyntax(TextSpan Span, bool IsRooted, ImmutableArray<NamePartSyntax> Parts)
-    : ExpressionSyntax(Span);
-
-/// <summary>One part of an identifier: a bare name, or a quoted string whose contents are the name.</summary>
-public sealed record NamePartSyntax(TextSpan Span, string Text, bool IsQuoted) : SyntaxNode(Span);
-
-public sealed record FunctionCallSyntax(TextSpan Span, NameToken Name, ImmutableArray<ExpressionSyntax> Arguments)
+public sealed record FunctionCallSyntax(TextSpan Span, NameToken? Source, NameToken Name, ImmutableArray<ExpressionSyntax> Arguments)
     : ExpressionSyntax(Span);
 
 /// <summary>

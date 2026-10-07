@@ -67,7 +67,6 @@ public sealed class EnglishErrorMessages : IErrorMessages
             Expectation.CloseParen => "A `)` is probably missing there, goro!",
             Expectation.CommaOrCloseParen => "A `,` or `)` is probably missing there, goro!",
             Expectation.Name => "A name is probably missing after `::`, goro!",
-            Expectation.NameOrQuotedName => "A name, or a quoted name, is probably missing after `::`, goro!",
             Expectation.Target => "A target such as `NUMBER` is probably missing after `AS`, goro!",
         },
         UnexpectedToken(var expected, var found) => expected switch
@@ -80,7 +79,6 @@ public sealed class EnglishErrorMessages : IErrorMessages
             Expectation.CloseParen => $"There's a `{found}` there instead of a `)`, goro!",
             Expectation.CommaOrCloseParen => $"There's a `{found}` there instead of a `,` or `)`, goro!",
             Expectation.Name => $"There's a `{found}` there instead of a name, goro!",
-            Expectation.NameOrQuotedName => $"There's a `{found}` there instead of a name, goro!",
             Expectation.Target => $"There's a `{found}` there instead of a target such as `NUMBER`, goro!",
         },
         ChainedComparison => "One comparison at a time, goro!",
@@ -93,9 +91,11 @@ public sealed class EnglishErrorMessages : IErrorMessages
         RangeEndpointNotLiteral => "Range limits go bare, goro!",
         ModifierAsWord(var modifier) => $"`{modifier}` wraps around like `{modifier}(...)`, goro!",
         ReservedWord(var word) => $"We can't use the keyword `{word}` as a name, goro!",
-        ReservedWordInIdentifier(var word) => $"`{word}` can't start a name without a leading `::`, goro!",
+        ReservedWordInIdentifier(var word) => $"`{word}` is a keyword, so nothing is named after it, goro!",
         WhitespaceInIdentifier => "We don't need spaces around `::`, goro!",
-        QualifiedFunctionCall => "Functions don't live in namespaces, goro!",
+        RootedIdentifier => "A name doesn't start with `::`, goro!",
+        NestedIdentifier(var identifier) => $"A source is one level deep, so `{identifier}` names nothing, goro!",
+        QuotedName => "A name a tag chose is read with `field()`, goro!",
         BorrowedEqual => "We need to use `==` to compare like that, goro!",
         BorrowedLessGreater => "We need to use `!=` to compare like that, goro!",
         BorrowedAnd => "That won't work, we need to say `AND` here, goro!",
@@ -116,10 +116,22 @@ public sealed class EnglishErrorMessages : IErrorMessages
         // -----------------------------------------------------------------------------------------
         // Semantic
 
-        UnknownNamespace(var @namespace) => $"There's no namespace `{@namespace}`, goro!",
+        UnknownSource(var source) => $"There's no source `{source}`, goro!",
         UnknownIdentifier(var name) => $"There's no `{name}` on our map, goro!",
-        UnknownIdentifierInNamespace(var @namespace, var name) => $"`{@namespace}` has no `{name}`, goro!",
+        UnknownIdentifierInSource(var source, var name) => $"`{source}` has no `{name}`, goro!",
+        ConceptNeedsSource(var name, var source) => $"`{name}` is always written with `{source}`, goro!",
         UnknownFunction(var name) => $"I don't know what `{name}` means, goro!",
+        SourceFunctionNeedsSource(var function) => $"`{function}()` needs a source in front, like `vorbis::{function}()`, goro!",
+        SourceFunctionNeedsArguments(var identifier) => $"`{identifier}` reads by name, as in `{identifier}(\"NAME\")`, goro!",
+        UnknownSourceFunction(var source, var function) => $"`{source}` has no function `{function}`, goro!",
+        SourceFunctionArgumentNotLiteral(var function, _) => $"`{function}()` takes names as strings in quotes, goro!",
+        MalformedFrame(var frame) => $"`{frame}` isn't an Id3v2 frame identifier, goro!",
+        FrameRenamed(var frame, var renamed) => $"We read `{frame}` as `{renamed}`, goro!",
+        FrameNotText(var frame) => $"`{frame}` holds no text, so it's read with `bytes()`, goro!",
+        DescriptionNotTaken(var frame) => $"`{frame}` has no description to choose by, goro!",
+        BlobOperand(var operand, var @operator) => $"`{operand}` is a blob, and `{@operator}` can't look inside one, goro!",
+        BlobNotConvertible(var operand) => $"`{operand}` is a blob, and a blob converts to nothing, goro!",
+        BlobInFallback(var argument) => $"`{argument}` is a blob, and there's no blob to fall back to, goro!",
         NullValue => "There are no nulls here -- absent is the word, goro!",
         NullComparison => "That won't work -- we need to test with `IS ABSENT`, goro!",
         TypeMismatch(_, var left, _, var right, _) => $"`{Name(left)}` and `{Name(right)}` don't compare, goro!",
@@ -168,6 +180,11 @@ public sealed class EnglishErrorMessages : IErrorMessages
         {
             2 => $"`{function}()` takes at least two arguments, not {actual}, goro!",
             _ => $"`{function}()` takes at least {minimum} arguments, not {actual}, goro!",
+        },
+        WrongArgumentCountBetween(var function, var minimum, var maximum, var actual) => (minimum, maximum) switch
+        {
+            (1, 2) => $"`{function}()` takes one or two arguments, not {actual}, goro!",
+            _ => $"`{function}()` takes {minimum} to {maximum} arguments, not {actual}, goro!",
         },
         FallbackDefaultNotConstant => "The fallback has to be a constant, goro!",
         ConstantDoesNotConvert(var operand, var target) => target switch

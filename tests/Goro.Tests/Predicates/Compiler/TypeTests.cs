@@ -24,7 +24,7 @@ public class TypeTests
     [TestCase("file::size > \"10kb\"", "file::size > 10kb")]
     [TestCase("file::size > \"10\"", "file::size > 10")]
     [TestCase("(x > 1) == \"TRUE\"", "(x > 1) == TRUE")]
-    [TestCase("id3v2::raw::TRCK > 9", "id3v2::raw::TRCK AS NUMBER > 9")]
+    [TestCase("id3v2::field(\"TRCK\") > 9", "id3v2::field(\"TRCK\") AS NUMBER > 9")]
     [TestCase("year > artist", "year > artist AS NUMBER")]
     public void Mismatch_OffersAConversion(string text, string rewrite)
     {
@@ -121,6 +121,38 @@ public class TypeTests
     public void Boolean_MayBeComparedForEquality_CountedAndSubstitutedFor(string text)
     {
         Compiles(text);
+    }
+
+    // A blob can be counted, tested for state and chosen among, and nothing that reads content takes one.
+    [TestCase("id3v2::bytes(\"APIC\") == id3v2::bytes(\"APIC\")", "id3v2::bytes(\"APIC\")")]
+    [TestCase("ape::bytes(\"x\") != \"y\"", "ape::bytes(\"x\")")]
+    [TestCase("vorbis::bytes(\"x\") BETWEEN 1..2", "vorbis::bytes(\"x\")")]
+    [TestCase("ALL(vorbis::bytes(\"x\")) < \"a\"", "vorbis::bytes(\"x\")")]
+    public void Blob_IsNoOperandOfAComparisonOrARange(string text, string operand)
+    {
+        var errors = Errors(text);
+
+        Assert.That(errors.Select(e => e.Code), Has.All.EqualTo(Codes.BlobNotUsable));
+        Assert.That(errors.Select(e => Marked(text, e)), Has.All.EqualTo(operand));
+    }
+
+    [TestCase("vorbis::bytes(\"x\") =~ r\"a\"", Codes.MatchSubjectNotString)]
+    [TestCase("LITERALLY(vorbis::bytes(\"x\")) IS USABLE", Codes.LiterallyOnStateTest)]
+    [TestCase("LITERALLY(vorbis::bytes(\"x\")) == \"a\"", Codes.LiterallyNotString)]
+    [TestCase("vorbis::bytes(\"x\") AS STRING == \"a\"", Codes.BlobNotUsable)]
+    [TestCase("vorbis::bytes(\"x\") AS NUMBER > 1", Codes.BlobNotUsable)]
+    [TestCase("FALLBACK(vorbis::bytes(\"x\"), \"a\") IS USABLE", Codes.BlobNotUsable)]
+    [TestCase("vorbis::bytes(\"x\")", Codes.NotACondition)]
+    [TestCase("PREFERRED(vorbis::bytes(\"x\"), vorbis::field(\"x\")) IS ABSENT", Codes.TypeMismatch)]
+    public void Blob_IsReadByNothingElse(string text, string code)
+    {
+        Assert.That(Codes(text), Does.Contain(code));
+    }
+
+    [Test]
+    public void BlobComparison_AsksForNoQuantifier()
+    {
+        Assert.That(Codes("vorbis::bytes(\"x\") != vorbis::bytes(\"y\")"), Is.EqualTo(new[] { Codes.BlobNotUsable, Codes.BlobNotUsable }));
     }
 
     [Test]

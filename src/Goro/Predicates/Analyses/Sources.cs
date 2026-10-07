@@ -9,15 +9,15 @@ namespace Goro.Predicates.Analyses;
 
 /// <summary>
 /// Warning sources: every structurally distinct sub-expression that can give birth to an unusable
-/// occurrence -- an identifier reference or a conversion -- gets the next <see cref="SourceId"/>,
+/// occurrence -- an identifier, a call of a source function, or a conversion -- gets the next <see cref="SourceId"/>,
 /// and every node of the same shape shares it.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Children are interned before their parents, which is what lets a parent's shape be its symbol
-/// plus its children's shapes. Identifiers are numbered by <see cref="IdentifierName"/> equality, so
-/// the spellings that name one identifier -- in any case, quoted or bare, with or without a leading
-/// <c>::</c> -- can never make two sources.
+/// plus its children's shapes. What is read from the file is numbered by <see cref="DeclaredName"/>
+/// equality, so the spellings that read one thing -- an identifier in any case, or a source function
+/// given a name in any case its source matches regardless of -- can never make two sources.
 /// </para>
 /// <para>
 /// Nothing here can be wrong, so it reports nothing, and it runs only on a tree that is going to be
@@ -35,7 +35,7 @@ public static class Sources
 
     private sealed class Interner(string text)
     {
-        private readonly Dictionary<IdentifierName, int> identifiers = [];
+        private readonly Dictionary<DeclaredName, int> reads = [];
         private readonly Dictionary<string, SourceId> ids = new(StringComparer.Ordinal);
         private readonly List<string> forms = [];
 
@@ -46,7 +46,7 @@ public static class Sources
         {
             SemanticLiteral { StandsIn: true } literal => Shape.OfUnit(literal.Type!.Value, ((NumberToken)literal.Token).Value),
             SemanticLiteral literal => Shape.OfLiteral(literal.Token),
-            SemanticIdentifier identifier => Source(identifier, Identifier(identifier.Declaration.Name)),
+            SemanticRead read => Source(read, Read(read.Declaration.Name)),
             SemanticConversion { IsIdentity: true } conversion => Visit(conversion.Argument),
             // Worked out when the predicate is read, so it can never be unusable, and is no source.
             SemanticConversion { IsConstant: true } conversion => Shape.Conversion(Visit(conversion.Argument), conversion.Type!.Value),
@@ -71,16 +71,15 @@ public static class Sources
             return Shape.Operator("BETWEEN", subject, $"{Visit(range.Minimum).Key}..{Visit(range.Maximum).Key}");
         }
 
-        private Shape Identifier(IdentifierName name)
+        private Shape Read(DeclaredName name)
         {
-            if (!identifiers.TryGetValue(name, out var number))
+            if (!reads.TryGetValue(name, out var number))
             {
-                number = identifiers.Count;
-                identifiers.Add(name, number);
+                number = reads.Count;
+                reads.Add(name, number);
             }
 
-            var lowered = new IdentifierName(name.Namespace.Select(Lower), Lower(name.Name));
-            return new Shape($"#{number}", lowered.ToString());
+            return new Shape($"#{number}", Lower(name.ToString()));
         }
 
         /// <summary>Gives a node of this shape its origin: the source of its shape, and the text it was written as.</summary>

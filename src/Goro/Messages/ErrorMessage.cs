@@ -63,7 +63,9 @@ public abstract record ErrorMessage
     public sealed record ReservedWord(Code Word) : ErrorMessage;
     public sealed record ReservedWordInIdentifier(Code Word) : ErrorMessage;
     public sealed record WhitespaceInIdentifier : ErrorMessage;
-    public sealed record QualifiedFunctionCall(Code Identifier) : ErrorMessage;
+    public sealed record RootedIdentifier(Code Identifier) : ErrorMessage;
+    public sealed record NestedIdentifier(Code Identifier) : ErrorMessage;
+    public sealed record QuotedName(Code Identifier) : ErrorMessage;
     public sealed record BorrowedEqual : ErrorMessage;
     public sealed record BorrowedLessGreater : ErrorMessage;
     public sealed record BorrowedAnd : ErrorMessage;
@@ -79,10 +81,22 @@ public abstract record ErrorMessage
     // ---------------------------------------------------------------------------------------------
     // Semantic
 
-    public sealed record UnknownNamespace(Code Namespace) : ErrorMessage;
+    public sealed record UnknownSource(Code Source) : ErrorMessage;
     public sealed record UnknownIdentifier(Code Name) : ErrorMessage;
-    public sealed record UnknownIdentifierInNamespace(Code Namespace, Code Name) : ErrorMessage;
+    public sealed record UnknownIdentifierInSource(Code Source, Code Name) : ErrorMessage;
+    public sealed record ConceptNeedsSource(Code Name, Code Source) : ErrorMessage;
     public sealed record UnknownFunction(Code Name) : ErrorMessage;
+    public sealed record SourceFunctionNeedsSource(Code Function) : ErrorMessage;
+    public sealed record SourceFunctionNeedsArguments(Code Identifier) : ErrorMessage;
+    public sealed record UnknownSourceFunction(Code Source, Code Function) : ErrorMessage;
+    public sealed record SourceFunctionArgumentNotLiteral(Code Function, Code Argument) : ErrorMessage;
+    public sealed record MalformedFrame(Code Frame) : ErrorMessage;
+    public sealed record FrameRenamed(Code Frame, Code Renamed) : ErrorMessage;
+    public sealed record FrameNotText(Code Frame) : ErrorMessage;
+    public sealed record DescriptionNotTaken(Code Frame) : ErrorMessage;
+    public sealed record BlobOperand(Code Operand, Code Operator) : ErrorMessage;
+    public sealed record BlobNotConvertible(Code Operand) : ErrorMessage;
+    public sealed record BlobInFallback(Code Argument) : ErrorMessage;
     public sealed record NullValue : ErrorMessage;
     public sealed record NullComparison : ErrorMessage;
     public sealed record TypeMismatch(Code Left, GoroType LeftType, Code Right, GoroType RightType, Code Operator) : ErrorMessage;
@@ -115,6 +129,7 @@ public abstract record ErrorMessage
     public sealed record QuantifierOnAbsentTest : ErrorMessage;
     public sealed record WrongArgumentCount(Code Function, int Expected, int Actual) : ErrorMessage;
     public sealed record TooFewArguments(Code Function, int Minimum, int Actual) : ErrorMessage;
+    public sealed record WrongArgumentCountBetween(Code Function, int Minimum, int Maximum, int Actual) : ErrorMessage;
     public sealed record FallbackDefaultNotConstant(Code Function, Code Default) : ErrorMessage;
     public sealed record ConstantDoesNotConvert(Code Operand, GoroType Target) : ErrorMessage;
     public sealed record RangeUnitMissing(Code Number) : ErrorMessage;

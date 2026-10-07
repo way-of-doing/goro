@@ -29,20 +29,24 @@ public class SourceTests
     [TestCase("x > 1 AND TRUE", new[] { "x" })]
     [TestCase("FALLBACK(s, \"0\") AS NUMBER > 1", new[] { "s", "FALLBACK(s, \"0\") AS NUMBER" })]
     [TestCase("COUNT(x > 1) AS STRING == \"1\"", new[] { "x", "COUNT(x > 1) AS STRING" })]
-    [TestCase("ape::\"Album Artist\" == \"x\"", new[] { "ape::\"album artist\"" })]
+    [TestCase("ape::field(\"Album Artist\") == \"x\"", new[] { "ape::field(\"album artist\")" })]
+    [TestCase("id3v2::field(\"TXXX\", \"MOOD\") == \"x\" OR id3v2::field(\"TXXX\") == \"x\"", new[] { "id3v2::field(\"txxx\", \"mood\")", "id3v2::field(\"txxx\")" })]
+    [TestCase("id3v2::field(\"TPE1\") == \"x\" OR id3v2::artist == \"x\" OR artist == \"x\"", new[] { "id3v2::field(\"tpe1\")", "id3v2::artist", "artist" })]
     [TestCase("1 == 1", new string[0])]
     public void SourceTable_ListsEveryDistinctSource_ChildrenFirst(string text, string[] forms)
     {
         Assert.That(Compiles(text).Sources.CanonicalForms, Is.EqualTo(forms));
     }
 
-    // Case, whitespace, an explicit namespace, parentheses and modifiers never make two sources.
-    [TestCase("x > 1 OR X > 2 OR ::x > 3 OR ( x ) > 4 OR ::\"X\" > 5", new[] { "x" })]
+    // Case, whitespace, the string form of a name, parentheses and modifiers never make two sources,
+    // and nor does the case of a name a source function matches without regard to case.
+    [TestCase("x > 1 OR X > 2 OR ( x ) > 4", new[] { "x" })]
     [TestCase("s AS NUMBER >  S  AS NUMBER", new[] { "s", "s AS NUMBER" })]
-    [TestCase("s AS NUMBER > 1 OR ::S AS number > 1", new[] { "s", "s AS NUMBER" })]
+    [TestCase("s AS NUMBER > 1 OR S AS number > 1", new[] { "s", "s AS NUMBER" })]
     [TestCase("ALL(m) == \"a\" OR LITERALLY(m) == \"b\" OR (ANY(m)) == \"c\"", new[] { "m" })]
-    [TestCase("file::size > 1 AND ::FILE::\"size\" > 2", new[] { "file::size" })]
-    [TestCase("vorbis::BPM == \"1\" OR vorbis::bpm == \"2\" OR vorbis::\"Bpm\" == \"3\"", new[] { "vorbis::bpm" })]
+    [TestCase("file::size > 1 AND FILE::Size > 2", new[] { "file::size" })]
+    [TestCase("vorbis::field(\"BPM\") == \"1\" OR VORBIS::Field(\"bpm\") == \"2\" OR vorbis::field(r\"Bpm\") == \"3\"", new[] { "vorbis::field(\"bpm\")" })]
+    [TestCase("id3v2::bytes(\"apic\") IS ABSENT OR id3v2::bytes(\"APIC\") IS USABLE", new[] { "id3v2::bytes(\"apic\")" })]
     [TestCase("FALLBACK(s, \"0\") AS NUMBER > FALLBACK(s, r\"0\") AS NUMBER", new[] { "s", "FALLBACK(s, \"0\") AS NUMBER" })]
     [TestCase("FALLBACK(s, \"0\") AS NUMBER > FALLBACK(s, \"00\") AS NUMBER", new[] { "s", "FALLBACK(s, \"0\") AS NUMBER", "FALLBACK(s, \"00\") AS NUMBER" })]
     public void SpellingsOfOneSubExpression_AreOneSource(string text, string[] forms)
@@ -84,11 +88,9 @@ public class SourceTests
         Assert.That(Evaluate("m == M", catalog).Quoted, Is.EqualTo(new[] { "m" }));
     }
 
-    // A leading "::" starts a name at the global namespace, where every namespace sits.
-    [TestCase("lab::q > 1 OR ::lab::q > 2", "lab::q")]
-    [TestCase("::lab::q > 1 OR lab::q > 2", "::lab::q")]
-    [TestCase("::LAB::\"Q\" > 1 OR lab::q > 2", "::LAB::\"Q\"")]
-    public void RootedAndUnrootedQualifiedNames_AreOneIdentifierAndOneSource(string text, string quoted)
+    [TestCase("lab::q > 1 OR LAB::Q > 2", "lab::q")]
+    [TestCase("LAB::Q > 1 OR lab::q > 2", "LAB::Q")]
+    public void QualifiedNames_InAnyCase_AreOneIdentifierAndOneSource(string text, string quoted)
     {
         var catalog = TestCatalog.Standard().With("lab::q", BadNumber);
 

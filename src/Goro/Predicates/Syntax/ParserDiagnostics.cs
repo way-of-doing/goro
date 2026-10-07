@@ -162,15 +162,61 @@ internal sealed class ParserDiagnostics(string text, ImmutableArray<Token> token
     public Diagnostic ReservedWordInIdentifier(Token word) =>
         new(Codes.ReservedWordInIdentifier, word.Span, new ErrorMessage.ReservedWordInIdentifier(Code(word)));
 
-    public Diagnostic WhitespaceInIdentifier(IdentifierSyntax identifier, IEnumerable<TextSpan> tokens) =>
-        new(Codes.WhitespaceInIdentifier, identifier.Span, new ErrorMessage.WhitespaceInIdentifier(),
-            [new Suggestion(identifier.Span, string.Concat(tokens.Select(token => token.Of(text))))]);
+    public Diagnostic WhitespaceInIdentifier(TextSpan identifier, IEnumerable<TextSpan> tokens) =>
+        new(Codes.WhitespaceInIdentifier, identifier, new ErrorMessage.WhitespaceInIdentifier(),
+            [new Suggestion(identifier, string.Concat(tokens.Select(token => token.Of(text))))]);
 
-    public Diagnostic QualifiedFunctionCall(IdentifierSyntax identifier)
+    /// <summary>A leading <c>::</c>, at <paramref name="index"/>, answered with what follows it.</summary>
+    public Diagnostic RootedIdentifier(int index)
     {
-        var name = identifier.Parts[^1];
-        ImmutableArray<Suggestion> unqualified = name.IsQuoted ? [] : [new Suggestion(identifier.Span, name.Text)];
-        return new Diagnostic(Codes.QualifiedFunctionCall, identifier.Span, new ErrorMessage.QualifiedFunctionCall(Code(identifier)), unqualified);
+        var colons = tokens[index];
+        var last = NamesFrom(index + 1);
+        if (last < 0)
+        {
+            return new Diagnostic(Codes.RootedIdentifier, colons.Span, new ErrorMessage.RootedIdentifier(Code(colons)));
+        }
+
+        var span = TextSpan.Covering(colons.Span, tokens[last].Span);
+        return new Diagnostic(Codes.RootedIdentifier, span, new ErrorMessage.RootedIdentifier(Code(span)),
+            [new Suggestion(span, Text(TextSpan.FromBounds(tokens[index + 1].Span.Start, tokens[last].Span.End)))]);
+    }
+
+    /// <summary>A name under a source and its name, the second <c>::</c> at <paramref name="index"/>.</summary>
+    public Diagnostic NestedIdentifier(NameToken source, int index)
+    {
+        var last = NamesFrom(index + 1);
+        var span = TextSpan.Covering(source.Span, last < 0 ? tokens[index].Span : tokens[last].Span);
+        return new Diagnostic(Codes.NestedIdentifier, span, new ErrorMessage.NestedIdentifier(Code(span)));
+    }
+
+    /// <summary><c>ape::"Album Artist"</c>: a name the source records under, which <c>field()</c> reads.</summary>
+    public Diagnostic QuotedName(NameToken source, StringToken name)
+    {
+        var span = TextSpan.Covering(source.Span, name.Span);
+        return new Diagnostic(Codes.QuotedName, span, new ErrorMessage.QuotedName(Code(span)),
+            [new Suggestion(span, $"{Text(source)}::field({Text(name)})")]);
+    }
+
+    /// <summary>
+    /// The index of the last name in a run of names joined by <c>::</c> starting at
+    /// <paramref name="index"/>, written without whitespace; -1 if no name starts there.
+    /// </summary>
+    private int NamesFrom(int index)
+    {
+        if (tokens[index] is not NameToken)
+        {
+            return -1;
+        }
+
+        var last = index;
+        while (last + 2 < tokens.Length
+            && tokens[last + 1].Kind == TokenKind.DoubleColon && tokens[last + 2] is NameToken
+            && tokens[last].Span.End == tokens[last + 1].Span.Start && tokens[last + 1].Span.End == tokens[last + 2].Span.Start)
+        {
+            last += 2;
+        }
+
+        return last;
     }
 
     // ----------------------------------------------------------------------------------------------

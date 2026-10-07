@@ -357,7 +357,7 @@ string written directly after the operator.
 | `ape :: artist` and `ape:: artist` | Each a syntax error, an identifier being written without whitespace around its `::`; the diagnostic offers the identifier without it |
 | `::artist`, `::file::size` and `ape::"artist"` | Each an error: there is no leading `::` and no quoted part. The diagnostics offer `artist`, `file::size` and `ape::field("artist")` |
 | `id3v2::track::x` | An error, a source being one level deep |
-| `and::x` and `NOT::x == 1` | Errors, no source being named after a reserved word |
+| `and::x`, `ape::and` and `NOT::x == 1` | Errors: the first two because nothing is named after a reserved word, the third because there is no leading `::`, the diagnostic offering `NOT x == 1` |
 | `vorbis::field`, `field("MOOD")`, `ape::count(genre)` and `id3v1::field("x")` | Errors: a source function needs its arguments and its source, `COUNT()` belongs to no source, and Id3v1 has no source functions |
 | `id3v2::field("TYER")`, `id3v2::field("APIC")`, `id3v2::field("TIT2", "x")` and `id3v2::field("TI")` | Errors: a renamed frame, offering `TDRC`; a frame that does not hold text, offering `bytes()`; a description given to a frame that has none; and an identifier of the wrong shape |
 | `id3v1::size`, `file::artist`, `artistt` and `size` | Errors: a concept qualified by a source that cannot supply it, a misspelled concept with a suggestion, and a `file` concept written without its source |

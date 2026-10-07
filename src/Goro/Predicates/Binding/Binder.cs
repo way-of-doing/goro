@@ -172,27 +172,32 @@ public sealed class Binder
 
     private SemanticExpression Identifier(IdentifierSyntax identifier)
     {
-        // A leading "::" roots the name at the global namespace, which every namespace is inside,
-        // so it changes nothing about which identifier is named.
-        var name = new IdentifierName(
-            identifier.Parts.Take(identifier.Parts.Length - 1).Select(part => part.Text), identifier.Parts[^1].Text);
-
-        switch (catalog.Lookup(name))
+        switch (catalog.Lookup(new IdentifierName(identifier.Source?.Text, identifier.Name.Text)))
         {
             case IdentifierLookup.Found(var declaration):
                 return new SemanticIdentifier(identifier, declaration);
 
-            case IdentifierLookup.UnknownNamespace(var known):
-                Report(report.UnknownNamespace(identifier, known));
-                return new SemanticInvalid(identifier, null, []);
+            case IdentifierLookup.UnknownSource(var known):
+                Report(report.UnknownSource(identifier.Source!, known));
+                break;
 
             case IdentifierLookup.UnknownIdentifier(var candidates):
                 Report(report.UnknownIdentifier(identifier, candidates));
-                return new SemanticInvalid(identifier, null, []);
+                break;
+
+            case IdentifierLookup.NeedsSource(var source):
+                Report(report.NeedsSource(identifier, source));
+                break;
+
+            case IdentifierLookup.IsSourceFunction:
+                Report(report.SourceFunctionNeedsArguments(identifier));
+                break;
 
             default:
                 throw new UnreachableException();
         }
+
+        return new SemanticInvalid(identifier, null, []);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -205,7 +210,18 @@ public sealed class Binder
             .Select(argument => Unmodified(argument, call.Name))
             .ToImmutableArray();
 
+        if (call.Source is not null)
+        {
+            return SourceCall(call, arguments);
+        }
+
         var function = call.Name.Text.ToUpperInvariant();
+        if (function is "FIELD" or "BYTES")
+        {
+            Report(report.SourceFunctionNeedsSource(call));
+            return new SemanticMalformedCall(call, null, null, arguments);
+        }
+
         if (function == "PREFERRED")
         {
             return Preferred(call, arguments);
@@ -256,6 +272,71 @@ public sealed class Binder
         };
     }
 
+    /// <summary>
+    /// A call of a source function. Its arguments are string literals, so it is resolved here, whole,
+    /// into the declaration of what it reads. A call that cannot be resolved still has the function's
+    /// type where the function is known, so that what is built on it is checked as usual.
+    /// </summary>
+    private SemanticExpression SourceCall(FunctionCallSyntax call, ImmutableArray<SemanticExpression> arguments)
+    {
+        SourceFunction function;
+        switch (catalog.LookupFunction(call.Source!.Text, call.Name.Text))
+        {
+            case SourceFunctionLookup.Found(var found):
+                function = found;
+                break;
+
+            case SourceFunctionLookup.UnknownSource(var known):
+                Report(report.UnknownSource(call.Source, known));
+                return new SemanticInvalid(call, null, arguments);
+
+            case SourceFunctionLookup.UnknownFunction(var candidates):
+                Report(report.UnknownSourceFunction(call, candidates));
+                return new SemanticInvalid(call, null, arguments);
+
+            default:
+                throw new UnreachableException();
+        }
+
+        var invalid = new SemanticInvalid(call, function.Type, arguments);
+        if (arguments.Length < function.MinimumArguments || arguments.Length > function.MaximumArguments)
+        {
+            Report(report.WrongArgumentCount(call, function.MinimumArguments, function.MaximumArguments));
+            return invalid;
+        }
+
+        var names = ImmutableArray.CreateBuilder<string>(arguments.Length);
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            if (arguments[i] is SemanticLiteral { Type: GoroType.String, Token: StringToken name })
+            {
+                names.Add(name.Value);
+            }
+            else
+            {
+                Report(report.ArgumentNotLiteral(call, call.Arguments[i]));
+            }
+        }
+
+        if (names.Count < arguments.Length)
+        {
+            return invalid;
+        }
+
+        switch (function.Resolve(names.MoveToImmutable()))
+        {
+            case SourceFunctionResolution.Found(var declaration):
+                return new SemanticSourceCall(call, declaration);
+
+            case SourceFunctionResolution.Rejected(var index, var reason):
+                Report(report.ArgumentRejected(call, index, reason));
+                return invalid;
+
+            default:
+                throw new UnreachableException();
+        }
+    }
+
     // ---------------------------------------------------------------------------------------------
     // Conversions
 
@@ -292,6 +373,12 @@ public sealed class Binder
             return new SemanticInvalid(syntax, target, [operand]);
         }
 
+        if (operand.Type == GoroType.Blob)
+        {
+            Report(report.BlobNotConvertible(operandSyntax));
+            return new SemanticInvalid(syntax, target, [operand]);
+        }
+
         if (operand.Type is GoroType.Duration or GoroType.ByteCount && IsUnit(target) && operand.Type != target)
         {
             Report(report.UnitsDoNotConvert(operandSyntax, operand.Type!.Value));
@@ -311,8 +398,15 @@ public sealed class Binder
         _ => null,
     };
 
-    private SemanticFallback Fallback(FunctionCallSyntax call, SemanticExpression argument, SemanticExpression @default)
+    private SemanticExpression Fallback(FunctionCallSyntax call, SemanticExpression argument, SemanticExpression @default)
     {
+        // There is no blob constant for a default to be, so a blob cannot fall back to anything.
+        if (argument.Type == GoroType.Blob)
+        {
+            Report(report.BlobInFallback(call.Arguments[0]));
+            return new SemanticInvalid(call, GoroType.Blob, [argument, @default]);
+        }
+
         // A default that is not a constant is the constants analysis's to report, and what type it
         // has is beside the point once it is reported. Only a literal can stand in for a unit.
         if (!argument.IsError && !@default.IsError && @default.IsConstant)
@@ -378,6 +472,13 @@ public sealed class Binder
         CheckLiterally(left);
         CheckLiterally(right);
 
+        // Reported, and then put aside as invalid, so that no analysis asks for a quantifier or offers
+        // a default for what cannot be compared at all.
+        if (BlobAmong(comparison.OperatorSpan, left, right))
+        {
+            return new SemanticInvalid(comparison, GoroType.Boolean, [left.Expression, right.Expression]);
+        }
+
         var (l, r) = (left.Expression, right.Expression);
         if (!l.IsError && !r.IsError && l.Type != r.Type)
         {
@@ -419,11 +520,16 @@ public sealed class Binder
         return new SemanticInvalid(comparison, GoroType.Boolean, [other.Expression]);
     }
 
-    private SemanticRange Between(BetweenSyntax between)
+    private SemanticExpression Between(BetweenSyntax between)
     {
         var subject = Operand(between.Subject);
         CheckLiterally(subject);
         var s = subject.Expression;
+        if (BlobAmong(null, subject))
+        {
+            return new SemanticInvalid(between, GoroType.Boolean, [s]);
+        }
+
         var minimum = new SemanticLiteral(between.Minimum, SemanticLiteral.TypeOf(between.Minimum.Token));
         var maximum = new SemanticLiteral(between.Maximum, SemanticLiteral.TypeOf(between.Maximum.Token));
 
@@ -504,6 +610,20 @@ public sealed class Binder
 
     private static SemanticLiteral StandIn(SemanticLiteral literal, GoroType wanted) =>
         literal.IsNumber && IsUnit(wanted) ? new SemanticLiteral(literal.Syntax, wanted) : literal;
+
+    /// <summary>Reports every operand that is a blob, which an operator reading content cannot take; true if there was one.</summary>
+    /// <param name="comparison">Where the comparison operator is, or null for <c>BETWEEN</c>.</param>
+    private bool BlobAmong(TextSpan? comparison, params SemanticOperand[] operands)
+    {
+        var any = false;
+        foreach (var operand in operands.Where(operand => operand.Expression.Type == GoroType.Blob))
+        {
+            Report(report.BlobOperand(operand.Core, comparison));
+            any = true;
+        }
+
+        return any;
+    }
 
     private void CheckLiterally(SemanticOperand operand)
     {

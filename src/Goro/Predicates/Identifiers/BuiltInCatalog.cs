@@ -5,96 +5,61 @@ using Goro.Predicates.Values;
 namespace Goro.Predicates.Identifiers;
 
 /// <summary>
-/// Every namespace and identifier docs/features/builtins/identifiers.md defines.
+/// Every source, concept and source function docs/features/builtins/identifiers.md defines.
 /// </summary>
 /// <remarks>
-/// The tables below follow that document's, namespace by namespace and row by row, so the two can
-/// be checked against each other by eye; the global namespace comes last only because it is built
-/// from the others. Each tag identifier of a format is declared through <see cref="Tag{T}"/>, whose
-/// binding is not implemented yet; the line that implements the tag namespaces replaces those rows'
-/// bindings, and each open namespace's binding for its other fields, and nothing else here. Each
-/// global identifier is a <see cref="PreferredBinding{T}"/> over the format identifiers of its name,
-/// and follows them.
+/// <see cref="Table"/> follows that document's table of concepts, row by row and cell by cell, so
+/// the two can be checked against each other by eye. Every cell, and every source function, is bound
+/// to a <see cref="TagBindings.NotImplemented{T}"/> binding: the line that reads tags replaces those
+/// bindings, and nothing else here. A concept written without a source is a
+/// <see cref="PreferredBinding{T}"/> over its cells, in <see cref="TagSources"/> order.
 /// </remarks>
 public sealed class BuiltInCatalog : IIdentifierCatalog
 {
-    private static readonly ImmutableArray<CatalogNamespace> Formats =
+    private const string Ape = "ape";
+    private const string Id3v1 = "id3v1";
+    private const string Id3v2 = "id3v2";
+    private const string Vorbis = "vorbis";
+
+    /// <summary>The tag sources, most preferred first, which is also the order of each row's cells.</summary>
+    private static readonly string[] TagSources = [Vorbis, Ape, Id3v2, Id3v1];
+
+    /// <summary>The concepts of the tag sources, and the field each source's cell reads.</summary>
+    private static readonly ImmutableArray<ConceptRow> Table =
     [
-        new OpenNamespace("ape", TagBindings.NotImplemented<string>,
-        [
-            Tag<string>(Bounds.Any, "artist"),
-            Tag<string>(Bounds.Any, "album"),
-            Tag<string>(Bounds.Any, "comment"),
-            Tag<string>(Bounds.Any, "genre"),
-            Tag<string>(Bounds.Any, "title"),
-            Tag<decimal>(Bounds.Any, "track"),
-            Tag<decimal>(Bounds.Any, "year"),
-        ]),
-        new OpenNamespace("ape::raw", TagBindings.NotImplemented<string>, []),
-        new ClosedNamespace("file", FileNamespace.Identifiers),
-        new ClosedNamespace("id3v1",
-        [
-            Tag<string>(Bounds.AtMostOne, "artist"),
-            Tag<string>(Bounds.AtMostOne, "album"),
-            Tag<string>(Bounds.AtMostOne, "comment"),
-            Tag<string>(Bounds.AtMostOne, "genre"),
-            Tag<string>(Bounds.AtMostOne, "title"),
-            Tag<decimal>(Bounds.AtMostOne, "track"),
-            Tag<decimal>(Bounds.AtMostOne, "year"),
-        ]),
-        new ClosedNamespace("id3v1::raw",
-        [
-            Tag<string>(Bounds.AtMostOne, "artist"),
-            Tag<string>(Bounds.AtMostOne, "album"),
-            Tag<string>(Bounds.AtMostOne, "comment"),
-            Tag<decimal>(Bounds.AtMostOne, "genre"),
-            Tag<string>(Bounds.AtMostOne, "title"),
-            Tag<decimal>(Bounds.AtMostOne, "track"),
-            Tag<string>(Bounds.AtMostOne, "year"),
-        ]),
-        new OpenNamespace("id3v2", TagBindings.NotImplemented<string>,
-        [
-            Tag<string>(Bounds.Any, "artist"),
-            Tag<string>(Bounds.Any, "album"),
-            Tag<string>(Bounds.Any, "comment"),
-            Tag<string>(Bounds.Any, "genre"),
-            Tag<string>(Bounds.Any, "title"),
-            Tag<decimal>(Bounds.Any, "track"),
-            Tag<decimal>(Bounds.Any, "year"),
-        ]),
-        new OpenNamespace("id3v2::raw", TagBindings.NotImplemented<string>, []),
-        new OpenNamespace("vorbis", TagBindings.NotImplemented<string>,
-        [
-            Tag<string>(Bounds.Any, "artist"),
-            Tag<string>(Bounds.Any, "album"),
-            Tag<string>(Bounds.Any, "description"),
-            Tag<string>(Bounds.Any, "genre"),
-            Tag<string>(Bounds.Any, "title"),
-            Tag<decimal>(Bounds.Any, "track"),
-            Tag<decimal>(Bounds.Any, "year"),
-        ]),
-        new OpenNamespace("vorbis::raw", TagBindings.NotImplemented<string>, []),
+        new ConceptRow<string>("artist", ["ARTIST", "Artist", "TPE1", "artist"]),
+        new ConceptRow<string>("album", ["ALBUM", "Album", "TALB", "album"]),
+        new ConceptRow<string>("genre", ["GENRE", "Genre", "TCON", "genre"]),
+        new ConceptRow<string>("title", ["TITLE", "Title", "TIT2", "title"]),
+        new ConceptRow<decimal>("track", ["TRACKNUMBER", "Track", "TRCK", "track"]),
+        new ConceptRow<decimal>("year", ["DATE", "Year", "TDRC", "year"]),
     ];
 
-    /// <summary>The formats a global identifier draws on, most preferred first.</summary>
-    private static readonly string[] PreferenceOrder = ["vorbis", "ape", "id3v2", "id3v1"];
-
-    private static readonly ImmutableArray<CatalogNamespace> Namespaces =
+    private static readonly ImmutableArray<CatalogSource> Sources =
     [
-        new ClosedNamespace("",
+        new(Ape, Cells(Ape),
         [
-            Preferred<string>("artist"),
-            Preferred<string>("album"),
-            Preferred<string>("genre"),
-            Preferred<string>("title"),
-            Preferred<decimal>("year"),
+            Field(Ape, 1),
+            Bytes(Ape, Bounds.AtMostOne),
         ]),
-        .. Formats,
+        new(FileSource.Name, FileSource.Concepts, []),
+        new(Id3v1, Cells(Id3v1), []),
+        new(Id3v2, Cells(Id3v2),
+        [
+            Field(Id3v2, 2, Id3v2Frames.CheckField),
+            Bytes(Id3v2, Bounds.Any, Id3v2Frames.CheckBytes),
+        ]),
+        new(Vorbis, Cells(Vorbis),
+        [
+            Field(Vorbis, 1),
+            Bytes(Vorbis, Bounds.Any),
+        ]),
     ];
 
-    // The global namespace is left out: it is never the one a predicate failed to name.
-    private static readonly ImmutableArray<string> KnownNamespaces =
-        [.. Namespaces.Where(@namespace => !@namespace.IsGlobal).Select(@namespace => @namespace.Spelling)];
+    private static readonly ImmutableArray<string> KnownSources = [.. Sources.Select(source => source.Name)];
+
+    private static readonly Dictionary<string, IdentifierDeclaration> Plain =
+        Table.Select(row => row.Plain(TagSources.Select(source => Cell(source, row.Name)))).ToDictionary(Concept, StringComparer.OrdinalIgnoreCase);
 
     public static BuiltInCatalog Instance { get; } = new();
 
@@ -102,36 +67,112 @@ public sealed class BuiltInCatalog : IIdentifierCatalog
     {
     }
 
-    /// <remarks>
-    /// <c>id3v2::raw</c> written as an identifier is, by the grammar, the name <c>raw</c> in the open
-    /// namespace <c>id3v2</c>, and so reads a field named "raw" like any other name there. The same
-    /// goes for <c>ape::raw</c> and <c>vorbis::raw</c>; in the closed <c>id3v1</c> it is unknown.
-    /// </remarks>
-    public IdentifierLookup Lookup(IdentifierName name) =>
-        Namespaces.FirstOrDefault(@namespace => @namespace.Contains(name)) is { } found
-            ? found.Lookup(name)
-            : new IdentifierLookup.UnknownNamespace(KnownNamespaces);
-
-    /// <summary>
-    /// A global identifier: the <c>PREFERRED()</c> of the identifiers of the same name in the formats,
-    /// in order of preference, with the bounds that gives.
-    /// </summary>
-    private static DeclarationRow<T> Preferred<T>(string name) where T : notnull
+    public IdentifierLookup Lookup(IdentifierName name)
     {
-        var candidates = PreferenceOrder.Select(format => FormatDeclaration<T>(format, name)).ToList();
-        var binding = new PreferredBinding<T>([.. candidates.Select(candidate => candidate.Binding)]);
-        return new(name, Bounds.Preferred(candidates.Select(candidate => candidate.Bounds)), _ => binding);
+        if (name.Source is null)
+        {
+            if (Plain.TryGetValue(name.Name, out var plain))
+            {
+                return new IdentifierLookup.Found(plain);
+            }
+
+            return SourceOf(FileSource.Name).Concept(name.Name) is not null
+                ? new IdentifierLookup.NeedsSource(FileSource.Name)
+                : new IdentifierLookup.UnknownIdentifier([.. Plain.Values.Select(Concept)]);
+        }
+
+        if (Find(name.Source) is not { } source)
+        {
+            return new IdentifierLookup.UnknownSource(KnownSources);
+        }
+
+        if (source.Concept(name.Name) is { } declaration)
+        {
+            return new IdentifierLookup.Found(declaration);
+        }
+
+        return source.Function(name.Name) is not null
+            ? new IdentifierLookup.IsSourceFunction()
+            : new IdentifierLookup.UnknownIdentifier(source.ConceptNames);
     }
 
-    private static IdentifierDeclaration<T> FormatDeclaration<T>(string format, string name) where T : notnull =>
-        Formats.Single(@namespace => @namespace.Spelling == format).Declarations
-            .OfType<IdentifierDeclaration<T>>()
-            .Single(declaration => declaration.Name.Name == name);
+    public SourceFunctionLookup LookupFunction(string source, string function)
+    {
+        if (Find(source) is not { } found)
+        {
+            return new SourceFunctionLookup.UnknownSource(KnownSources);
+        }
 
-    /// <summary>
-    /// An identifier that reads tags, which can be absent, any tag being able to be missing, and can
-    /// hold several occurrences or not as its format allows.
-    /// </summary>
-    private static DeclarationRow<T> Tag<T>(Bounds bounds, string name) where T : notnull =>
-        new(name, bounds, TagBindings.NotImplemented<T>);
+        return found.Function(function) is { } named
+            ? new SourceFunctionLookup.Found(named)
+            : new SourceFunctionLookup.UnknownFunction(found.FunctionNames);
+    }
+
+    private static CatalogSource? Find(string name) =>
+        Sources.FirstOrDefault(source => string.Equals(source.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    private static CatalogSource SourceOf(string name) => Find(name)!;
+
+    private static IdentifierDeclaration Cell(string source, string concept) =>
+        SourceOf(source).Concept(concept)!;
+
+    private static string Concept(IdentifierDeclaration declaration) => ((IdentifierName)declaration.Name).Name;
+
+    /// <summary>The cells a tag source has: one for every concept of the table, Id3v1's never holding more than one occurrence.</summary>
+    private static ImmutableArray<IdentifierDeclaration> Cells(string source)
+    {
+        var bounds = source == Id3v1 ? Bounds.AtMostOne : Bounds.Any;
+        return [.. Table.Select(row => row.Cell(source, bounds))];
+    }
+
+    /// <summary><c>field()</c>: the data as text, as recorded, one occurrence for each value the format records.</summary>
+    private static SourceFunction Field(string source, int maximumArguments, Func<ImmutableArray<string>, ArgumentCheck>? check = null) =>
+        new SourceFunction<string>(source, "field", 1, maximumArguments, Bounds.Any, TagBindings.NotImplemented<string>, check);
+
+    /// <summary><c>bytes()</c>: the data as recorded, one occurrence for each item, frame or comment.</summary>
+    private static SourceFunction Bytes(string source, Bounds bounds, Func<ImmutableArray<string>, ArgumentCheck>? check = null) =>
+        new SourceFunction<Blob>(source, "bytes", 1, 1, bounds, TagBindings.NotImplemented<Blob>, check);
+
+    /// <summary>A row of the table of concepts: a concept's name, its type, and the field each tag source's cell reads.</summary>
+    private abstract record ConceptRow(string Name, ImmutableArray<string> Fields)
+    {
+        public abstract IdentifierDeclaration Cell(string source, Bounds bounds);
+
+        /// <summary>The concept written without a source: the preference among its cells.</summary>
+        public abstract IdentifierDeclaration Plain(IEnumerable<IdentifierDeclaration> cells);
+    }
+
+    private sealed record ConceptRow<T>(string Name, ImmutableArray<string> Fields) : ConceptRow(Name, Fields) where T : notnull
+    {
+        public override IdentifierDeclaration Cell(string source, Bounds bounds)
+        {
+            var name = new IdentifierName(source, Name);
+            return new IdentifierDeclaration<T>(name, bounds, TagBindings.NotImplemented<T>(name));
+        }
+
+        public override IdentifierDeclaration Plain(IEnumerable<IdentifierDeclaration> cells)
+        {
+            var candidates = cells.Cast<IdentifierDeclaration<T>>().ToList();
+            return new IdentifierDeclaration<T>(
+                IdentifierName.Plain(Name),
+                Bounds.Preferred(candidates.Select(candidate => candidate.Bounds)),
+                new PreferredBinding<T>([.. candidates.Select(candidate => candidate.Binding)]));
+        }
+    }
+
+    /// <summary>A source: the concepts it supplies and the source functions it has.</summary>
+    private sealed class CatalogSource(string name, ImmutableArray<IdentifierDeclaration> concepts, ImmutableArray<SourceFunction> functions)
+    {
+        public string Name { get; } = name;
+
+        public ImmutableArray<string> ConceptNames { get; } = [.. concepts.Select(BuiltInCatalog.Concept)];
+
+        public ImmutableArray<string> FunctionNames { get; } = [.. functions.Select(function => function.Name)];
+
+        public IdentifierDeclaration? Concept(string concept) =>
+            concepts.FirstOrDefault(declaration => string.Equals(BuiltInCatalog.Concept(declaration), concept, StringComparison.OrdinalIgnoreCase));
+
+        public SourceFunction? Function(string function) =>
+            functions.FirstOrDefault(candidate => string.Equals(candidate.Name, function, StringComparison.OrdinalIgnoreCase));
+    }
 }

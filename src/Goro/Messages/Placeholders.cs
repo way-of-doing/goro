@@ -2,7 +2,7 @@ namespace Goro.Messages;
 
 /// <summary>
 /// Text that goes into a message as it is: the user's own, verbatim, or a name Goro spells, such as
-/// a keyword, a function, a namespace or a unit. Never words of the message itself.
+/// a keyword, a function, a source or a unit. Never words of the message itself.
 /// </summary>
 public readonly record struct Code(string Text)
 {
@@ -29,7 +29,6 @@ public enum Expectation
     CloseParen,
     CommaOrCloseParen,
     Name,
-    NameOrQuotedName,
     Target,
 }
 

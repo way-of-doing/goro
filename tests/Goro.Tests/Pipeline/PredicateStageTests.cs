@@ -212,7 +212,7 @@ public class PredicateStageTests
     public void ATagIdentifierThatCannotBeReadYet_Propagates()
     {
         var sources = new Sources();
-        var artist = sources.Identifier<string>(IdentifierName.Global("artist"), "artist");
+        var artist = sources.Identifier<string>(IdentifierName.Plain("artist"), "artist");
         var predicate = sources.Compile(new ComparisonTest<string>(
             new(artist, Quantifier.Existential), ComparisonOperator.Equal,
             new(new Literal<string>("x"), Quantifier.Existential), StringOrder.Normalized));
@@ -267,7 +267,7 @@ public class PredicateStageTests
         private readonly List<string> _forms = [];
 
         public Expression<T> File<T>(string name) where T : notnull =>
-            Identifier<T>(new IdentifierName(["file"], name), $"file::{name}");
+            Identifier<T>(new IdentifierName("file", name), $"file::{name}");
 
         public Expression<T> Identifier<T>(IdentifierName name, string written) where T : notnull
         {

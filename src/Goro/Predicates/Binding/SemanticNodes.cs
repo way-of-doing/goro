@@ -98,15 +98,33 @@ public sealed class SemanticLiteral(LiteralSyntax syntax, GoroType type) : Seman
     };
 }
 
-/// <summary>An identifier, resolved to its declaration.</summary>
-public sealed class SemanticIdentifier(IdentifierSyntax syntax, IdentifierDeclaration declaration)
+/// <summary>
+/// Something read from the file, resolved to its declaration: an identifier, or a call of a source
+/// function. The two differ only in how they were written, and every analysis treats them alike.
+/// </summary>
+public abstract class SemanticRead(ExpressionSyntax syntax, IdentifierDeclaration declaration)
     : SemanticExpression(syntax, declaration.Type)
 {
-    public new IdentifierSyntax Syntax => (IdentifierSyntax)base.Syntax;
-
     public IdentifierDeclaration Declaration { get; } = declaration;
 
     public override IEnumerable<SemanticExpression> Children => [];
+}
+
+/// <summary>An identifier, resolved to its declaration.</summary>
+public sealed class SemanticIdentifier(IdentifierSyntax syntax, IdentifierDeclaration declaration)
+    : SemanticRead(syntax, declaration)
+{
+    public new IdentifierSyntax Syntax => (IdentifierSyntax)base.Syntax;
+}
+
+/// <summary>
+/// A call of a source function, such as <c>vorbis::field("MOOD")</c>, resolved to its declaration.
+/// Its arguments are literals, so they are part of the declaration rather than children of the node.
+/// </summary>
+public sealed class SemanticSourceCall(FunctionCallSyntax syntax, IdentifierDeclaration declaration)
+    : SemanticRead(syntax, declaration)
+{
+    public new FunctionCallSyntax Syntax => (FunctionCallSyntax)base.Syntax;
 }
 
 /// <summary>

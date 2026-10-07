@@ -5,7 +5,10 @@ using Goro.Predicates.Values;
 
 namespace Goro.Predicates.Evaluation;
 
-/// <summary>A resolved identifier. Its unusable occurrences are born here, at <see cref="Origin"/>.</summary>
+/// <summary>
+/// A resolved identifier, or call of a source function. Its unusable occurrences are born here, at
+/// <see cref="Origin"/>.
+/// </summary>
 public sealed class IdentifierReference<T>(IdentifierDeclaration<T> declaration, Origin origin)
     : Expression<T> where T : notnull
 {
