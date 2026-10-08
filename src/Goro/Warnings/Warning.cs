@@ -68,3 +68,26 @@ public sealed record UnansweredWarning(string Message) : Warning
 
     public override string ToString() => $"goro: warning: {Message}";
 }
+
+/// <summary>
+/// Some of the files a run opened could be read only in part: a tag broken off or unreadable, or a
+/// playing time that could not be had. One per run, written once every file has been processed,
+/// after the <see cref="UnansweredWarning"/>. Unlike that one it reports nothing a command decided,
+/// so its wording is Goro's own, and it points to <c>goro audit</c> for what the files hold.
+/// </summary>
+/// <param name="Incomplete">How many files could be read only in part; at least one.</param>
+/// <param name="Opened">How many files were opened and processed, those included.</param>
+public sealed record IncompleteWarning(int Incomplete, int Opened) : Warning
+{
+    public override WarningCategory Category => WarningCategory.Incomplete;
+
+    public override string ToString() => $"goro: warning: {Message}";
+
+    private string Message => (Incomplete, Opened) switch
+    {
+        (1, 1) => "the one file opened could be read only in part; goro audit can say what it holds",
+        (1, _) => $"1 of the {Opened} files opened could be read only in part; goro audit can say what it holds",
+        _ when Incomplete == Opened => $"none of the {Opened} files opened could be read in full; goro audit can say what they hold",
+        _ => $"{Incomplete} of the {Opened} files opened could be read only in part; goro audit can say what they hold",
+    };
+}

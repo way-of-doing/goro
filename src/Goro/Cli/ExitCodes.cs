@@ -23,8 +23,11 @@ public static class ExitCodes
     /// <summary>Strict only: the predicate could not be answered for at least one file, and the warning saying so was emitted.</summary>
     public const int UnansweredPredicates = 11;
 
+    /// <summary>Strict only: part of at least one file could not be read, and the warning saying so was emitted.</summary>
+    public const int IncompleteFiles = 12;
+
     /// <summary>Strict only: at least one file warning was emitted.</summary>
-    public const int FileWarnings = 12;
+    public const int FileWarnings = 13;
 
     /// <summary>Strict only: files were examined, but none of them matched.</summary>
     public const int NothingMatched = 20;
@@ -49,6 +52,11 @@ public static class ExitCodes
         if (outcome.Warned.Contains(WarningCategory.File))
         {
             return FileWarnings;
+        }
+
+        if (outcome.Warned.Contains(WarningCategory.Incomplete))
+        {
+            return IncompleteFiles;
         }
 
         if (outcome.Warned.Contains(WarningCategory.Unanswered))

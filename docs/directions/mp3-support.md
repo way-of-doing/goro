@@ -244,3 +244,14 @@ layout and finds `E` as it reads the frames.
   Still open: `architecture.md` says a load failure makes a file unreadable and that evaluation is
   synchronous because the tag library is; both change with step 2's loader. Next step: review of
   step 1, then 1b, in plan mode.
+- 2026-10-08 -- Step 1 committed (`a9d1e6b`). Step 1b written, awaiting review: the `incomplete`
+  category in `src/`, exit code `12` with file warnings at `13`, `--no-warn=incomplete`, and an
+  `IncompleteWarning` emitted once per run after the `unanswered` one, worded by Goro rather than by
+  the command. Each file's outcome now says how much of it was read (`FileReading`: not opened,
+  read, read in part), and the tally counts the files opened and those read in part; an unreadable
+  file counts as neither. `goro hash` marks every hashed file read; `goro list --filter` takes it
+  from `FileData.Opened`, which a facet sets unless it only asks the file system (`OpensFile`), so a
+  predicate on `file::size` opens nothing. Nothing is read in part yet: the CLI tests wrap the real
+  planner in one that marks chosen files so. Next step: review of 1b, then step 2, the reader and
+  the tags facet. Step 2 replaces `FileData.Opened` with the loader, which reports read-in-part
+  from the layout's conditions.

@@ -16,7 +16,7 @@ public sealed class HashPipelineStage(IAudioHasher audioHasher, HashAlgorithmKin
         try
         {
             var hash = await audioHasher.ComputeHashAsync(filePath, algorithm, cancellationToken);
-            return FileOutcome<HashResult>.Matched(new HashResult(filePath, algo, hash));
+            return FileOutcome<HashResult>.Matched(new HashResult(filePath, algo, hash), reading: FileReading.Read);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

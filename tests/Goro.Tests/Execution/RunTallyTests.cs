@@ -49,6 +49,32 @@ public class RunTallyTests
     }
 
     [Test]
+    public void Record_CountsTheFilesOpened_AndThoseReadOnlyInPart_WhateverTheirDisposition()
+    {
+        var tally = new RunTally(new RecordingWarningSink());
+
+        tally.Record(FileOutcome<string>.Matched("a", reading: FileReading.Read));
+        tally.Record(FileOutcome<string>.Matched("b", reading: FileReading.ReadInPart));
+        tally.Record(FileOutcome<string>.Unmatched(reading: FileReading.ReadInPart));
+        tally.Record(FileOutcome<string>.Unmatched(unanswered: true, reading: FileReading.ReadInPart));
+        tally.Record(FileOutcome<string>.Matched("e"));
+        tally.Record(FileOutcome<string>.Unreadable(new FileWarning("f", "damaged")));
+
+        Assert.That(tally.Outcome, Has.Property(nameof(RunOutcome.Opened)).EqualTo(4)
+            .And.Property(nameof(RunOutcome.Incomplete)).EqualTo(3)
+            .And.Property(nameof(RunOutcome.Unanswered)).EqualTo(1));
+    }
+
+    // An unreadable file has its own warning, and counts as neither opened nor incomplete.
+    [Test]
+    public void Unreadable_IsNeverCountedAsOpened()
+    {
+        var outcome = FileOutcome<string>.Unreadable(new FileWarning("a", "damaged"), "a");
+
+        Assert.That(outcome.Reading, Is.EqualTo(FileReading.NotOpened));
+    }
+
+    [Test]
     public void Record_HandsTheFilesWarningsToTheSinkTogether_AndOutcomeReportsTheirCategories()
     {
         var sink = new RecordingWarningSink();

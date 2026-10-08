@@ -15,6 +15,8 @@ internal sealed class FileSystemFacet : FileFacet<FileMetadata>
     {
     }
 
+    public override bool OpensFile => false;
+
     public override FileMetadata Load(string path)
     {
         // The path is the link's, but the audio file is its target, and FileInfo of a symbolic link

@@ -25,11 +25,15 @@ public sealed class FileData
 
     public string Path { get; }
 
+    /// <summary>Whether a facet that opens the file has been loaded, or tried.</summary>
+    public bool Opened { get; private set; }
+
     /// <exception cref="UnreadableFileException">The facet cannot be loaded.</exception>
     public T Get<T>(FileFacet<T> facet) where T : notnull
     {
         if (!loaded.TryGetValue(facet, out var entry))
         {
+            Opened |= facet.OpensFile;
             entry = Load(facet);
             loaded.Add(facet, entry);
         }

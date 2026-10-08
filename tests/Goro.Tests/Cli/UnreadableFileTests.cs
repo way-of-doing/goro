@@ -97,7 +97,7 @@ public class UnreadableFileTests
 
         var (exitCode, stdOut, stdErr) = await app.RunCapturedAsync("hash", "--strict-exit-code", _collection.Root);
 
-        Assert.That(exitCode, Is.EqualTo(12));
+        Assert.That(exitCode, Is.EqualTo(13));
         Assert.That(Lines(stdOut), Has.One.Match(HashedLine(good)).And.One.EqualTo($"{vanishing} md5 -"));
         AssertOneFileWarning(stdErr, vanishing);
         Assert.That(stdErr, Does.Contain("no such file or directory"));
@@ -116,7 +116,7 @@ public class UnreadableFileTests
         var (strictCode, strictOut, _) = await GoroAppFactory.Create().RunCapturedAsync("hash", "--strict-exit-code", _collection.Root);
         var (plainCode, plainOut, _) = await GoroAppFactory.Create().RunCapturedAsync("hash", _collection.Root);
 
-        Assert.That(strictCode, Is.EqualTo(12));
+        Assert.That(strictCode, Is.EqualTo(13));
         Assert.That(plainCode, Is.EqualTo(0));
         Assert.That(Lines(strictOut), Has.Length.EqualTo(11));
         Assert.That(Lines(plainOut), Is.EquivalentTo(Lines(strictOut)));
@@ -131,7 +131,7 @@ public class UnreadableFileTests
 
         var (exitCode, stdOut, _) = await GoroAppFactory.Create().RunCapturedAsync("hash", "--strict-exit-code", bad);
 
-        Assert.That(exitCode, Is.EqualTo(12));
+        Assert.That(exitCode, Is.EqualTo(13));
         Assert.That(stdOut.Trim(), Is.EqualTo($"{bad} md5 -"));
     }
 
@@ -206,7 +206,7 @@ public class UnreadableFileTests
 
         var (exitCode, stdOut, stdErr) = await app.RunCapturedAsync("list", "--strict-exit-code", "--filter=file::size >= 0", _collection.Root);
 
-        Assert.That(exitCode, Is.EqualTo(12));
+        Assert.That(exitCode, Is.EqualTo(13));
         Assert.That(Lines(stdOut), Is.EqualTo(new[] { good }));
         AssertOneFileWarning(stdErr, vanishing);
         Assert.That(stdErr, Does.Contain("no such file or directory"));
@@ -248,7 +248,7 @@ public class UnreadableFileTests
         var (exitCode, stdOut, stdErr) = await RunAsync(
             "list", "--strict-exit-code", "--filter=file::name AS NUMBER > 1 OR file::duration > 0", _collection.Root);
 
-        Assert.That(exitCode, Is.EqualTo(12));
+        Assert.That(exitCode, Is.EqualTo(13));
         Assert.That(stdOut, Is.Empty);
         AssertOneFileWarning(stdErr, notAudio);
     }
@@ -316,7 +316,7 @@ public class UnreadableFileTests
 
         var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "file::duration >= 0", _collection.Root));
 
-        Assert.That(exitCode, Is.EqualTo(strict ? 12 : 0));
+        Assert.That(exitCode, Is.EqualTo(strict ? 13 : 0));
         Assert.That(Lines(stdOut), Has.Length.EqualTo(10).And.No.EqualTo(bad));
         AssertOneFileWarning(stdErr, bad);
     }
@@ -331,7 +331,7 @@ public class UnreadableFileTests
 
         var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "file::name AS NUMBER > 1 OR file::duration >= 0", _collection.Root));
 
-        Assert.That(exitCode, Is.EqualTo(strict ? 12 : 0));
+        Assert.That(exitCode, Is.EqualTo(strict ? 13 : 0));
         Assert.That(Lines(stdOut), Is.EqualTo(new[] { good }));
         var lines = Lines(stdErr);
         Assert.That(lines, Has.Length.EqualTo(2), stdErr);
@@ -348,7 +348,7 @@ public class UnreadableFileTests
 
         var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "file::duration > 100000", _collection.Root));
 
-        Assert.That(exitCode, Is.EqualTo(strict ? 12 : 0));
+        Assert.That(exitCode, Is.EqualTo(strict ? 13 : 0));
         Assert.That(stdOut, Is.Empty);
         AssertOneFileWarning(stdErr, bad);
     }
@@ -388,7 +388,7 @@ public class UnreadableFileTests
 
         var (exitCode, stdOut, stdErr) = await RunAsync(ListArgs(strict, "file::name AS NUMBER > 1 AND file::duration >= 0", _collection.Root));
 
-        Assert.That(exitCode, Is.EqualTo(strict ? 12 : 0));
+        Assert.That(exitCode, Is.EqualTo(strict ? 13 : 0));
         Assert.That(stdOut, Is.Empty);
         var lines = Lines(stdErr);
         Assert.That(lines, Has.Length.EqualTo(3), stdErr);
@@ -399,7 +399,7 @@ public class UnreadableFileTests
 
     // --- pathspecs ---
 
-    [TestCase(true, 12)]
+    [TestCase(true, 13)]
     [TestCase(false, 0)]
     public async Task List_SubdirectoryThatCannotBeListed_WarnsAndEverySiblingIsStillListed(bool strict, int expectedCode)
     {

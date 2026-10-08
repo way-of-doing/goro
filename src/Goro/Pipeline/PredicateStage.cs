@@ -40,7 +40,8 @@ public sealed class PredicateStage(CompiledPredicate predicate) : IPipelineStage
 
     private FileOutcome<ListResult> Decide(string filePath)
     {
-        var context = new EvaluationContext(new FileData(filePath), Predicate.Sources.Count);
+        var data = new FileData(filePath);
+        var context = new EvaluationContext(data, Predicate.Sources.Count);
 
         Truth truth;
         try
@@ -53,9 +54,10 @@ public sealed class PredicateStage(CompiledPredicate predicate) : IPipelineStage
         }
 
         var warnings = context.Reported.Select(origin => new DataWarning(filePath, origin.Text));
+        var reading = data.Opened ? FileReading.Read : FileReading.NotOpened;
         return truth == Truth.True
-            ? FileOutcome<ListResult>.Matched(new ListResult(filePath), warnings)
-            : FileOutcome<ListResult>.Unmatched(warnings, unanswered: truth == Truth.Unusable);
+            ? FileOutcome<ListResult>.Matched(new ListResult(filePath), warnings, reading: reading)
+            : FileOutcome<ListResult>.Unmatched(warnings, unanswered: truth == Truth.Unusable, reading: reading);
     }
 
     /// <summary>

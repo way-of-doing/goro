@@ -40,7 +40,7 @@ public class WarningSuppressionTests
         _collection.Unlock(locked);
         var clean = await RunAsync("list", "--strict-exit-code", _collection.Root);
 
-        Assert.That(warning.ExitCode, Is.EqualTo(12), "the scenario must actually warn");
+        Assert.That(warning.ExitCode, Is.EqualTo(13), "the scenario must actually warn");
         Assert.That(warning.StdErr, Does.Contain(locked));
         AssertIndistinguishable(suppressed, clean);
         Assert.That(clean.ExitCode, Is.EqualTo(0));
@@ -69,7 +69,7 @@ public class WarningSuppressionTests
 
         var (exitCode, _, stdErr) = await RunAsync("hash", "--strict-exit-code", "--no-warn=data", bad);
 
-        Assert.That(exitCode, Is.EqualTo(12));
+        Assert.That(exitCode, Is.EqualTo(13));
         Assert.That(stdErr, Does.Contain($"goro: warning: {bad}: cannot be read"));
     }
 
@@ -104,7 +104,7 @@ public class WarningSuppressionTests
         var without = await RunAsync("hash", "--strict-exit-code", _collection.Root);
         var with = await RunAsync("hash", "--strict-exit-code", "--no-warn=data", _collection.Root);
 
-        Assert.That(without.ExitCode, Is.EqualTo(12));
+        Assert.That(without.ExitCode, Is.EqualTo(13));
         AssertIndistinguishable(with, without);
     }
 
@@ -198,7 +198,7 @@ public class WarningSuppressionTests
 
         var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--no-warn=data", WarnsBothWays, _collection.Root);
 
-        Assert.That(exitCode, Is.EqualTo(12));
+        Assert.That(exitCode, Is.EqualTo(13));
         Assert.That(stdOut.Trim(), Is.EqualTo(good));
         Assert.That(stdErr.Trim(), Does.StartWith($"goro: warning: {bad}: cannot be read: ").And.Not.Contain("\n"));
     }
@@ -230,9 +230,9 @@ public class WarningSuppressionTests
         var warning = await RunAsync("list", "--strict-exit-code", WarnsThreeWays, _collection.Root);
         var all = await RunAsync("list", "--strict-exit-code", "--no-warn=all", WarnsThreeWays, _collection.Root);
         var separate = await RunAsync("list", "--strict-exit-code", "--no-warn", "all", WarnsThreeWays, _collection.Root);
-        var every = await RunAsync("list", "--strict-exit-code", "--no-warn=data,unanswered,file", WarnsThreeWays, _collection.Root);
+        var every = await RunAsync("list", "--strict-exit-code", "--no-warn=data,unanswered,incomplete,file", WarnsThreeWays, _collection.Root);
 
-        Assert.That(warning.ExitCode, Is.EqualTo(12), "the scenario must actually warn");
+        Assert.That(warning.ExitCode, Is.EqualTo(13), "the scenario must actually warn");
         Assert.That(warning.StdErr, Does.Contain("could not be answered for 1 of the 2 files examined"));
         Assert.That(all.ExitCode, Is.EqualTo(0));
         Assert.That(all.StdErr, Is.Empty);
@@ -251,7 +251,7 @@ public class WarningSuppressionTests
         var without = await RunAsync("list", "--strict-exit-code", predicate, _collection.Root);
         var with = await RunAsync("list", "--strict-exit-code", "--no-warn=data", predicate, _collection.Root);
 
-        Assert.That(without.ExitCode, Is.EqualTo(12));
+        Assert.That(without.ExitCode, Is.EqualTo(13));
         AssertIndistinguishable(with, without);
     }
 

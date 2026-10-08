@@ -188,6 +188,37 @@ public class PredicateStageTests
         Assert.That(outcome.Warnings, Is.Empty);
     }
 
+    // --- Whether the file was opened, which the incomplete warning counts ---
+
+    [Test]
+    public async Task APredicateOnTheNameAlone_OpensNothing()
+    {
+        var outcome = await Run(NumberOfNameGreaterThanOne(), "/music/5");
+
+        Assert.That(outcome.Reading, Is.EqualTo(FileReading.NotOpened));
+    }
+
+    [Test]
+    public async Task APredicateOnTheSize_OpensNothing_TheFileSystemHavingTheAnswer()
+    {
+        var good = _collection.Mp3("good.mp3");
+
+        var outcome = await Run(SizeAtLeastZero(), good);
+
+        Assert.That(outcome.Disposition, Is.EqualTo(FileDisposition.Matched));
+        Assert.That(outcome.Reading, Is.EqualTo(FileReading.NotOpened));
+    }
+
+    [Test]
+    public async Task APredicateOnTheDuration_OpensTheFile()
+    {
+        var good = _collection.Mp3("good.mp3");
+
+        var outcome = await Run(DurationAtLeastZero(new Sources()), good);
+
+        Assert.That(outcome.Reading, Is.EqualTo(FileReading.Read));
+    }
+
     // D3: a file that was not processed has nothing to say about its data.
     [Test]
     public async Task UnusableDataMetBeforeTheFileTurnsOutUnreadable_IsDropped_LeavingOnlyTheFileWarning()

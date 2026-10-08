@@ -13,6 +13,7 @@ public class ExitCodesTests
 {
     private const WarningCategory Data = WarningCategory.Data;
     private const WarningCategory Unanswered = WarningCategory.Unanswered;
+    private const WarningCategory Incomplete = WarningCategory.Incomplete;
     private const WarningCategory File = WarningCategory.File;
 
     private static RunOutcome Outcome(int found, int examined, int matched, params WarningCategory[] warned) =>
@@ -28,6 +29,7 @@ public class ExitCodesTests
         yield return Case("a data warning", Outcome(3, 3, 3, Data), ExitCodes.DataWarnings);
         yield return Case("a file warning", Outcome(3, 2, 2, File), ExitCodes.FileWarnings);
         yield return Case("an unanswered predicate", Outcome(3, 3, 2, Unanswered), ExitCodes.UnansweredPredicates);
+        yield return Case("a file read only in part", Outcome(3, 3, 3, Incomplete), ExitCodes.IncompleteFiles);
         yield return Case("examined, none matched", Outcome(3, 3, 0), ExitCodes.NothingMatched);
         yield return Case("nothing found", Outcome(0, 0, 0), ExitCodes.NothingFound);
 
@@ -35,12 +37,16 @@ public class ExitCodesTests
         yield return Case("unreadable file and uninterpretable tag", Outcome(3, 2, 2, Data, File), ExitCodes.FileWarnings);
         yield return Case("unanswered predicate and the data behind it", Outcome(3, 3, 2, Data, Unanswered), ExitCodes.UnansweredPredicates);
         yield return Case("unanswered predicate and an unreadable file", Outcome(3, 2, 1, Unanswered, File), ExitCodes.FileWarnings);
-        yield return Case("all three", Outcome(3, 2, 1, Data, Unanswered, File), ExitCodes.FileWarnings);
+        yield return Case("incomplete file and an unanswered predicate", Outcome(3, 3, 2, Unanswered, Incomplete), ExitCodes.IncompleteFiles);
+        yield return Case("incomplete file and uninterpretable data", Outcome(3, 3, 2, Data, Incomplete), ExitCodes.IncompleteFiles);
+        yield return Case("incomplete file and an unreadable one", Outcome(3, 2, 2, Incomplete, File), ExitCodes.FileWarnings);
+        yield return Case("all four", Outcome(3, 2, 1, Data, Unanswered, Incomplete, File), ExitCodes.FileWarnings);
 
         // The 1x group beats the 2x group.
         yield return Case("data warning and an empty result", Outcome(3, 3, 0, Data), ExitCodes.DataWarnings);
         yield return Case("unanswered predicate and an empty result", Outcome(1, 1, 0, Unanswered), ExitCodes.UnansweredPredicates);
         yield return Case("file warning and an empty result", Outcome(3, 2, 0, File), ExitCodes.FileWarnings);
+        yield return Case("incomplete file and an empty result", Outcome(3, 3, 0, Incomplete), ExitCodes.IncompleteFiles);
         yield return Case("both warnings and an empty result", Outcome(3, 2, 0, Data, File), ExitCodes.FileWarnings);
         yield return Case("an unlistable directory and nothing found", Outcome(0, 0, 0, File), ExitCodes.FileWarnings);
 
@@ -55,6 +61,8 @@ public class ExitCodesTests
         yield return Case("file warnings suppressed, data warning fired", Outcome(3, 2, 1, Data), ExitCodes.DataWarnings);
         yield return Case("data warnings suppressed, a predicate unanswered", Outcome(1, 1, 0, Unanswered), ExitCodes.UnansweredPredicates);
         yield return Case("unanswered suppressed, data warning fired", Outcome(1, 1, 0, Data), ExitCodes.DataWarnings);
+        yield return Case("incomplete suppressed, a predicate unanswered", Outcome(1, 1, 0, Unanswered), ExitCodes.UnansweredPredicates);
+        yield return Case("incomplete suppressed, nothing else to report", Outcome(3, 3, 3), ExitCodes.Completed);
     }
 
     private static TestCaseData Case(string name, RunOutcome outcome, int expected) =>

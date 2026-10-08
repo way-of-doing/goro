@@ -20,13 +20,30 @@ public enum FileDisposition
 }
 
 /// <summary>
+/// How much of a file was read, which is what the <c>incomplete</c> warning counts
+/// (docs/concepts/warnings.md). A file counts once it is opened, whatever the command needed from it.
+/// </summary>
+public enum FileReading
+{
+    /// <summary>The file was not opened: nothing beyond its path and file system metadata was needed.</summary>
+    NotOpened,
+
+    /// <summary>The file was opened, and everything in it could be read.</summary>
+    Read,
+
+    /// <summary>The file was opened and processed, although part of what it holds could not be read.</summary>
+    ReadInPart,
+}
+
+/// <summary>
 /// Everything a pipeline hands back for one file: the result to render, if there is one, what the
 /// file counts towards, and the warnings it produced, which reach standard error together.
 ///
 /// Whether the file's predicate could not be answered is a separate matter from its disposition, which
 /// is the command's decision about such a file: <c>goro list</c> leaves it out, while a command
 /// bound to account for every file would keep it. Either way the run counts it, for the one warning
-/// that reports such files (docs/concepts/warnings.md).
+/// that reports such files (docs/concepts/warnings.md). How much of the file was read is a third
+/// matter, counted for the warning about files read only in part.
 ///
 /// A file that could not be read carries its one file warning and nothing else; any data warning met
 /// before the file turned out to be unreadable is not emitted (docs/concepts/warnings.md). The
@@ -35,12 +52,13 @@ public enum FileDisposition
 public sealed record FileOutcome<TResult>
     where TResult : class
 {
-    private FileOutcome(TResult? output, FileDisposition disposition, ImmutableArray<Warning> warnings, bool isUnanswered)
+    private FileOutcome(TResult? output, FileDisposition disposition, ImmutableArray<Warning> warnings, bool isUnanswered, FileReading reading)
     {
         Output = output;
         Disposition = disposition;
         Warnings = warnings;
         IsUnanswered = isUnanswered;
+        Reading = reading;
     }
 
     /// <summary>What the renderer writes for this file, or null when the file is left out of the output.</summary>
@@ -56,18 +74,26 @@ public sealed record FileOutcome<TResult>
     /// </summary>
     public bool IsUnanswered { get; }
 
+    /// <summary>
+    /// How much of the file was read. A file that could not be read is never counted as opened,
+    /// having a warning of its own.
+    /// </summary>
+    public FileReading Reading { get; }
+
     /// <summary>The file was examined, matched, and appears in the output.</summary>
-    public static FileOutcome<TResult> Matched(TResult output, IEnumerable<Warning>? warnings = null, bool unanswered = false) =>
-        new(output, FileDisposition.Matched, [.. warnings ?? []], unanswered);
+    public static FileOutcome<TResult> Matched(
+        TResult output, IEnumerable<Warning>? warnings = null, bool unanswered = false, FileReading reading = FileReading.NotOpened) =>
+        new(output, FileDisposition.Matched, [.. warnings ?? []], unanswered, reading);
 
     /// <summary>The file was examined, did not match, and is left out of the output.</summary>
-    public static FileOutcome<TResult> Unmatched(IEnumerable<Warning>? warnings = null, bool unanswered = false) =>
-        new(null, FileDisposition.Unmatched, [.. warnings ?? []], unanswered);
+    public static FileOutcome<TResult> Unmatched(
+        IEnumerable<Warning>? warnings = null, bool unanswered = false, FileReading reading = FileReading.NotOpened) =>
+        new(null, FileDisposition.Unmatched, [.. warnings ?? []], unanswered, reading);
 
     /// <summary>
     /// The file could not be read. Whether it still appears in the output is the command's to say:
     /// <c>goro hash</c> shows it with its hash absent, <c>goro list</c> leaves it out.
     /// </summary>
     public static FileOutcome<TResult> Unreadable(FileWarning warning, TResult? output = null) =>
-        new(output, FileDisposition.Unreadable, [warning], isUnanswered: false);
+        new(output, FileDisposition.Unreadable, [warning], isUnanswered: false, FileReading.NotOpened);
 }
