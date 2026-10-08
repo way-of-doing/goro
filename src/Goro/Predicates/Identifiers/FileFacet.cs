@@ -7,13 +7,7 @@ namespace Goro.Predicates.Identifiers;
 /// </summary>
 public abstract class FileFacet<T> where T : notnull
 {
-    /// <summary>Loads this facet's data for the file at <paramref name="path"/>.</summary>
+    /// <summary>Loads this facet's data for <paramref name="file"/>, through its loader where it needs the file's contents.</summary>
     /// <exception cref="Exception">Any failure; <see cref="FileData"/> turns it into an unreadable file.</exception>
-    public abstract T Load(string path);
-
-    /// <summary>
-    /// Whether loading this facet opens the file, rather than asking the file system about it. A file
-    /// counts towards the <c>incomplete</c> warning once it is opened (docs/concepts/warnings.md).
-    /// </summary>
-    public virtual bool OpensFile => true;
+    public abstract T Load(FileData file);
 }

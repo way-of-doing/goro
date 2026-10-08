@@ -4,6 +4,7 @@ using Goro.Predicates.Diagnostics;
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Tests.Predicates.Evaluation.Support;
+using Goro.Tests.TestSupport;
 
 namespace Goro.Tests.Predicates.Support;
 
@@ -48,7 +49,7 @@ internal static class CompileAssert
     public static Outcome Evaluate(string text, IIdentifierCatalog catalog)
     {
         var predicate = Compiles(text, catalog);
-        var context = new EvaluationContext(new FileData("any"), predicate.Sources.Count);
+        var context = new EvaluationContext(TestFiles.Data("any"), predicate.Sources.Count);
         var truth = predicate.Evaluate(context);
         return new Outcome(truth, context.Reported);
     }

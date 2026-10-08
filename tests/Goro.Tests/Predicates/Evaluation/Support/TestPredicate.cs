@@ -3,6 +3,7 @@ using Goro.Predicates;
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
+using Goro.Tests.TestSupport;
 
 namespace Goro.Tests.Predicates.Evaluation.Support;
 
@@ -18,7 +19,7 @@ internal sealed class TestPredicate
 
     public int SourceCount => sources.Count;
 
-    public FileData File { get; } = new("any");
+    public FileData File { get; } = TestFiles.Data("any");
 
     /// <summary>An identifier, quoted in warnings as <paramref name="name"/>, holding the given bag.</summary>
     public IdentifierReference<T> Id<T>(string name, params Occurrence<T>[] occurrences) where T : notnull =>

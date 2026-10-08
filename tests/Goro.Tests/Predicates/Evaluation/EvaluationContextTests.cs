@@ -1,12 +1,13 @@
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
+using Goro.Tests.TestSupport;
 
 namespace Goro.Tests.Predicates.Evaluation;
 
 public class EvaluationContextTests
 {
-    private static readonly FileData File = new("any");
+    private static readonly FileData File = TestFiles.Data("any");
 
     [Test]
     public void File_IsTheOneGiven()

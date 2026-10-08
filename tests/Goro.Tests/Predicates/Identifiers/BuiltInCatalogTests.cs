@@ -4,6 +4,8 @@ using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
 using Goro.Tests.Predicates.Evaluation.Support;
 using static Goro.Tests.Predicates.Evaluation.Support.Nodes;
+using Goro.Tests.TestSupport;
+using Goro.Reading.Bytes;
 
 namespace Goro.Tests.Predicates.Identifiers;
 
@@ -212,7 +214,7 @@ public class BuiltInCatalogTests
     public void Resolve_TagIdentifier_IsNotImplementedYet(string identifier)
     {
         var declaration = Found(Lookup(identifier));
-        var file = new FileData("/music/track.mp3");
+        var file = TestFiles.Data("/music/track.mp3");
         var origin = new Origin(new SourceId(0), identifier, 0);
 
         TestDelegate resolve = declaration switch
@@ -226,14 +228,16 @@ public class BuiltInCatalogTests
     }
 
     [Test]
-    public void Resolve_SourceFunction_IsNotImplementedYet()
+    public void Resolve_SourceFunction_ReadsTheFilesTags()
     {
         var bytes = ((SourceFunctionLookup.Found)BuiltInCatalog.Instance.LookupFunction("id3v2", "bytes")).Function;
         var declaration = (IdentifierDeclaration<Blob>)((SourceFunctionResolution.Found)bytes.Resolve(["APIC"])).Declaration;
+        var path = AudioCorpus.PathOf("mp3/id3v24.mp3");
+        using var loader = new FileDataLoader(path, ReadPolicy.Default);
 
-        TestDelegate resolve = () => declaration.Binding.Resolve(new FileData("/music/track.mp3"), new Origin(new SourceId(0), "x", 0));
+        var value = declaration.Binding.Resolve(new FileData(path, loader), new Origin(new SourceId(0), "x", 0));
 
-        Assert.That(resolve, Throws.TypeOf<NotSupportedException>().With.Message.Contains("not implemented yet"));
+        Assert.That(value.Occurrences, Has.Length.EqualTo(1).And.All.InstanceOf<Usable<Blob>>());
     }
 
     // The expansions identifiers.md gives, written out independently of the catalog's tables.
@@ -311,7 +315,7 @@ public class BuiltInCatalogTests
         var after = new CannedBinding<decimal>([Ok(2000m)]);
         var binding = new PreferredBinding<decimal>([new CannedBinding<decimal>([BadNumber]), chosen, after]);
 
-        var value = binding.Resolve(new FileData("any"), new Origin(new SourceId(0), "year", 0));
+        var value = binding.Resolve(TestFiles.Data("any"), new Origin(new SourceId(0), "year", 0));
 
         Assert.That(value.Occurrences, Is.EqualTo(new[] { Ok(1991m) }));
         Assert.That(after.Resolutions, Is.Zero);

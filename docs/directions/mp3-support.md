@@ -314,3 +314,25 @@ layout and finds `E` as it reads the frames.
     passes by reference, since it belongs to reading one frame.
 
   Next step: review of 2a, then plan 2b.
+- 2026-10-08 -- Step 2a committed (`556ed9b`). Step 2b written, awaiting review: the loader and the
+  tag source functions.
+  - `IFileDataLoader` / `FileDataLoader`: one per file, created by `PredicateStage` in a `using`,
+    opening the file only when something inside it is first needed. `FileData` holds it, and
+    `FileFacet.Load` takes the `FileData`. Whether a file was opened is the loader's to say, which
+    retired 1b's `FileData.Opened` and `FileFacet.OpensFile`.
+  - `TagsFacet` makes a file with no audio unreadable ("no MPEG audio found"). The TagLibSharp
+    duration facet checks the layout first, so the rule, and "counts once opened", hold for a
+    `file::duration` predicate too.
+  - `field()` and `bytes()` are bound for `id3v2`, `ape` and `vorbis` (absent in an MP3, though the
+    file is still opened). An Id3v2 description, and an APE key, match with `OrdinalIgnoreCase`, as
+    `SourceCallName` compares names. Of APE keys differing only in case, the last is read.
+    `HoldsText` gained Apple's three frames.
+  - The concepts are still unbound, for 2c. `goro hash` still reads through TagLibSharp and counts no
+    tag damage, until step 4.
+  - architecture.md gained a File reader section, and its Executor section now covers the
+    `incomplete` warning, which 1b had left out. Six test names still said `Returns12` for file
+    warnings after 1b's renumbering, and were corrected.
+
+  Run over the corpus, `goro list --filter 'id3v2::field("TIT2") == "Title v2.2"'` lists the one
+  file, warns about the two titles that do not decode and the file that ends inside its tag, and
+  counts 10 of 69 files as read only in part. Next step: review of 2b, then plan 2c.

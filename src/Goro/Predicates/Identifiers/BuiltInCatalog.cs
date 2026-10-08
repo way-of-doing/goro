@@ -9,9 +9,10 @@ namespace Goro.Predicates.Identifiers;
 /// </summary>
 /// <remarks>
 /// <see cref="Table"/> follows that document's table of concepts, row by row and cell by cell, so
-/// the two can be checked against each other by eye. Every cell, and every source function, is bound
-/// to a <see cref="TagBindings.NotImplemented{T}"/> binding: the line that reads tags replaces those
-/// bindings, and nothing else here. A concept written without a source is a
+/// the two can be checked against each other by eye. The source functions are bound to the file's
+/// tags through <see cref="TagBindings"/>; every cell is still bound to a
+/// <see cref="TagBindings.NotImplemented{T}"/> binding, which step 2c of
+/// docs/directions/mp3-support.md replaces. A concept written without a source is a
 /// <see cref="PreferredBinding{T}"/> over its cells, in <see cref="TagSources"/> order.
 /// </remarks>
 public sealed class BuiltInCatalog : IIdentifierCatalog
@@ -127,11 +128,11 @@ public sealed class BuiltInCatalog : IIdentifierCatalog
 
     /// <summary><c>field()</c>: the data as text, as recorded, one occurrence for each value the format records.</summary>
     private static SourceFunction Field(string source, int maximumArguments, Func<ImmutableArray<string>, ArgumentCheck>? check = null) =>
-        new SourceFunction<string>(source, "field", 1, maximumArguments, Bounds.Any, TagBindings.NotImplemented<string>, check);
+        new SourceFunction<string>(source, "field", 1, maximumArguments, Bounds.Any, TagBindings.Field(source), check);
 
     /// <summary><c>bytes()</c>: the data as recorded, one occurrence for each item, frame or comment.</summary>
     private static SourceFunction Bytes(string source, Bounds bounds, Func<ImmutableArray<string>, ArgumentCheck>? check = null) =>
-        new SourceFunction<Blob>(source, "bytes", 1, 1, bounds, TagBindings.NotImplemented<Blob>, check);
+        new SourceFunction<Blob>(source, "bytes", 1, 1, bounds, TagBindings.Bytes(source), check);
 
     /// <summary>A row of the table of concepts: a concept's name, its type, and the field each tag source's cell reads.</summary>
     private abstract record ConceptRow(string Name, ImmutableArray<string> Fields)

@@ -10,9 +10,9 @@ namespace Goro.Tests.Cli;
 
 /// <summary>
 /// The "Unreadable files and pathspecs" class of docs/testing.md. What a file that cannot be read
-/// does to the output, standard error and exit code, end to end, with and without a predicate. The
-/// rows that need a tag identifier wait for the tag namespaces; their counterparts here use
-/// <c>file::duration</c>, which needs the file read in the same way.
+/// does to the output, standard error and exit code, end to end, with and without a predicate. Most
+/// rows use <c>file::duration</c>, which needs the file read as the tags do; the rows that name a tag
+/// use a source function, the concepts not being bound yet.
 /// </summary>
 public class UnreadableFileTests
 {
@@ -104,7 +104,7 @@ public class UnreadableFileTests
     }
 
     [Test]
-    public async Task Hash_OneUnreadableFileAmongManyReadable_Returns12UnderStrict_And0Without()
+    public async Task Hash_OneUnreadableFileAmongManyReadable_Returns13UnderStrict_And0Without()
     {
         for (var i = 0; i < 10; i++)
         {
@@ -125,7 +125,7 @@ public class UnreadableFileTests
     // An unreadable file does not count as examined, so a run whose only file was unreadable is not
     // one where "files were examined, but none of them matched".
     [Test]
-    public async Task Hash_OnlyFileUnreadable_Returns12Not20()
+    public async Task Hash_OnlyFileUnreadable_Returns13Not20()
     {
         var bad = _collection.NotAudio("bad.mp3");
 
@@ -241,6 +241,33 @@ public class UnreadableFileTests
 
     // testing.md writes this row with `artist == "x"`; file::duration needs the file read the same way.
     [Test]
+    public async Task List_Filter_TagSourceFunction_FileThatCannotBeRead_IsNotListed_AndWarnsOnce([Values] UnreadableKind kind)
+    {
+        var good = _collection.Mp3("good.mp3");
+        var bad = MakeUnreadable(kind);
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", """--filter=id3v2::field("TIT2") IS ABSENT""", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(13));
+        Assert.That(Lines(stdOut), Is.EqualTo(new[] { good }), "the good file's tag holds nothing but padding");
+        AssertOneFileWarning(stdErr, bad);
+    }
+
+    [Test]
+    public async Task List_Filter_SizeOnly_OverAFileWithNoAudio_DoesNotWarn_WhereATagPredicateWould()
+    {
+        var notAudio = _collection.NotAudio("text.mp3");
+
+        var bySize = await RunAsync("list", "--strict-exit-code", "--filter=file::size > 0", _collection.Root);
+        var byTag = await RunAsync("list", "--strict-exit-code", """--filter=id3v2::field("TIT2") IS ABSENT""", _collection.Root);
+
+        Assert.That(bySize.ExitCode, Is.EqualTo(0));
+        Assert.That(bySize.StdErr, Is.Empty);
+        Assert.That(byTag.ExitCode, Is.EqualTo(13));
+        AssertOneFileWarning(byTag.StdErr, notAudio);
+    }
+
+    [Test]
     public async Task List_Filter_UninterpretableDataThenAFileThatCannotBeRead_GivesOneFileWarningAndNoDataWarning()
     {
         var notAudio = _collection.NotAudio("text.mp3");
@@ -305,7 +332,7 @@ public class UnreadableFileTests
         strict ? ["list", "--strict-exit-code", $"--filter={predicate}", root] : ["list", $"--filter={predicate}", root];
 
     [Test]
-    public async Task List_Filter_OneUnreadableFileAmongManyReadable_Returns12([Values] bool strict)
+    public async Task List_Filter_OneUnreadableFileAmongManyReadable_Returns13([Values] bool strict)
     {
         for (var i = 0; i < 10; i++)
         {
@@ -324,7 +351,7 @@ public class UnreadableFileTests
     // Within a group the higher-numbered code wins. The readable file's name is not a number, which
     // warns; the unreadable file says only that it could not be read.
     [Test]
-    public async Task List_Filter_UnreadableFileAndUninterpretableData_Returns12Not10([Values] bool strict)
+    public async Task List_Filter_UnreadableFileAndUninterpretableData_Returns13Not10([Values] bool strict)
     {
         var good = _collection.Mp3("good.mp3");
         var bad = _collection.NotAudio("bad.mp3");
@@ -341,7 +368,7 @@ public class UnreadableFileTests
 
     // An unreadable file does not count as examined.
     [Test]
-    public async Task List_Filter_UnreadableFileWhereNothingMatched_Returns12Not20([Values] bool strict)
+    public async Task List_Filter_UnreadableFileWhereNothingMatched_Returns13Not20([Values] bool strict)
     {
         _collection.Mp3("good.mp3");
         var bad = _collection.NotAudio("bad.mp3");
@@ -381,7 +408,7 @@ public class UnreadableFileTests
 
     // An unreadable file has its own warning, is not counted as unanswered, and outranks the summary.
     [Test]
-    public async Task List_Filter_UnansweredAndAnUnreadableFile_Returns12_AndCountsOnlyTheFileExamined([Values] bool strict)
+    public async Task List_Filter_UnansweredAndAnUnreadableFile_Returns13_AndCountsOnlyTheFileExamined([Values] bool strict)
     {
         var good = _collection.Mp3("good.mp3");
         var bad = _collection.NotAudio("bad.mp3");

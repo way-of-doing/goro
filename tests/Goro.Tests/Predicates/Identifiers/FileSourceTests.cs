@@ -1,6 +1,7 @@
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
 using Goro.Tests.TestSupport;
+using Goro.Reading.Bytes;
 
 namespace Goro.Tests.Predicates.Identifiers;
 
@@ -35,8 +36,11 @@ public class FileSourceTests
         return declaration.Binding.Resolve(file, new Origin(new SourceId(0), $"file::{identifier}", 0));
     }
 
-    private static Value<T> Resolve<T>(string identifier, string path) where T : notnull =>
-        Resolve<T>(identifier, new FileData(path));
+    private static Value<T> Resolve<T>(string identifier, string path) where T : notnull
+    {
+        using var loader = new FileDataLoader(path, ReadPolicy.Default);
+        return Resolve<T>(identifier, new FileData(path, loader));
+    }
 
     private static T SingleDatum<T>(Value<T> value) where T : notnull
     {
@@ -210,7 +214,9 @@ public class FileSourceTests
     [Test]
     public void SizeAndDuration_ShareTheFilesData_AndFailIndependently()
     {
-        var file = new FileData(WriteFile("not audio"u8.ToArray(), "list.mp3"));
+        var path = WriteFile("not audio"u8.ToArray(), "list.mp3");
+        using var loader = new FileDataLoader(path, ReadPolicy.Default);
+        var file = new FileData(path, loader);
 
         Assert.Throws<UnreadableFileException>(() => Resolve<Duration>("duration", file));
 

@@ -5,6 +5,7 @@ using Goro.Hashing;
 using Goro.Messages;
 using Goro.Pipeline;
 using Goro.Predicates.Identifiers;
+using Goro.Reading.Bytes;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -44,6 +45,7 @@ public sealed class GoroApp
         var services = new ServiceCollection();
         services.AddSingleton<IFileDiscoveryService, FileDiscoveryService>();
         services.AddSingleton<IAudioHasher, TagLibAudioHasher>();
+        services.AddSingleton(ReadPolicy.Default);
         services.AddSingleton<IPipelinePlanner, PipelinePlanner>();
         services.AddSingleton<IExecutor, ConcurrentExecutor>();
         services.AddSingleton<IIdentifierCatalog>(BuiltInCatalog.Instance);

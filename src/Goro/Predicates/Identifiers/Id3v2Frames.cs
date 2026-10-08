@@ -26,8 +26,11 @@ public static class Id3v2Frames
     /// <summary>The frames told apart by a description, which <c>field()</c> can select by.</summary>
     public static FrozenSet<string> Described { get; } = new[] { "TXXX", "WXXX", "COMM", "USLT" }.ToFrozenSet();
 
-    /// <summary>Whether the frame holds text that <c>field()</c> can read: a text or URL frame, a comment, or lyrics.</summary>
-    public static bool HoldsText(string frame) => frame[0] is 'T' or 'W' || frame is "COMM" or "USLT";
+    /// <summary>
+    /// Whether the frame holds text that <c>field()</c> can read: a text or URL frame, a comment,
+    /// lyrics, or one of Apple's three text frames not named <c>T…</c> (docs/design/quirks.md).
+    /// </summary>
+    public static bool HoldsText(string frame) => frame[0] is 'T' or 'W' || frame is "COMM" or "USLT" or "GRP1" or "MVNM" or "MVIN";
 
     /// <summary>The arguments of <c>id3v2::field()</c>: a frame that holds text, and a description where it carries one.</summary>
     public static ArgumentCheck CheckField(ImmutableArray<string> arguments)
