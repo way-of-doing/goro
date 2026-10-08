@@ -171,8 +171,8 @@ layout and finds `E` as it reads the frames.
   of good frames or by `F`. The duration is unusable for such a file anyway; only the hash needs
   this.
 - **Committing real test files.** None are committed, their licences unweighed. music-metadata's
-  samples are MIT-licensed, which permits it with the notice kept; Goro has no licence of its own
-  yet.
+  samples are MIT-licensed, which permits it with the notice kept, and Goro is now MIT-licensed
+  too.
 
 ## Done when
 
@@ -218,3 +218,29 @@ layout and finds `E` as it reads the frames.
   own stream and nothing the container adds. APEv1 text is read as ISO-8859-1. A summary header is
   trusted up to an exact frame end, and the junk after it is never hashed. Next step: pick the line
   up, starting with step 1.
+- 2026-10-08 -- Picked up the line. Step 1 written, awaiting review:
+  - rationale entries on why Goro reads tags itself, why damaged tag data does not make a file
+    unreadable, playing time as the timeline, and what the hash covers, the last noting that the
+    MP3 range changed from TagLibSharp's while no hash was stored; "three categories" became four;
+  - identifiers.md: damaged data, `bytes()` with the storage transformations undone, an unreadable
+    description, the first of several Id3v2 tags, and `file::duration` as the timeline, exactly one
+    but possibly unusable. The Vorbis sentence saying `field()` is never unusable now defers to the
+    damaged-data rule; ogg-support and flac-support should check it against their decisions;
+  - warnings.md and exit-codes.md: the `incomplete` category at `12`, `file` at `13`, and the rule
+    that a damaged tag makes a file unreadable gone;
+  - hash.md says what an MP3's hash covers; implementation.md trades its TagLibSharp entry for edge
+    reading and the reader never throwing; testing.md's TagLibSharp section is now one about
+    Goro's reader, with damage, quirks, playing time and hash range scenarios; the FAQ has the
+    `file::duration IS USABLE` entry.
+
+  Decided with PJ: a file counts as `incomplete` once a run opens it, whatever the run needed from
+  it; the two once-per-run warnings come in code order, `unanswered` then `incomplete`; the 4 MiB
+  decompression cap stays out of the spec, a frame over it being one that cannot be decompressed.
+  The steps gained one, since none put the warning category into code:
+
+  1b. The `incomplete` category in `src/`: `file` renumbered to `13`, `--no-warn=incomplete`, and
+      the count, with nothing to count until step 2.
+
+  Still open: `architecture.md` says a load failure makes a file unreadable and that evaluation is
+  synchronous because the tag library is; both change with step 2's loader. Next step: review of
+  step 1, then 1b, in plan mode.

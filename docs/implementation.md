@@ -55,13 +55,28 @@ to the version its tables follow.
 reporting the length of the link, so the link is resolved to its final target before the length is
 read; a link whose target is gone makes the file unreadable.
 
-### Damaged tags and `file::duration`
+### Reading a file from its edges
 
-TagLibSharp reads a file's tags while it locates the audio, so the facet behind `file::duration`
-parses them too, and a strict tag parser would make a file unreadable for a predicate that never
-asked about its tags. TagLibSharp 2.3.0 tolerates every shape of damaged Id3v2 tag tried, and a
-test asserts that a file with such a tag still has a duration, so that a stricter release is noticed
-rather than shipped.
+Everything Goro learns from inside a file, apart from the audio a hash reads, comes from one
+analysis of the file's edges, shared by every command: the tags and an index of their fields,
+where the audio starts and ends, and its playing time. Tag values are read from the index only
+when a predicate asks for them, and large payloads such as cover art only when `bytes()` does. The
+analysis never walks the whole file. Its reads go through one reader that serves the head and the
+tail from windows read once, charges every read to a purpose -- sniffing, declared structure, a
+search, a payload -- and refuses what its limits do not allow, so that what a file cost to read is
+something a test can assert. The limits begin as 64 KiB windows at each end, 256 KiB for a search
+and 4 MiB for a payload, and are to become configurable.
+
+The payload limit is also the cap on decompressing an Id3v2 frame. A compressed frame that would
+inflate past it is treated as one that cannot be decompressed, and is unusable.
+
+### The reader never throws over what a file holds
+
+Reading a file can fail over input and output, and over nothing else. Whatever a file contains,
+however damaged, the analysis describes it rather than throwing: audio that cannot be found is a
+finding, which each command interprets. A fuzz test in the suite, truncating and overwriting the
+fixture corpus, holds the reader to this, since passing the corpus alone proved nothing in the
+prototype.
 
 ### Symbolic links in a directory walk
 

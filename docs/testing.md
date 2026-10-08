@@ -6,90 +6,85 @@ test in the suite: ordinary unit tests for ordinary code need no entry here. A c
 belongs in this document when getting it wrong would produce **silently wrong results rather
 than a visible failure**, or when correctness rests on behaviour Goro does not control.
 
-## Predicate evaluation over tag data read through TagLibSharp
+## Reading audio files
 
 ### Why this earns its own class of tests
 
-Goro does not read tag structures itself; it reads them through TagLibSharp and then interprets
-what it gets. That places a third-party library in the middle of every predicate that touches a
-tag, and it means two kinds of breakage that no ordinary unit test would notice:
+Goro reads tag structures, playing time and the audio's position itself, from formats written by
+decades of taggers and encoders that each read the specifications their own way. Every predicate
+that touches a tag, every `file::duration` and every hash rests on that reading, and nearly every
+way of getting it wrong is silent:
 
-- **The library's behaviour differs by tag version in ways that are not obvious.** Reading an
-  Id3v2.3 tag does not yield the same shape of data as reading an Id3v2.4 tag holding identical
-  content. Goro's job is to hide that difference, so the tests must assert that it is hidden.
-- **Some of what Goro relies on is emergent rather than contractual.** Recovering the text of a
-  frame as it appears on disk depends on implementation details of the library rather than on a
-  documented guarantee. A dependency upgrade can change it without any compilation error, and
-  the symptom is a predicate quietly matching the wrong files.
+- **Text read slightly wrongly is still text.** A value decoded in the wrong byte order, a frame
+  read under the wrong name, or a slash taken for a separator gives a well-formed string, and the
+  symptom is a predicate quietly matching the wrong files.
+- **Damage that is handled wrongly looks like ordinary data.** A reader that runs past a broken
+  frame size hands back the frames after it as text, and one that gives up too early turns data
+  that was there into absence.
+- **A playing time a few tens of milliseconds out changes the whole second** for a few files in
+  every hundred, and nothing in the output says which.
+- **A hash range a few bytes out either takes in tag data,** so that a tag edit looks like bit rot,
+  or leaves out audio, so that bit rot there goes unseen.
 
 A failure in this area does not crash and does not show up in output. It silently changes which
-files a command operates on, which for a tool whose purpose is to decide what to touch is the
-worst failure mode available.
+files a command operates on, or what a stored hash means, which for a tool whose purpose is to
+decide what to touch is the worst failure mode available.
 
 ### What the tests must establish
 
 **Version independence.** For each concept Goro defines, and each frame a source function names
 by its v2.4 identifier, tag content that is semantically identical must produce an identical value
-whether it was stored as Id3v2.2, v2.3 or v2.4. This
-is the property that the documentation promises, so it is the property that must be tested
-directly rather than inferred from the parts.
+whether it was stored as Id3v2.2, v2.3 or v2.4. This is the property that the documentation
+promises, so it is the property that must be tested directly rather than inferred from the parts.
 
-**Faithfulness of the source functions.** `field()` must yield the datum as recorded, as text and
-uninterpreted, and `bytes()` the datum as recorded, as a blob. Where that is not achievable, the
-test must pin the exact discrepancy so that it is a known and documented deviation rather than a
-surprise.
+**Faithfulness of the source functions.** `field()` must yield the datum's text as recorded,
+uninterpreted, and `bytes()` its content as recorded, with only the storage transformations the
+format defines undone.
 
-### Known deviations are recorded as skipped tests, not as prose
+**What damage yields.** Each kind of damage must resolve as
+[Built-in identifiers](features/builtins/identifiers.md#absent-usable-and-unusable-data) says:
+an unusable occurrence where a datum is clearly recorded and cannot be read, absence beyond a break
+and for a tag that cannot be read at all, the rest of the file unaffected, and the file counted in
+the `incomplete` warning exactly when its structure is broken or its playing time cannot be had.
 
-Goro obtains the recorded text of a frame by a route that is faithful in almost every case and
-inexactly faithful in a small, enumerable set of cases. That set is not documented only in prose:
-each case gets a real test that asserts the *correct* behaviour and is **skipped**, grouped under
-a category the test runner can exclude wholesale so that a normal run neither fails nor reports
-noise.
+**The reader never throws over what a file holds.** The corpus alone does not show this: the
+prototype passed it, and a fuzzer damaging its files still found 16 exceptions. The suite
+therefore carries a fuzz test, truncating and overwriting every corpus file at random, that
+asserts the analysis returns for every one.
 
-This is deliberate, and it is preferred over the alternative of reading library internals to
-achieve exactness. A route through internals would have to be guarded by tests that prove the
-internals still behave as assumed, and no realistic suite can exercise the code paths a large
-collection in the wild will; a dependency upgrade could therefore ship a silently broken release.
-Choosing the inexact but supported route means the failure mode is a known, bounded, documented
-near-miss with an obvious workaround, rather than an unbounded unknown.
+**Reads stay at the edges.** The analysis behind tags and `file::duration` must never walk the
+whole file. Its reads are logged, so the test asserts what was read rather than inferring it from
+timing: on a long file, every read lies within the windows at either end or a bounded search.
 
-Skipped tests are the right home for these cases because they state the correct expectation
-precisely, they are impossible to lose track of, and the day a bug report arrives the work begins
-by removing a skip rather than by reconstructing what the problem was.
+**Expected values are independent of the reader.** The corpus manifest records what each fixture
+holds, written by the corpus builder rather than read back by the reader under test, so that a
+misreading cannot land in both the code and its expectation.
 
-### Canary tests guard the defects we work around
+### Fixtures
 
-Where Goro compensates for a defect in a dependency, the compensation is invisible from outside:
-the documentation describes correct behaviour and says nothing about the defect. That leaves a
-hazard, because if the dependency is fixed the compensation becomes a second, opposite defect.
-
-Every such workaround therefore carries a **canary test that asserts the defect is still
-present** in the dependency. A canary failing is not a regression; it is notice that the
-dependency changed and that the compensating logic and its tests must be revisited. Canaries are
-grouped so that this intent is unmistakable to whoever sees one fail.
+The fixtures are the corpus in `tests/Goro.Tests/Fixtures/Audio`, whose README lists every file,
+and tag bytes built by hand in a test where a scenario needs a shape of its own. Nothing is written
+through a tag library: a writer and a reader that share assumptions conceal exactly the defects a
+file from another tagger would show. The corpus's `rw-` files rebuild shapes found in other
+projects' test data, which is not in the repository; they are what keep the quirks in
+[quirks](design/quirks.md) tested.
 
 ### Scenarios to cover
 
-Tests must construct tag bytes directly rather than writing tags through TagLibSharp. Writing
-through the library and reading back conceals defects, because the writer and the reader share
-assumptions that a real-world file does not: a value written through the library arrives back
-looking correct even when the same bytes produced by another tagger would not. The test project
-already builds Id3v2 tag bytes by hand for other purposes, and that is the approach to extend.
-
-Every scenario below is to be exercised for **each of Id3v2.2, v2.3 and v2.4**, both through
-concepts and through source functions.
+Every scenario in the first table is to be exercised for **each of Id3v2.2, v2.3 and v2.4**, both
+through concepts and through source functions.
 
 | Scenario | What it is there to catch |
 |---|---|
-| A value containing a forward slash, such as an artist named `AC/DC` | The library splits some v2.3 frames on `/`; a single value must not become two |
+| A value containing a forward slash, such as an artist named `AC/DC` | Outside genres a slash is part of the value; a single value must not become two |
 | A value containing a semicolon, such as `Rock; Metal` | Goro's own split applies to genres only, and every resulting value must be trimmed -- `Metal` and not `" Metal"`, the space after a separator being the commonest convention there is |
 | A genre written as a bare number, `17` | Must expand to the named genre on every version |
 | A genre written as a reference, `(17)` | The parenthesised form is legal in v2.2 and v2.3 and out of spec in v2.4, but occurs there after a version migration |
 | A genre reference with a refinement, `(17)Post-Rock` | Must yield both the referenced name and the refinement, on every version |
 | Several genre references, `(51)(39)` | Every reference must be expanded, not only the first |
 | A genre reference with an escaped parenthesis, `(17)((weird)` | The doubled parenthesis must be unescaped, on every version |
-| `(RX)` and a bare `RX`, and the same for `CR` | Indistinguishable on v2.3, distinguishable on v2.4; both must map to the same result |
+| `(RX)` and a bare `RX`, and the same for `CR` | Both must map to the same result |
+| A `TCON` frame through `field()`, holding `(17)/Post-Rock` | The text as recorded, slash and parentheses included: the genre conventions belong to the concept |
 | A track number written `3/12` | Must yield the track and not be mistaken for two values |
 | A date in each accepted timestamp form, and one in no accepted form | The latter must produce an unusable occurrence, not a wrong date |
 | A date-shaped field holding `0000` | Must be unusable; there is no year zero, and resolving it to the number zero would match a great many files silently |
@@ -100,22 +95,83 @@ concepts and through source functions.
 | A number-typed field, such as the one behind `id3v2::year`, present but empty or only whitespace | Must yield an unusable occurrence: the frame was written and holds no year |
 | The same frame repeated, with and without distinguishing descriptions | Must yield a multivalue of the expected cardinality |
 | A single text frame holding several NUL-separated values, in each revision | The only spec-sanctioned source of multiple values in one frame in v2.4, and read the same way in v2.2 and v2.3 |
-| A frame the library has no class for, holding text | Must be readable through `field()` |
+| A text frame Goro has no particular knowledge of, such as `TZZZ` | Must be readable through `field()` |
 | An `APIC` frame holding a picture | Must be a usable blob through `bytes()`, holding the frame's content as recorded, so that a predicate can tell a file that has cover art from one that does not; `id3v2::field("APIC")` must be an error |
 | A `TYER` frame, in a v2.3 tag and in a v2.4 tag | Read as `TDRC` in both: the name depends on the frame and never on the revision the tag declares |
-| A v2.3 tag holding `TYER`, `TDAT` and `TIME` | `id3v2::field("TDRC")` must be the year alone, and `TDAT` and `TIME` readable under their own names; TagLibSharp 2.3.0 merges the three into one `TDRC` |
+| A v2.3 tag holding `TYER`, `TDAT` and `TIME` | `id3v2::field("TDRC")` must be the year alone, and `TDAT` and `TIME` readable under their own names |
 | `TXXX`, `COMM` and `USLT` frames with several descriptions, differing in letter case | `field()` with a description must read only the frames whose description matches it without regard to case, and without one must read them all |
-| A v2.2 frame whose identifier the dependency maps to the wrong v2.4 name | Canary: Goro corrects the mapping internally, so the test asserts the underlying defect is still there |
-| A `TCON` frame on v2.3 whose genres are separated by a forward slash, and one holding `(RX)` | Skipped: the recorded text is reported with a semicolon in place of the slash, and without the parentheses. Affects `field()` only |
 
-For APE, which has one revision worth testing and no frames:
+How Id3v2 stores a frame, and what real files do with it:
+
+| Scenario | What it is there to catch |
+|---|---|
+| A tag unsynchronised as a whole, and a single frame unsynchronised with a data length indicator | `bytes()` gives the content with the inserted bytes removed, and the flag prefix left out |
+| A compressed frame, in v2.3 and in v2.4 | `bytes()` and `field()` read the decompressed content |
+| A compressed frame whose zlib does not inflate, and one that would inflate past the cap | Unusable through both `bytes()` and `field()`, and the frames around it intact |
+| An encrypted frame | Unusable through both: no reader can know its content, even when it happens to be plain text |
+| An extended header, and a v2.4 footer | Stepped over, every frame read |
+| An Id3v2.4 tag appended after the audio | Read as the file's `id3v2` source |
+| Several Id3v2 tags one after another | Only the first is the `id3v2` source: values of the others must not appear |
+| `TIT2` written twice | Two occurrences, though the format forbids it |
+| UTF-16 text without a byte order mark | Read as little-endian |
+| A second terminator-separated UTF-16 value without its own byte order mark, in v2.3 | Read in the first value's byte order |
+| A frame with an illegal identifier and a good size | Stepped over by its size, the frames after it read |
+| `GRP1`, `MVNM` and `MVIN` | Text frames: readable through `field()`, where any other non-`T` frame is an error |
+| Every frame size written as a plain integer, as iTunes once did | Read as the writer meant, every frame intact |
+
+Damage, for every tag format an MP3 carries. Each row also asserts whether the file is counted in
+the `incomplete` warning, and that it is never unreadable on this account.
+
+| Scenario | What it is there to catch |
+|---|---|
+| A value declared UTF-8 that is not, and UTF-16 of odd length | One unusable occurrence through `field()`, its bytes intact through `bytes()`; never U+FFFD, and not counted as incomplete |
+| An encoding byte no revision defines | The same |
+| A frame description that does not decode | Unusable for every description asked about, and without one |
+| A frame whose size runs past the end of its tag | That frame unusable, the frames before it intact, nothing after it found; counted |
+| A zero-size frame, and a block of zeroes in the middle of a tag | What lies before the break intact, what lies after absent; counted |
+| A tag size past the end of the file, one not syncsafe, and a version byte of 5 | The `id3v2` source absent everywhere, other tags and `file::duration` unaffected; counted |
+| A tag size too short, so the tag's end lies inside a frame | The same, the audio still found behind it |
+| A file ending inside its Id3v2 tag | Unreadable, there being no audio |
+| An APE item running past its tag, an item count too high, and a tag size reaching before the start of the file | As for the corresponding Id3v2 damage |
+| APEv2 text that is not valid UTF-8 | One unusable occurrence through `field()`, a usable blob through `bytes()` |
+| APEv1 text outside ASCII | Read as ISO-8859-1, usable |
+| Random bytes after `TAG` | Read as an Id3v1 tag of whatever they spell: nothing can tell |
+
+APE, which has one revision worth testing and no frames:
 
 | Scenario | What it is there to catch |
 |---|---|
 | A text item holding two values | Two occurrences through `field()`, and one through `bytes()`, which never splits |
 | A binary item | One unusable occurrence through `field()`, and one usable blob through `bytes()` |
 | Two items whose keys differ only in case | Only the last is seen, through every concept and source function alike |
-| A text item that is not valid UTF-8 | Pinned by whichever line reads APE tags; TagLibSharp 2.3.0 hands back U+FFFD and keeps nothing else |
+| A tag with a footer only, one before the audio, and one behind a Lyrics3v2 block | Each found and read |
+
+Playing time, for MP3. Every row asserts the whole seconds `file::duration` gives, and whether the
+file is counted in the `incomplete` warning.
+
+| Scenario | What it is there to catch |
+|---|---|
+| A CBR file with a LAME tag | The encoder delay and padding removed: 3.300 s and not the 3.344 s of its frames |
+| A VBR file with a Xing header, and one with a VBRI header | The header's frame count, trimmed |
+| A first frame that does not follow the tag directly: junk, an APE tag, a tag size too short | The LAME tag still found, and the Info frame not counted as audio |
+| A Xing frame count doubled, so that the LAME CRC fails | Unusable, not twice the length |
+| A file cut in half, its header describing the whole | Unusable: the byte count disagrees |
+| Junk appended after the last frame, a frame ending exactly where the header says | The header trusted, the junk not counted |
+| Two files joined, a frame starting where the first one's header ends | Unusable |
+| A CBR file without a summary header | Counted from its edges, exact |
+| The same file truncated mid-frame | Unusable: no frame ends where the trailing tags start |
+| A VBR file without a summary header | Unusable, not an estimate: no scan |
+| Junk after a tag that could pass for a free-format frame | Not taken for one without a third frame at the same distance |
+| A playing time of 3.9 seconds | 3 seconds: truncated, not rounded |
+
+The hash range, for MP3:
+
+| Scenario | What it is there to catch |
+|---|---|
+| The same audio under every tag layout in the corpus, and under every edit to a tag: values, sizes, padding, a tag added or removed | One hash for all of them. This is the property the hash exists for |
+| An Info frame rewritten, or the LAME tag's gapless counts changed | The hash unchanged: they belong to the container |
+| Junk before the first frame and after the last, and an APE tag behind a Lyrics3v2 block | None of it hashed |
+| A bit flipped inside an audio frame | The hash changes |
 
 ### Concepts written without a source
 
@@ -477,10 +533,13 @@ single-condition test exercises.
 |---|---|
 | A file whose permissions deny reading | Must warn and continue, and the run must complete rather than abort |
 | A file removed between discovery and processing | The same treatment; the window is real on a large collection, so this must not be a distinct failure mode |
-| A file that is not audio at all, and one whose audio is truncated | Must warn and continue, not propagate an exception from the tag library |
+| A file that is not audio at all, and one that ends inside its Id3v2 tag | Must warn and continue, not propagate an exception from the reader |
 | A predicate mentioning only `file::path`, `file::name` or `file::extension`, against a file that cannot be opened at all | Must **not** warn, and must evaluate: nothing was read |
-| A predicate mentioning only `file::size`, against a file whose tags cannot be read | Must **not** warn: nothing needed the tags, so nothing failed |
+| A predicate mentioning only `file::size`, against a file in which no audio can be found | Must **not** warn: nothing needed the file's contents, so nothing failed |
 | The same file under a predicate mentioning a tag concept | Must warn, and the file must not be listed |
+| A file whose Id3v2 tag cannot be read at all, under a predicate mentioning a tag concept and under `goro hash` | Not unreadable: the predicate is evaluated with the source absent, the hash is computed, and the file is counted in the `incomplete` warning |
+| A file whose tags are healthy but whose playing time cannot be had, under a predicate mentioning only `artist` | Counted in the `incomplete` warning: a file counts once it is opened, whatever the predicate asked |
+| Several incomplete files, one also unanswered and one unreadable | One `incomplete` warning for the run, after the `unanswered` one, counting the first two and not the unreadable file |
 | A predicate that meets uninterpretable data in a file and then finds the file cannot be read, such as `file::name AS NUMBER > 1 OR artist == "x"` | One file warning and no data warning: a file that was not processed has nothing to say about its data |
 | `goro list` with no filter, over a file that cannot be opened | Must list it and must not warn, the command having needed nothing but the path |
 | `goro hash` over an unreadable file, in both output formats | The row must appear, with `-` in plain and `null` in JSON. Omitting the row is precisely the failure this scenario exists to catch |
@@ -488,12 +547,15 @@ single-condition test exercises.
 | `goro list --filter` over a file whose predicate evaluates to unusable | The file must not be listed, the data warnings that made it unusable must be on standard error, and the run must end with one `unanswered` warning counting it, after every other warning |
 | The same file under the same predicate wrapped as `FALLBACK(..., TRUE)` | The file must be listed, and there must be no `unanswered` warning: the predicate, not the command, decides here |
 | Several files whose predicates evaluate to unusable | One `unanswered` warning for the run, not one per file, with the count and the number examined right |
-| One unreadable file among many readable ones, with `--strict-exit-code` | Code `12` |
-| An unreadable file together with a tag that could not be interpreted | Code `12`, not `10`: within a group the higher-numbered code wins |
-| An unreadable file in a run where nothing matched | Code `12`, not `20`, an unreadable file not counting as examined |
+| One unreadable file among many readable ones, with `--strict-exit-code` | Code `13` |
+| An unreadable file together with a tag that could not be interpreted | Code `13`, not `10`: within a group the higher-numbered code wins |
+| An unreadable file in a run where nothing matched | Code `13`, not `20`, an unreadable file not counting as examined |
+| An incomplete file together with an unanswered predicate | Code `12`, which outranks `11` |
+| An incomplete file together with an unreadable one | Code `13` |
+| An incomplete file in a run where nothing matched | Code `12`, not `20`: the file was examined, and the `1`x group takes precedence |
 | A data warning and an empty result, with no unreadable file | Code `10`, not `20`: the `1`x group takes precedence over the `2`x group |
 | A file whose predicate evaluates to unusable, with `--strict-exit-code` | Code `11`, which outranks the `10` its data warnings would give |
-| An unanswered predicate together with an unreadable file | Code `12`, and the unreadable file not counted in the `unanswered` warning |
+| An unanswered predicate together with an unreadable file | Code `13`, and the unreadable file not counted in the `unanswered` warning |
 | An unanswered predicate in a run where nothing else matched | Code `11`, not `20`: the file was examined, and the `1`x group takes precedence |
 | All of the above without `--strict-exit-code` | Code `0` in every case; the option must be the only thing that surfaces any of this |
 | A pathspec naming a file that does not exist | An error before anything is processed, code `2`, and no output at all |
@@ -543,9 +605,10 @@ channels.
 | `--no-warn=data` where the only file's predicate evaluated to unusable | Code `11`, with the `unanswered` warning the only line on standard error: suppressing data warnings must not hide a file whose answer the command decided |
 | `--no-warn=unanswered` where a predicate evaluated to unusable | Code `10`: the data warnings remain, and the summary is gone |
 | `--no-warn=data,unanswered` where the only file's predicate evaluated to unusable | Code `20`: the file was examined and not listed, and nothing reports why, the caller having said neither is a problem |
-| `--no-warn=data` where a file also could not be read | Code `12` regardless: the other categories are untouched |
+| `--no-warn=data` where a file also could not be read | Code `13` regardless: the other categories are untouched |
+| `--no-warn=incomplete` where an incomplete file's predicate evaluated to unusable | Code `11`, with the `incomplete` warning absent and the `unanswered` one still there |
 | `--no-warn=file` where a file could not be read and a data warning fired | Code `10`, with the file warning absent from standard error |
-| `--no-warn=all`, `--no-warn all` and `--no-warn=data,unanswered,file` | All three identical in every channel |
+| `--no-warn=all`, `--no-warn all` and `--no-warn=data,unanswered,incomplete,file` | All three identical in every channel |
 | `--no-warn` given no categories, at the end of the line or followed by another option | Rejected as a command line error with code `2`, before anything is processed: a bare option must not quietly silence the warnings about files that cannot be read |
 | `--no-warn=data` on a run with no unusable data at all | Identical to the same run without the option: suppressing something that did not happen must change nothing |
 | An unrecognised category name | Rejected as a command line error with code `2`, before anything is processed |
