@@ -20,6 +20,11 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <!-- The audio fixture corpus, read by the reader's tests from beside the test assembly. -->
+  <ItemGroup>
+    <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Goro\Goro.csproj" />
   </ItemGroup>

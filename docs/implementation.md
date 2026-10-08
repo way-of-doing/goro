@@ -60,15 +60,33 @@ read; a link whose target is gone makes the file unreadable.
 Everything Goro learns from inside a file, apart from the audio a hash reads, comes from one
 analysis of the file's edges, shared by every command: the tags and an index of their fields,
 where the audio starts and ends, and its playing time. Tag values are read from the index only
-when a predicate asks for them, and large payloads such as cover art only when `bytes()` does. The
-analysis never walks the whole file. Its reads go through one reader that serves the head and the
-tail from windows read once, charges every read to a purpose -- sniffing, declared structure, a
-search, a payload -- and refuses what its limits do not allow, so that what a file cost to read is
-something a test can assert. The limits begin as 64 KiB windows at each end, 256 KiB for a search
-and 4 MiB for a payload, and are to become configurable.
+when a predicate asks for them, and large payloads such as cover art only when `bytes()` does.
 
-The payload limit is also the cap on decompressing an Id3v2 frame. A compressed frame that would
-inflate past it is treated as one that cannot be decompressed, and is unusable.
+The analysis never walks the whole file, and this is enforced rather than hoped for. Its reads go
+through one reader that serves the head and the tail from windows read once, and every other read
+is charged to its purpose: sniffing a header, reading declared structure, searching. Each purpose
+has a budget for the whole file, however many reads make it up, so that a file cannot be walked
+from end to end by reads that are each small. The budgets belong to a policy, shared by every
+file and immutable; each file's reader takes an allowance from it, which holds what is left and
+refuses a read the budget no longer covers. The analysis of any file therefore takes from it at
+most the two windows and the three budgets, which a test asserts, damaged files included. The
+windows begin at 64 KiB each, and the budgets at 4 KiB for sniffing, 256 KiB for searching and
+16 MiB for declared structure, all to become configurable. A search reads in steps of 16 KiB, since
+the first frame nearly always follows the tags directly, so a healthy file costs its two windows
+and nothing more.
+
+A refusal is never silent. A tag whose structure the budget cuts off is broken off there, as if it
+were damaged, and a file whose analysis was refused anything is reported as incomplete. The
+structure budget is large because of one case: an Id3v2 tag before v2.4 that is unsynchronised as
+a whole, which has to be read whole and undone before its frames can be found. One larger than the
+budget is treated as a tag that cannot be read. Padding longer than the budget allows to check for
+data is taken as padding without being read.
+
+A value, read as a payload, is held to a limit of its own instead, 4 MiB, and charged nothing. A
+budget shared between values would make whether one can be read depend on which others a
+predicate read first. The payload limit is also the cap on decompressing an Id3v2 frame: a
+compressed frame that would inflate past it is treated as one that cannot be decompressed, and is
+unusable.
 
 ### The reader never throws over what a file holds
 
@@ -158,5 +176,15 @@ and sample rate, sits where the frame says it ends. A free-format frame states n
 length is only the distance to the next sync, which junk can fake as easily as the sync itself:
 one is confirmed only by a third frame at the same distance again, allowing a byte for padding. In
 other projects' test data, 90 bytes of junk after a tag passed for a free-format frame under the
-weaker rule, and cost a 201-second file its playing time.
+weaker rule, and cost a 201-second file its playing time. A header with nothing after it to confirm
+it is not a frame either, so sync near the end of a file that ends inside its tag is not taken for
+audio, at the cost that a file of a single frame has none.
+
+### Data after an Id3v2 tag's padding breaks the tag
+
+A zero byte where a frame header should start is the start of the padding, which runs to the end
+of the tag. When anything but zero follows it, a block of the tag was zeroed, as bit rot does, and
+the frames did not really end there: the structure counts as broken at that point, and the file is
+reported as incomplete. Id3v2 says padding is zeroes, so a tagger that left other bytes in it is
+reported the same way, which is the cost.
 

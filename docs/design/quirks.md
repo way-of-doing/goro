@@ -63,3 +63,17 @@ do.
 
 **What it costs:** nothing that has been seen; the two readings disagree only on frames of 128
 bytes or more, and only one of them lines up.
+
+## Id3v2.4's text encodings in an Id3v2.3 or v2.2 tag
+
+**The specifications:** v2.3 and v2.2 define two text encodings, `$00` ISO-8859-1 and `$01`
+Unicode, which is UTF-16 with a byte order mark. v2.4 adds `$02`, UTF-16 big-endian without a mark,
+and `$03`, UTF-8.
+
+**What Goro does:** reads all four in a tag of any revision, so a v2.3 frame whose encoding byte is
+`$03` is read as UTF-8. Only an encoding byte that no revision defines makes a frame unusable.
+Taggers are reported to write UTF-8 into v2.3 tags, which are still the most widely read revision
+(not verified here).
+
+**What it costs:** nothing that has been seen. No revision gives `$02` or `$03` another meaning,
+so the only text read differently is text that a strict reader would have refused.

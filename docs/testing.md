@@ -128,7 +128,8 @@ the `incomplete` warning, and that it is never unreadable on this account.
 | An encoding byte no revision defines | The same |
 | A frame description that does not decode | Unusable for every description asked about, and without one |
 | A frame whose size runs past the end of its tag | That frame unusable, the frames before it intact, nothing after it found; counted |
-| A zero-size frame, and a block of zeroes in the middle of a tag | What lies before the break intact, what lies after absent; counted |
+| A zero-size frame | That frame unusable, having no encoding byte, and the frames after it read; not counted |
+| A block of zeroes in the middle of a tag | What lies before the break intact, what lies after absent; counted |
 | A tag size past the end of the file, one not syncsafe, and a version byte of 5 | The `id3v2` source absent everywhere, other tags and `file::duration` unaffected; counted |
 | A tag size too short, so the tag's end lies inside a frame | The same, the audio still found behind it |
 | A file ending inside its Id3v2 tag | Unreadable, there being no audio |

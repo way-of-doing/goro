@@ -112,8 +112,11 @@ the duration outcome. The steps run one after another within a file; Goro's conc
 across files.
 
 **Bounded, tracked reads.** The steps reach the bytes only through a reader that serves the head
-and tail from windows read once, charges every read to a purpose, and refuses what its policy
-does not allow, so that "never walks the whole file" is something a test can assert:
+and tail from windows read once, charges every other read to a purpose against the file's
+allowance, and refuses what the allowance does not cover, so that "never walks the whole file" is
+something a test can assert. (Revised in review on 2026-10-08: the limits are budgets for the whole
+file, kept by a `ReadAllowance` that each file's reader takes from the shared `ReadPolicy`, and a
+payload has a limit for each value; see the Log.)
 
 ```csharp
 public interface IByteSource : IDisposable          // RandomAccess.Read in production, byte[] in tests
@@ -124,11 +127,22 @@ public interface IByteSource : IDisposable          // RandomAccess.Read in prod
 
 public enum ReadPurpose { Sniff, DeclaredStructure, Search, Payload }
 
-public sealed record ReadPolicy(                     // defaults to begin with; configurable later
+public sealed record ReadPolicy(                     // shared and immutable; defaults to begin with, configurable later
     int HeadWindow = 64 * 1024,
     int TailWindow = 64 * 1024,
-    int SearchLimit = 256 * 1024,
-    int PayloadLimit = 4 * 1024 * 1024);              // also the decompression cap
+    int SniffBudget = 4 * 1024,                       // budgets: totals for the whole file
+    int SearchBudget = 256 * 1024,
+    int StructureBudget = 16 * 1024 * 1024,
+    int PayloadLimit = 4 * 1024 * 1024)               // for each value; also the decompression cap
+{
+    public ReadAllowance CreateAllowance();
+}
+
+public sealed class ReadAllowance                    // one per file: what is left, and whether a read fits it
+{
+    public bool Allows(ReadPurpose purpose, long count);
+    public bool TryCharge(ReadPurpose purpose, long count);
+}
 
 public sealed class BoundedReader
 {
@@ -255,3 +269,48 @@ layout and finds `E` as it reads the frames.
   planner in one that marks chosen files so. Next step: review of 1b, then step 2, the reader and
   the tags facet. Step 2 replaces `FileData.Opened` with the loader, which reports read-in-part
   from the layout's conditions.
+- 2026-10-08 -- Step 1b committed (`a6a297c`). Step 2 split in three, each landing on its own:
+  2a the reader, 2b the loader and the source functions, 2c the concepts (trimming, genres,
+  track numbers, dates), since nothing in `src/` interpreted tag text yet either. 2a written,
+  awaiting review:
+  - `src/Goro/Reading/`: `BoundedReader` over an `IByteSource`, with head and tail windows and a
+    log. Reads outside the windows are checked against a `ReadAllowance`, which each file's reader
+    takes from the shared, immutable `ReadPolicy`. Sniffing, searching and declared structure each
+    have a budget for the whole file; a payload has a limit for each value and is charged nothing.
+    A structure budget (16 MiB) was added for a pre-v2.4 tag unsynchronised as a whole.
+  - `Mp3Analysis`: head, tail and collation, giving a `FileLayout` with typed conditions.
+  - Indexes for Id3v2, APE and Id3v1 that read no values, and `TagValues` reading them on demand.
+  - The rename table moved to `Reading/Tags/Id3v2FrameNames`, so that `Reading` depends on
+    nothing in `Predicates`.
+
+  Found while testing:
+  - the first-frame search read its whole 256 KiB limit for every file, and now reads in 16 KiB
+    steps, so a healthy file costs its two windows and nothing more;
+  - a header with nothing after it no longer counts as a confirmed frame, since sync near the end
+    of a file that ends inside its tag passed for audio;
+  - a zero-size frame is a single unreadable datum and not a break, so testing.md's damage table
+    was corrected;
+  - data after the start of an Id3v2 tag's padding counts as a break, recorded in implementation.md;
+  - the corpus builder recorded `IPLS` as holding no text, though it is read as `TIPL`, so
+    `Corpus.cs` was fixed and the manifest regenerated, changing only that row.
+
+  In review PJ pointed out that the limits as first written were per read, so that a file could
+  still be walked whole by small reads, and nothing tested otherwise. They became per-file budgets,
+  held by an allowance per file as PJ suggested, and a refusal in the analysis now breaks off the
+  structure and reports the file as incomplete; before, a refused frame header ended a tag's walk
+  silently. Tests now assert that small reads stop at the budget, that a tag of 20,000 frames and
+  a run of 500 tags are cut off and reported, and that no damaged file costs its analysis more than
+  the policy's ceiling.
+
+  Decided with PJ: when an MP3 holds two APE tags, the first in file order is the source, as for
+  Id3v2. Also decided: `$02` and `$03`, which only v2.4 defines, are read in v2.2 and v2.3 tags
+  too, recorded in quirks.md. From review:
+  - only `FileByteSource` is disposable, since `BoundedReader` never owns its source and whoever
+    opens a file holds it by its own type;
+  - the Id3v2 encodings are an `IId3v2TextEncoding` with four stateless singletons, chosen by
+    `IId3v2TextEncoding.FromByte` after section 4 of the Id3v2.4 structure document. They had been
+    bare numbers switched on inside a class whose name suggested any format. What a frame's strings
+    share, the inherited UTF-16 byte order and the quirks met, is a `FrameTextState` the caller
+    passes by reference, since it belongs to reading one frame.
+
+  Next step: review of 2a, then plan 2b.

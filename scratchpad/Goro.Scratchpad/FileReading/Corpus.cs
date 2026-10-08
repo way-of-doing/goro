@@ -221,7 +221,8 @@ public static class Corpus
             return [];
         }
 
-        var isText = f.Id[0] == 'T' && f.Id is not ("TXXX" or "TXX") || f.Id is "GRP1" or "MVNM" or "MVIN";
+        // IPLS (v2.2 IPL) is read as TIPL, a text frame (docs/features/builtins/identifiers.md).
+        var isText = f.Id[0] == 'T' && f.Id is not ("TXXX" or "TXX") || f.Id is "GRP1" or "MVNM" or "MVIN" or "IPLS" or "IPL";
         if (isText)
         {
             return Values(c[0], c.AsSpan(1));
