@@ -56,11 +56,19 @@ typed conditions.
 - **Tag unusable:** why. Examples are a size past the end of the file, a size that is not
   syncsafe, an unknown major version, an APE size past the start, and a vendor length overrun.
 
+**Choices Goro made where a specification is silent** (see
+[implementation](../implementation.md#choices-the-specifications-leave-open)): an APEv1 value
+holding bytes outside ASCII, read as ISO-8859-1 and possibly the wrong text.
+
 **Layout:**
 
+- several Id3v2 tags in a row, of which only the first is the `id3v2` source;
+- every quirk Goro applied to read a file (see [quirks](../design/quirks.md)), and UTF-16 text read
+  as little-endian for want of a byte order mark;
 - unexplained bytes before the audio. Junk, or a tag whose header was wiped: the one way a tag
   damaged past recognition can still be noticed;
-- bytes after the last frame that no tag accounts for;
+- bytes after the last frame that no tag accounts for. These are never hashed, so audit is the
+  only place they show;
 - a tag size that disagrees with where the next structure starts.
 
 **Playing time:** the evidence and the outcome.
@@ -154,3 +162,10 @@ the fixture corpus.
   everything about that home raised during the survey. Next step: pick it up after mp3-support has
   typed conditions to report, or earlier if the reader's condition types are designed with audit
   as their consumer.
+- 2026-10-08 -- mp3-support agreed an edge analysis that every command shares, returning a
+  `FileLayout` and never throwing over what a file contains. Audit's quick mode would be that
+  analysis reported in full; its deep mode adds the walk the other commands never do. A file whose
+  audio cannot be found is unreadable to `goro list` and `goro hash` but a finding to audit, which
+  is the first case of a condition each command interprets in its own way. Chained and
+  multiplexed Ogg are declined, and a file concatenated with itself, which only a walk detects, is
+  audit's to find. The `incomplete` warning advertises audit even before it exists.

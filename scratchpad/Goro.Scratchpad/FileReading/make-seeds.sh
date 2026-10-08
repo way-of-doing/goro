@@ -4,8 +4,9 @@
 # damage in it are exactly what the builder says they are.
 #
 # Tool versions the committed seeds were made with: ffmpeg 9.0.2, LAME 4.0, flac 1.5.0,
-# opus-tools 0.2 (libopus 1.6.1), vorbis-tools 1.4.3. Re-running with other versions gives other
-# bytes, so the committed seeds, not this script, are the reference.
+# opus-tools 0.2 (libopus 1.6.1), vorbis-tools 1.4.3, speex 1.2.1. Re-running them, or the same
+# tools at other versions, gives other bytes (oggenc picks a random serial number), so the
+# committed seeds, not this script, are the reference.
 #
 # Usage: make-seeds.sh <work dir> <seeds dir>
 set -eu
@@ -47,6 +48,8 @@ q oggenc -q 2 -o "$W/vorbis-b.ogg" "$W/src44m-b.wav"
 q opusenc --bitrate 32 "$W/src48m.wav" "$S/opus.opus"
 q opusenc --bitrate 32 "$W/src44m.wav" "$S/opus-from44k.opus"            # input rate 44.1 kHz in OpusHead
 q opusenc --bitrate 32 "$W/src44m-b.wav" "$W/opus-b.opus"
+# Speex in Ogg, a codec Goro does not read, under the .ogg extension it often has (speexenc 1.2.1).
+q speexenc "$W/src8m.wav" "$S/ogg-speex.ogg"
 # Chained: logical streams one after another, which is what concatenation produces.
 cat "$S/ogg-vorbis.ogg" "$W/vorbis-b.ogg" > "$S/ogg-chained-vorbis.ogg"
 cat "$S/ogg-vorbis.ogg" "$W/opus-b.opus" > "$S/ogg-chained-vorbis-opus.ogg"

@@ -80,3 +80,68 @@ earliest among those reported for it in the file, in an array indexed by source.
 well, an empty slot meaning that the source has not been reported yet, so no separate bitset is
 kept, and it is allocated on the first report, so that a file which warns about nothing allocates
 nothing.
+
+## Choices the specifications leave open
+
+A format's specification sometimes says less than reading real files needs, or says something
+real files do not follow. Goro then has to choose for itself. Each choice is recorded here, with
+what it costs, and each is something `goro audit` points out where it applies.
+
+### APEv1 text is read as ISO-8859-1
+
+APEv2 specifies its text as UTF-8. APEv1 specified plain ASCII, and the programs that wrote it
+stored whatever their local code page held: a report on the Mp3tag forum shows APEv1 values in
+the Windows "ANSI" code page, which Mp3tag shows as empty because it takes all APE text for UTF-8.
+Goro decodes APEv1 text as ISO-8859-1, as it decodes Id3v1. Every value then reads as text, and
+ASCII, the only text the specification allows, reads exactly. The cost is that a value written in
+any other code page reads as the wrong text, usable and without a warning, as an Id3v1 value
+written that way already does. `goro audit` flags APEv1 values holding bytes outside ASCII.
+
+### An MP3 summary header is trusted up to an exact frame end
+
+A Xing, Info or VBRI header says how many bytes of audio follow. When more bytes follow than it
+says, they are either junk appended to the file or more audio, from a file joined on to this one,
+and the format offers no way to tell. Goro trusts the header when a frame ends exactly where the
+header says the audio ends, and no frame starts there: the bytes after it are then junk, never
+hashed and reported by `goro audit`, and the header's frame count gives the playing time. A frame
+starting there means more audio, so the header describes only part of the file and the playing
+time is unusable. Either way can be wrong: junk whose first bytes happen to form a matching frame
+header makes a file look joined, which only costs it its playing time, and nothing in the file
+says whether appended audio was meant to be there.
+
+### A constant-bitrate MP3 without a summary header is counted from the edges
+
+Without a Xing, Info or VBRI header an MP3 says nothing about its length, and only a walk of every
+frame header gives the count exactly. Many real files are like this, all of those seen constant
+bitrate, written by Apple's encoders among others. Goro trusts a file to be constant bitrate when
+three things hold: the first confirmed frame gives a bitrate; a frame of that bitrate is found at
+each of seven evenly spaced points, by a bounded search; and a frame of that bitrate ends exactly
+where the trailing tags start. It then counts the frames as the audio's length over the average
+frame length for that bitrate. Tested against a walk on other projects' test data, that was exact
+on 32 of the 33 files it accepted and one frame out on a deliberately corrupt one. A file that
+fails any check, a variable-bitrate one in particular, has an unusable `file::duration`. The
+logic, these checks and the summary header's own, lives in a single type, so that the one place
+that decides an MP3's duration can be read and tested on its own.
+
+### UTF-16 text without a byte order mark is read as little-endian
+
+Id3v2's text encoding `$01` is UTF-16 that begins with a byte order mark: v2.3 says Unicode strings
+"must begin with the Unicode BOM", and v2.4 defines `$01` as UTF-16 "with BOM", keeping a separate
+`$02` for big-endian text without one. Real files nonetheless hold `$01` text with no mark, the
+work of Windows software, where little-endian is native. RFC 2781, the UTF-16 definition v2.4
+cites, says such text "SHOULD be interpreted as being big-endian", which turns these files'
+text into nonsense. Goro reads it as little-endian, as mutagen, TagLibSharp, TagLibSharp2 and ATL
+were all found to, and gets the text the writer meant in every such file seen. The cost is a
+big-endian writer that also left the mark out, of which none has been seen. `goro audit` flags
+text read this way.
+
+### An MP3 frame is confirmed by the frames after it
+
+Nothing marks where an MP3's audio starts but the frame sync, eleven set bits, which junk and tag
+data can hold by chance. A frame header counts only when a header matching it, in version, layer
+and sample rate, sits where the frame says it ends. A free-format frame states no bitrate, so its
+length is only the distance to the next sync, which junk can fake as easily as the sync itself:
+one is confirmed only by a third frame at the same distance again, allowing a byte for padding. In
+other projects' test data, 90 bytes of junk after a tag passed for a free-format frame under the
+weaker rule, and cost a 201-second file its playing time.
+

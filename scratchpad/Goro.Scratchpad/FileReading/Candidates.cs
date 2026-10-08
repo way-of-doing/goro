@@ -54,10 +54,13 @@ public static class Candidates
     static CandidateResult Prototype(string path) => Timed("goro-prototype", () =>
     {
         var r = FormatReaders.Read(path);
-        var fields = r.Tags.SelectMany(t => t.Fields.Select(f => new Observed(Family(t.Tag), f.Key, f.Description, f.Values, f.Content ?? f.Stored))).ToList();
+        var fields = r.Tags.Where(t => t.IsSource)
+            .SelectMany(t => t.Fields.Where(f => f.Quirk != "illegal frame identifier, stepped over")
+                .Select(f => new Observed(Family(t.Tag), f.Key, f.Description, f.Values, f.Content ?? f.Stored))).ToList();
         var best = r.Best("policy");
         var notes = r.Problems.Concat(r.Tags.Where(t => t.StructureProblem is not null).Select(t => $"{t.Tag}: {t.StructureProblem}"))
             .Concat(r.Tags.SelectMany(t => t.Fields.Where(f => f.Problem is not null).Select(f => $"{t.Tag} {f.Key}: {f.Problem}")))
+            .Concat(r.Tags.SelectMany(t => t.Fields.Where(f => f.Quirk is not null).Select(f => $"{t.Tag} {f.Key}: quirk: {f.Quirk}")))
             .Append("durations: " + string.Join(", ", r.Durations)).Distinct().ToList();
         return (best is { Rate: > 0 } ? best.Seconds : null, fields, notes);
     });

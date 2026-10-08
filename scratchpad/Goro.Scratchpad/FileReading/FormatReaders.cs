@@ -108,6 +108,7 @@ public static class FormatReaders
             break;
         }
 
+        MarkLaterId3v2Tags(tags, problems);
         var durations = new List<DurationEvidence>();
         var first = FindFirstFrame(f, start, end);
         if (first < 0)
@@ -123,97 +124,21 @@ public static class FormatReaders
 
         MpegHeader.TryParse(f, (int)first, out var h);
         var spf = h.SamplesPerFrame;
-        int delay = 0, padding = 0;
-        var hasLame = false;
-        var lameCrcOk = true;
-        // LAME places the tag as if there were no CRC, even in a CRC-protected frame, so look at both places.
-        var xingAt = (int)first + h.XingOffset;
-        if (h.Crc && !StartsWith(f, xingAt, "Xing") && !StartsWith(f, xingAt, "Info") && (StartsWith(f, xingAt - 2, "Xing") || StartsWith(f, xingAt - 2, "Info")))
-        {
-            xingAt -= 2;
-            problems.Add("Info tag written at the offset of a frame without CRC");
-        }
+        var duration = Mp3Duration.Decide(f, first, end, h);
+        problems.AddRange(duration.Problems);
+        durations.Add(duration.Policy);
+        durations.AddRange(duration.Evidence);
 
-        long? xingFrames = null;
-        long? xingBytes = null;
-        var firstIsInfo = false;
-        if (StartsWith(f, xingAt, "Xing") || StartsWith(f, xingAt, "Info"))
-        {
-            firstIsInfo = true;
-            // A file cut short inside its first frame can end anywhere in the tag.
-            bool Fits(int at, int length) => at + length <= f.Length;
-            var flags = Fits(xingAt + 4, 4) ? ReadU32BE(f, xingAt + 4) : 0;
-            var o = xingAt + 8;
-            if ((flags & 1) != 0 && Fits(o, 4))
-            {
-                xingFrames = ReadU32BE(f, o);
-                o += 4;
-            }
-
-            if ((flags & 2) != 0 && Fits(o, 4))
-            {
-                xingBytes = ReadU32BE(f, o);
-                o += 4;
-            }
-
-            o += (flags & 4) != 0 ? 100 : 0;
-            o += (flags & 8) != 0 ? 4 : 0;
-            // The LAME tag: a 9-byte encoder string, then delay and padding at bytes 21-23.
-            if (o + 24 <= f.Length && (StartsWith(f, o, "LAME") || StartsWith(f, o, "Lavc") || StartsWith(f, o, "Lavf")))
-            {
-                hasLame = true;
-                delay = f[o + 21] << 4 | f[o + 22] >> 4;
-                padding = (f[o + 22] & 0x0F) << 8 | f[o + 23];
-                // The tag's own CRC covers every byte of the frame before it, Xing counts included.
-                if (o + 36 <= f.Length)
-                {
-                    lameCrcOk = Crc16Arc(f.AsSpan((int)first, o + 34 - (int)first)) == ReadU16BE(f, o + 34);
-                    if (!lameCrcOk)
-                    {
-                        problems.Add("LAME tag CRC fails: the Info frame is damaged");
-                    }
-                }
-            }
-        }
-        else if (StartsWith(f, (int)first + 36, "VBRI") && first + 36 + 18 <= f.Length)
-        {
-            firstIsInfo = true;
-            xingFrames = ReadU32BE(f, (int)first + 36 + 14);
-            xingBytes = ReadU32BE(f, (int)first + 36 + 10);
-            durations.Add(new DurationEvidence("vbri", xingFrames.Value * spf, h.SampleRate));
-        }
-
-        if (xingFrames is { } frames && (StartsWith(f, xingAt, "Xing") || StartsWith(f, xingAt, "Info")))
-        {
-            durations.Add(new DurationEvidence("xing", frames * spf, h.SampleRate));
-            if (hasLame)
-            {
-                durations.Add(new DurationEvidence("xing-gapless", frames * spf - delay - padding, h.SampleRate, $"delay {delay}, padding {padding}"));
-            }
-        }
-
-        var scan = Scan(f, first, end, h, firstIsInfo);
+        // Evidence for audit only: a walk of every frame, and the estimate naive readers make.
+        var scan = Scan(f, first, end, h, duration.FirstIsInfo);
         problems.AddRange(scan.Problems);
         durations.Add(new DurationEvidence("scan", scan.AudioFrames * spf, h.SampleRate, scan.Note));
-        if (hasLame)
+        if (duration.HasLame)
         {
-            durations.Add(new DurationEvidence("scan-gapless", scan.AudioFrames * spf - delay - padding, h.SampleRate));
+            durations.Add(new DurationEvidence("scan-gapless", scan.AudioFrames * spf - duration.Delay - duration.Padding, h.SampleRate));
         }
 
-        // The policy (decided 2026-10-08): the summary header, only when its byte count agrees with
-        // the audio found (within one frame) and the LAME tag's CRC passes. Otherwise the duration is
-        // unusable; the scan above stays as evidence for audit, never as the answer.
-        var audioBytes = end - first;
-        var consistent = lameCrcOk && xingFrames is not null && xingBytes is { } xb && Math.Abs(xb - audioBytes) <= 2881;
-        durations.Insert(0, consistent
-            ? new DurationEvidence("policy", xingFrames!.Value * spf - (hasLame ? delay + padding : 0), h.SampleRate, "summary header, byte count agrees")
-            : new DurationEvidence("policy", 0, 0,
-                xingFrames is null ? "no summary header: unusable"
-                : !lameCrcOk ? "summary header fails its CRC: unusable"
-                : $"summary header disagrees (bytes {xingBytes} vs {audioBytes}): unusable"));
-
-        // What a reader does with no summary header: file size over the first audio frame's bitrate.
-        var audioFrame = firstIsInfo ? first + (h.FrameLength > 0 ? h.FrameLength : 0) : first;
+        var audioFrame = duration.FirstIsInfo ? first + (h.FrameLength > 0 ? h.FrameLength : 0) : first;
         if (MpegHeader.TryParse(f, (int)audioFrame, out var ah) && ah.BitrateKbps > 0)
         {
             var bytes = end - audioFrame;
@@ -221,6 +146,40 @@ public static class FormatReaders
         }
 
         return new FileReport("mp3", tags, start, end, durations, problems);
+    }
+
+    /// <summary>
+    /// Only the first Id3v2 tag in a file is the <c>id3v2</c> source, as players and other readers
+    /// take it; the others are read, so that their extent and damage are known, and reported.
+    /// </summary>
+    static void MarkLaterId3v2Tags(List<RawTag> tags, List<string> problems)
+    {
+        var id3 = tags.Where(t => t.Tag.StartsWith("id3v2")).OrderBy(t => t.Offset).ToList();
+        if (id3.Count < 2)
+        {
+            return;
+        }
+
+        foreach (var later in id3.Skip(1))
+        {
+            tags[tags.IndexOf(later)] = later with { IsSource = false };
+        }
+
+        problems.Add($"{id3.Count - 1} further Id3v2 tags after the first, which alone is read");
+    }
+
+    /// <summary>The first confirmed frame matching the stream between two positions, if any.</summary>
+    public static (long At, MpegHeader Header)? FindConfirmedFrame(byte[] f, long from, long to, MpegHeader stream)
+    {
+        for (var i = from; i + 4 <= to; i++)
+        {
+            if (f[i] == 0xFF && IsConfirmedFrame(f, i, to, out var h) && h.Matches(stream))
+            {
+                return (i, h);
+            }
+        }
+
+        return null;
     }
 
     /// <summary>A frame header at <paramref name="at"/> confirmed by a matching header where the next frame should start.</summary>
@@ -237,14 +196,31 @@ public static class FormatReaders
             return false;
         }
 
+        var freeFormat = h.FrameLength == 0;
         h = h with { FrameLength = length };
         var next = at + length;
         if (next >= end)
         {
-            return true; // the last frame: nothing to confirm against
+            return !freeFormat; // the last frame: nothing to confirm against
         }
 
-        return MpegHeader.TryParse(f, (int)next, out var n) && n.Matches(h);
+        if (!MpegHeader.TryParse(f, (int)next, out var n) || !n.Matches(h))
+        {
+            return false;
+        }
+
+        // A free-format frame's length is only the distance to the next sync, which junk can fake:
+        // it is confirmed only by a third frame at the same distance again, padding aside.
+        if (freeFormat)
+        {
+            var third = next + length;
+            var stream = h;
+            return n.BitrateKbps == 0 && (FreeAt(third) || FreeAt(third + 1) || FreeAt(third - 1));
+
+            bool FreeAt(long i) => i < end && MpegHeader.TryParse(f, (int)i, out var t) && t.Matches(stream) && t.BitrateKbps == 0;
+        }
+
+        return true;
     }
 
     /// <summary>Free format: the frame ends where the next header with the same fixed bits starts.</summary>
@@ -397,6 +373,7 @@ public static class FormatReaders
 
         // Links may differ in sample rate (Vorbis then Opus), so the chain is summed in microseconds.
         long totalMicroseconds = 0;
+        var recognised = 0;
         foreach (var (serial, _, _) in spans)
         {
             var mine = pages.Where(p => p.Serial == serial).ToList();
@@ -476,6 +453,7 @@ public static class FormatReaders
             }
 
             totalMicroseconds += (lastGood - preSkip) * 1_000_000 / rate;
+            recognised++;
         }
 
         if (serials.Count > 1 && !multiplexed)
@@ -487,6 +465,8 @@ public static class FormatReaders
         // answer for multiplexed streams, where which stream is "the audio" is not the file's to say.
         durations.Insert(0, multiplexed
             ? new DurationEvidence("policy", 0, 0, "multiplexed: declined")
+            : recognised == 0
+            ? new DurationEvidence("policy", 0, 0, "no stream in a codec Goro reads")
             : new DurationEvidence("policy", totalMicroseconds, 1_000_000, serials.Count > 1 ? "sum of chained links" : "last granule on a page passing its CRC"));
 
         return new FileReport("ogg", tags, 0, f.Length, durations, problems);
@@ -509,6 +489,7 @@ public static class FormatReaders
             at = (int)Math.Min(f.Length, id3.Offset + id3.Length);
         }
 
+        MarkLaterId3v2Tags(tags, problems);
         if (!StartsWith(f, at, "fLaC"))
         {
             problems.Add("no fLaC marker");

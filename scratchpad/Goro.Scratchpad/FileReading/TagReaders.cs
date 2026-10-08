@@ -10,10 +10,21 @@ namespace Goro.Scratchpad.FileReading;
 /// (unsynchronisation, compression), or null where they could not be. <see cref="Values"/> is the
 /// text, one entry per value the format records, or null where there is no text or it would not decode.
 /// </summary>
-public sealed record RawField(string Tag, string Key, string? Description, byte[] Stored, byte[]? Content, string[]? Values, string? Problem = null);
+public sealed record RawField(string Tag, string Key, string? Description, byte[] Stored, byte[]? Content, string[]? Values, string? Problem = null)
+{
+    /// <summary>A quirk applied to read this field (see docs/design/quirks.md), or a choice the specification left open: for audit.</summary>
+    public string? Quirk { get; init; }
+}
 
-/// <summary>What a tag reader made of one tag: its fields, and the first point at which it lost the structure, if any.</summary>
-public sealed record RawTag(string Tag, long Offset, long Length, List<RawField> Fields, string? StructureProblem = null);
+/// <summary>
+/// What a tag reader made of one tag: its fields, and the first point at which it lost the structure,
+/// if any. A tag that is not <see cref="IsSource"/> was read for its extent and damage only: a second
+/// Id3v2 tag, for instance.
+/// </summary>
+public sealed record RawTag(string Tag, long Offset, long Length, List<RawField> Fields, string? StructureProblem = null)
+{
+    public bool IsSource { get; init; } = true;
+}
 
 /// <summary>Prototype readers that give tag data as recorded and never throw on damaged input.</summary>
 public static class TagReaders
@@ -111,6 +122,17 @@ public static class TagReaders
 
             if (!IsFrameId(body, pos, idLength))
             {
+                // An illegal identifier whose size lands on another frame, the padding or the end of
+                // the tag is stepped over, as the size field exists for (docs/design/quirks.md).
+                if (major > 2 && StepsCleanly(body, pos, major == 4 && !plainSizes) is { } skipped)
+                {
+                    var odd = Encoding.Latin1.GetString(body, pos, 4);
+                    fields.Add(new RawField(tagName, odd, null, body.AsSpan(pos + 10, skipped - 10).ToArray(), null, null)
+                        { Quirk = "illegal frame identifier, stepped over" });
+                    pos += skipped;
+                    continue;
+                }
+
                 problem ??= $"no frame identifier at body offset {pos}";
                 break;
             }
@@ -145,6 +167,24 @@ public static class TagReaders
         }
 
         return new RawTag(tagName, at, 10 + size + footer, fields, problem);
+    }
+
+    /// <summary>
+    /// The length of the frame at <paramref name="pos"/>, header included, if its identifier is
+    /// printable and its size lands on another frame, padding or the end of the tag; else null.
+    /// </summary>
+    static int? StepsCleanly(byte[] body, int pos, bool syncsafe)
+    {
+        if (pos + 10 > body.Length || body.AsSpan(pos, 4).ContainsAnyExceptInRange((byte)0x20, (byte)0x7E))
+        {
+            return null;
+        }
+
+        long size = syncsafe ? ReadSyncsafe(body, pos + 4) : ReadU32BE(body, pos + 4);
+        var next = pos + 10 + size;
+        return next == body.Length || next < body.Length && (body[next] == 0 || IsFrameId(body, (int)next, 4))
+            ? (int)(10 + size)
+            : null;
     }
 
     static bool WalksCleanly(byte[] body, int start, bool syncsafe)
@@ -236,14 +276,51 @@ public static class TagReaders
             return new RawField(tag, id, null, stored, null, null, $"cannot undo frame encoding: {e.GetType().Name}");
         }
 
-        var (description, values, textProblem) = Text(id, data);
-        return new RawField(tag, id, description, stored, data, values, problem ?? textProblem);
+        var (description, values, textProblem, quirk) = Text(id, data, major);
+        return new RawField(tag, id, description, stored, data, values, problem ?? textProblem) { Quirk = quirk };
     }
 
     /// <summary>The description and values of a frame that holds text; nulls for any other frame.</summary>
-    static (string? Description, string[]? Values, string? Problem) Text(string id, byte[] c)
+    /// <summary>How a frame's UTF-16 text was read: the byte order its strings share, and what had to be assumed.</summary>
+    sealed class Utf16State
     {
-        var isPlainText = id[0] == 'T' && id is not ("TXXX" or "TXX") || id == "IPLS";
+        public bool? BigEndian;
+        public bool MarkMissing;
+        public bool MarkInherited;
+    }
+
+    static (string? Description, string[]? Values, string? Problem, string? Quirk) Text(string id, byte[] c, byte major)
+    {
+        var state = new Utf16State();
+        var (description, values, problem) = TextFields(id, c, state);
+        var quirks = new List<string>();
+        if (state.MarkMissing)
+        {
+            quirks.Add("UTF-16 without a byte order mark, read as little-endian");
+        }
+
+        if (state.MarkInherited)
+        {
+            quirks.Add("a UTF-16 value without its own byte order mark, read in the frame's byte order");
+        }
+
+        if (major < 4 && values is { Length: > 1 })
+        {
+            quirks.Add($"several values in a v2.{major} text frame");
+        }
+
+        if (id is "GRP1" or "MVNM" or "MVIN")
+        {
+            quirks.Add("Apple's text frame");
+        }
+
+        return (description, values, problem, quirks.Count == 0 ? null : string.Join("; ", quirks));
+    }
+
+    static (string? Description, string[]? Values, string? Problem) TextFields(string id, byte[] c, Utf16State state)
+    {
+        // Apple's GRP1, MVNM and MVIN are laid out as text frames (docs/design/quirks.md).
+        var isPlainText = id[0] == 'T' && id is not ("TXXX" or "TXX") || id is "IPLS" or "GRP1" or "MVNM" or "MVIN";
         var isDescribed = id is "TXXX" or "TXX" or "WXXX" or "WXX" or "COMM" or "COM" or "USLT" or "ULT";
         var isUrl = id[0] == 'W' && !isDescribed;
         if (isUrl)
@@ -288,7 +365,7 @@ public static class TagReaders
                 return (null, null, "description has no terminator");
             }
 
-            var d = DecodeStrict(enc, rest[..nul]);
+            var d = Decode(enc, rest[..nul], state);
             if (d is null)
             {
                 return (null, null, "description does not decode");
@@ -302,7 +379,7 @@ public static class TagReaders
             }
         }
 
-        var values = SplitValues(enc, rest, out var problem);
+        var values = SplitValues(enc, rest, state, out var problem);
         return (description, values, problem);
     }
 
@@ -324,7 +401,7 @@ public static class TagReaders
         return b.IndexOf((byte)0);
     }
 
-    static string[]? SplitValues(byte enc, ReadOnlySpan<byte> b, out string? problem)
+    static string[]? SplitValues(byte enc, ReadOnlySpan<byte> b, Utf16State state, out string? problem)
     {
         problem = null;
         var values = new List<string>();
@@ -332,7 +409,7 @@ public static class TagReaders
         {
             var nul = FindTerminator(b, enc);
             var part = nul < 0 ? b : b[..nul];
-            var s = DecodeStrict(enc, part);
+            var s = Decode(enc, part, state);
             if (s is null)
             {
                 problem = $"text does not decode in encoding {enc}";
@@ -353,6 +430,48 @@ public static class TagReaders
         }
 
         return values.ToArray();
+    }
+
+    /// <summary>
+    /// Decodes one string of a frame. In encoding 1 a string without a byte order mark takes the
+    /// byte order of an earlier string in the frame, or little-endian if it is the first
+    /// (implementation.md, and docs/design/quirks.md).
+    /// </summary>
+    static string? Decode(byte enc, ReadOnlySpan<byte> b, Utf16State state)
+    {
+        if (enc != 1 || b.Length < 2 || b[0] == 0xFF && b[1] == 0xFE || b[0] == 0xFE && b[1] == 0xFF)
+        {
+            if (enc == 1 && b.Length >= 2)
+            {
+                state.BigEndian = b[0] == 0xFE;
+            }
+
+            return DecodeStrict(enc, b);
+        }
+
+        if (b.Length % 2 != 0)
+        {
+            return null;
+        }
+
+        if (state.BigEndian is null)
+        {
+            state.MarkMissing = true;
+            state.BigEndian = false;
+        }
+        else
+        {
+            state.MarkInherited = true;
+        }
+
+        try
+        {
+            return new UnicodeEncoding(state.BigEndian.Value, false, true).GetString(b);
+        }
+        catch (DecoderFallbackException)
+        {
+            return null;
+        }
     }
 
     /// <summary>Decodes text in an Id3v2 encoding, or null where the bytes are not valid in it.</summary>

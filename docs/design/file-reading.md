@@ -108,7 +108,9 @@ The cheap checks, all verified on the corpus:
 - **MP3:** trust the Xing or VBRI frame count only if its byte count matches the audio found,
   within one frame, and the LAME tag's CRC passes. That CRC is CRC-16/ARC over every byte of the
   Info frame before the CRC field, so it covers the frame count. A doubled count with an unchanged
-  byte count fails it. Otherwise the duration is unusable: Goro does not scan.
+  byte count fails it. When more bytes follow than the header counts, it is still trusted if a
+  frame ends exactly where it says the audio ends and no frame starts there; the rest is junk.
+  Otherwise the duration is unusable: Goro does not scan.
 - **FLAC:** read back from the end of the audio to the last frame whose header CRC-8 and frame
   CRC-16 both pass. If its end sample matches STREAMINFO, use STREAMINFO. If not, use the last
   frame, unless the bytes after it could hold the missing samples. That case is a damaged tail,
@@ -116,9 +118,9 @@ The cheap checks, all verified on the corpus:
 - **Ogg:** use the last granule on a page that passes its CRC, minus Opus pre-skip. For a chain,
   sum the links, in seconds, since links can differ in sample rate.
 
-With these rules the prototype gives no duration for 12 files: 11 MP3s whose header is missing or
-fails its checks, and the multiplexed Ogg file. Of the 107 files with both a duration and an
-ffmpeg reference, it agrees with ffmpeg to within 50 ms on 95. The other twelve are explained:
+With these rules the prototype gives no duration for 11 files: 10 MP3s whose header is missing or
+fails its checks, and the multiplexed Ogg file. Of the 108 files with both a duration and an
+ffmpeg reference, it agrees with ffmpeg to within 50 ms on 96. The other twelve are explained:
 
 - **Five MP3s whose first frame does not follow the tag directly:** junk, garbage, an APE header,
   or a tag size that is too short or not syncsafe. ffmpeg misses the LAME tag in all of them and
@@ -135,10 +137,11 @@ file once cached, and 7 ms for 24 MB at 320 kbps. Its cost is reading the whole 
 about 128 KiB of it, which is part of why a header that fails its checks makes the duration
 unusable instead.
 
-One refinement is worth having. Bytes appended after the last frame, with no tag to account for
-them, make the byte count disagree, so `mp3/garbage-appended.mp3` currently gets no duration. A
-confirmed frame ending exactly where the byte count says the audio ends would show that the
-header is right and the tail is junk. Checking that reads a few KiB.
+Bytes appended after the last frame, with no tag to account for them, make the byte count
+disagree. The exact-frame-end check above settles `mp3/garbage-appended.mp3`, which gets its
+3.300 s while `mp3/joined-cbr.mp3`, where a frame starts at that point, stays unusable. The
+check reads a few KiB, and since no answer is right for every file, it is recorded among
+[implementation](../implementation.md#choices-the-specifications-leave-open)'s choices.
 
 ## Prior art, measured
 
@@ -288,6 +291,170 @@ Checked by running code, and worth knowing beyond this survey:
   124,000 damaged reads give none (`fuzz 1000`). A production reader wants the same check in its
   test suite.
 
+## Real-world test data
+
+The corpus is hand-built, so its shapes are the ones somebody thought of. To find others, the
+prototype was run over the test data of four tag-reading projects, files most of which came from
+users' bug reports: mutagen (`ada28b2`), TagLib (`961dd69`), TagLib# (`da41dc3`) and music-metadata
+(`9b71259`). That is 240 audio files: 163 MP3, 39 Ogg and 38 FLAC.
+`scratchpad/Goro.Scratchpad/FileReading/fetch-realworld.sh` fetches them at those commits and
+`realworld <dir> <out>` dumps what the prototype reads. Their licences (GPL-2.0, LGPL-2.1 or
+MPL-1.1, LGPL-2.1, MIT) have not been weighed, so none of it is in the repository.
+
+**What held.** No reader threw. Of 944 Id3v2 text frames that mutagen also reads, 877 matched
+exactly, and of 702 Vorbis comments, 687 did; most of the rest are mutagen merging Id3v1 into its
+Id3v2 view, joining repeated frames into one, or normalising timestamps, where the prototype gives
+what was recorded. Of 119 files with a duration from both, 113 agree with ffmpeg to within 50 ms.
+
+**Shapes the corpus lacked**, each in a file mutagen reads and the prototype did not:
+
+- **An illegal frame identifier with a good size.** A v2.3 tag whose first frame is named `Date`.
+  The prototype stops at it and loses the six frames behind; mutagen steps over it by its size.
+- **v2.2 frame names in a v2.3 tag**, written by iTunes 12.1.2.27: v2.3's frame layout, with
+  three-letter identifiers padded by a zero byte. The prototype loses the whole tag.
+- **UTF-16 without a byte order mark,** which the prototype calls undecodable and mutagen reads
+  as little-endian; and **a second value inheriting the first value's byte order mark.**
+- **iTunes text frames not named `T…`:** `GRP1`, `MVNM` and `MVIN`. The identifier documentation
+  makes `field()` on them an error, since only `T…`, `W…`, `COMM` and `USLT` frames hold text.
+- **Several Id3v2 tags in a row,** three in one file, holding different values. The prototype reads
+  them all as one source; mutagen and TagLibSharp read the first.
+- **A FLAC `VORBIS_COMMENT` block declaring fewer bytes than it holds,** which mutagen reads
+  through and the prototype treats as a broken structure.
+- **An Ogg Skeleton stream beside the audio,** an index rather than audio, which the rule declining
+  multiplexed files throws out with it. Five such files, one for each codec.
+- **Ogg files holding FLAC, Speex or Theora,** whose comments the prototype does not read and
+  whose duration it gives as 0 rather than unusable. That last is a prototype bug.
+
+**MP3s without a summary header are common, and all constant bitrate.** 50 of the 134 MP3s with
+audio, conformance streams aside, have no Xing, Info or VBRI header. They include full songs,
+Windows' sample `Sleep Away.mp3` and files written by iTunes 4.6 to Apple's Music 13.10, so Apple's
+encoders evidently write constant-bitrate MP3s without one. Every one of the 50 is constant
+bitrate, by a walk of its frames. That contradicts the assumption behind
+[limitations](limitations.md)' entry on them, and suggests an answer that stays at the edges:
+
+- take the bitrate of the first confirmed frame;
+- confirm it at seven evenly spaced points, each a short bounded search for a frame;
+- require a frame of that bitrate to end exactly where the trailing tags start;
+- count the frames as the audio's length over the average frame length.
+
+Tested against a walk of every frame, that gives the exact count for 32 of the 33 files it
+accepts, and is one frame out on the 33rd, a deliberately corrupt file. It rejects 12, all of them
+truncated or damaged test snippets. A variable-bitrate file without a header would still fail the
+probes, as it should.
+
+**After the decisions.** With the decisions taken on these findings built into the prototype (see
+[Decisions](#decisions)), all its MP3 duration logic gathered in `Mp3Duration.cs`, it reads the
+same 240 files without an exception. Tags match mutagen on 894 of 908 Id3v2 text frames. The rest
+are the deferred iTunes 12.1 tag, a garbled `TLEN` that is unusable by design, and mutagen merging
+repeated frames or normalising a timestamp. Durations agree with ffmpeg within 50 ms on 156 of the
+159 files that both give one, and 31 MP3s without a summary header are counted from their edges.
+The other 51 that ffmpeg decodes get no duration: 21 truncated test snippets whose header
+describes the whole song, 14 header-less files the constant-bitrate checks reject, mostly
+truncated snippets too, 5 conformance streams, 6 multiplexed Ogg files, 4 Ogg files in codecs Goro
+does not read, and 1 whose LAME tag fails its CRC. Bringing the prototype up to date also found a
+defect worth remembering: junk after a tag can pass for a free-format frame, whose length is only
+the distance to the next sync, so a free-format frame is now confirmed by a third frame at the
+same distance.
+
+## What the hash covers
+
+**Decided on 2026-10-08: the hash covers the codec's own stream, and nothing the container adds
+around it.** The container's summaries, its trimming information and its tags are all left out.
+For each format:
+
+- **MP3:** the frames from `D` to `E` in [mp3-layout](mp3-layout.md), from the first audio frame to
+  the end of the last whole frame. The Info frame is left out, LAME tag included. When the summary
+  header is trusted up to an exact frame end, `E` is where it says the audio ends.
+- **FLAC:** the frames, from the first to the end of the last whole frame. STREAMINFO is left out.
+- **Ogg, both codecs:** every packet of the logical stream except the comment packet. That covers
+  the Vorbis identification and setup headers, and `OpusHead`, and leaves out pages, granule
+  positions and the comments.
+- **MP4, should AAC be admitted:** the decoder configuration and the samples, in decode order.
+
+**Why.** The first leaning was to hash the audio plus the decode parameters: values outside the
+audio that change what a decoder outputs, measured below. It was given up for four reasons:
+
+- **They are small.** Three bytes in MP3, 28 bits of STREAMINFO in FLAC, 8 bytes of granule in
+  Ogg, a 28-byte edit list in MP4. Bit rot is very unlikely to land there, and nothing is lost
+  that a whole frame's damage would not show anyway.
+- **They are conditional.** STREAMINFO's sample rate matters only when frame headers defer to it,
+  which no practical rule can follow.
+- **They belong to the container, and tools rewrite them.** Rebuilding an Info frame, or fixing a
+  gapless count, should not look like bit rot.
+- **Picking fields means a canonical form for each format,** and a reason to keep each field. Whole
+  units need neither.
+
+**Where the codec's setup lives decides the boundary.** In MP3 and FLAC the codec's parameters
+travel in every frame header, so hashing the frames covers everything a decoder needs. In Ogg
+they live in header packets of their own, and "audio packets only" would leave out the Vorbis
+codebooks, 3,077 bytes in the mono seed and 4,225 in a stereo file at quality 5, without which
+no packet decodes: bit rot there would leave the file unplayable and its hash unchanged. Hashing
+every packet but the comment covers them, stays clear of tag edits, since the comment is a packet
+of its own, and picks no fields. It does take in `OpusHead`'s output gain, so editing the gain
+changes the hash. MP3 behaves the same way, since gain tools rewrite each frame's own gain field
+(known behaviour, not verified here).
+
+**What this costs.** The hash no longer changes for every change in decoded output. Trimming the
+end of an Ogg stream through its final granule, or rewriting MP3 gapless counts, changes what a
+decoder outputs and leaves the hash as it was. [The vision](../vision.md) was reworded to match on
+2026-10-08: the hash changes "if, and only if, the encoded audio stream would change as well",
+where it had said the decoded audio bitstream.
+
+### What was weighed
+
+The decode parameters considered and set aside. Each row was tested by changing the field and
+decoding with ffmpeg 9.0.2.
+
+| Format     | Field                                            | Decode parameter | What changing it did
+|------------|--------------------------------------------------|------------------|---------------------
+| MP3        | LAME encoder delay and padding                   | yes              | 145,530 samples became 146,927
+| MP3        | Info frame byte count                            | no               | nothing
+| FLAC       | STREAMINFO sample rate, frames defer             | yes              | same samples, stream rate 100,001 Hz became 50,000 Hz
+| FLAC       | STREAMINFO sample rate, frames explicit          | no               | nothing: the frame headers win
+| FLAC       | STREAMINFO total samples, MD5, frame size bounds | no               | nothing
+| Ogg Opus   | `OpusHead` pre-skip                              | yes              | 158,400 samples became 155,592
+| Ogg Opus   | `OpusHead` output gain                           | yes              | same length, different samples
+| Ogg Opus   | `OpusHead` input sample rate                     | no               | nothing
+| Ogg Opus   | final granule position                           | yes              | 158,400 samples became 148,800
+| Ogg Vorbis | final granule position                           | yes              | lowered by 500, 500 samples fewer; lowered by more than the last packet holds, ffmpeg ignores it
+| Ogg Vorbis | identification header bitrate                    | no               | nothing
+| AAC in MP4 | edit list (`elst`)                               | yes              | 145,530 samples; 146,554 with the edit list ignored
+
+FLAC's stream parameters (sample rate, channels, sample size) matter only when frame headers
+defer to STREAMINFO, but they never change under a tag edit, so including them always is
+harmless. Not tested: the parameters needed to decode at all, without which there is no output to
+compare (the Vorbis identification and setup headers, `OpusHead`'s channel mapping, AAC's
+`AudioSpecificConfig`), and the Ogg first granule, which gives a start offset.
+
+### AAC, as a likely later format
+
+AAC fits the rule above, but not the byte-range thinking the MP3 hash started from. Three things were
+measured on files ffmpeg wrote:
+
+- **The audio is located by tables, not by position.** In an MP4 file the `moov` box holds the
+  sample tables, whose chunk offsets are absolute positions in the file. Making the title 5,000
+  characters longer moved the first chunk from byte 1,411 to 6,406, and so rewrote the table: a
+  tag edit changes the bytes of the structure that locates the audio. The hash has to cover the
+  samples the tables point to, in order, as for Ogg packets.
+- **Trimming lives in the structure.** The edit list's media time of 1,024 is the encoder's
+  priming, and decoding with it ignored gives 1,024 more samples.
+- **Raw AAC (ADTS) is like MP3 without a LAME tag:** frames with headers, no trimming
+  information, 147,456 samples for 145,530 of input. Id3v2 and APE tags can sit around it as they
+  do around MP3.
+
+What the model would struggle with, from the format's documentation and not tested here:
+
+- **Gapless information inside the tags.** iTunes records priming and padding in an `iTunSMPB`
+  item inside `ilst`, the tag. Under the rule above it is left out, like every other trimming
+  value.
+- **Tags and structure in one tree.** `ilst` lives inside `moov`, beside the sample tables, so
+  the edges of an MP4 are not where its tags are. Its analysis would walk the box tree, reading box
+  headers and skipping payloads, which is still bounded reading. `moov` can come before or after
+  the audio, and fragmented files spread the tables across the file.
+- **Several tracks.** Chapters as a text track, cover art as a video track: a multiplex, which
+  Ogg's rule would decline.
+- **Encrypted samples** (FairPlay), which cannot be decoded or meaningfully hashed.
+
 ## Decisions
 
 Decided on 2026-10-08, for the three lines to write into the normative documents.
@@ -317,11 +484,40 @@ Decided on 2026-10-08, for the three lines to write into the normative documents
   `file::duration` is unusable, and the file is reported. Goro does not scan. The data warning
   this leads to is emitted as usual, and is not suppressed; the FAQ is to say that
   `file::duration IS USABLE AND …` avoids it.
-- **`file::duration` is unusable, not the file unreadable,** whenever the file can be opened but
-  its playing time cannot be had. Unreadable is kept for files that cannot be opened or are not in
-  a format Goro reads. `file::duration` stays exactly one; only `identifiers.md`'s "exactly one
-  usable occurrence" changes.
-- **Multiplexed Ogg files are declined,** as a conservative default to revisit.
+- **A file whose audio cannot be found is unreadable;** one whose audio is found but whose playing
+  time cannot be had has an unusable `file::duration`. "Cannot be found" includes giving up a
+  bounded search, for the first frame behind a tag whose size cannot be trusted, for instance. The
+  analysis describes such a file rather than failing on it, and each command decides what it
+  means: `goro list` and `goro hash` treat it as unreadable, with the usual `file` warning, while
+  `goro audit` reports it as a finding. `file::duration` stays exactly one; only
+  `identifiers.md`'s "exactly one usable occurrence" changes. (Narrowed on 2026-10-08 from "the
+  file can be opened".)
+- **Multiplexed and chained Ogg files are declined,** as conservative defaults to revisit. Both
+  are recorded in [limitations](limitations.md).
+- **Tag values are read on demand.** Reading a file's tags indexes them: frame and item headers,
+  comment lengths, where each value lies. Values, descriptions included, are read only when a
+  predicate asks for them, and large binary payloads such as cover art only when `bytes()` asks.
+  The index finds broken structure and unusable tags, the rungs that report the file, so the
+  `incomplete` count needs no value read. A value that does not decode, rung 2, surfaces when it is
+  read. A `TXXX`, `WXXX`, `COMM` or `USLT` frame whose description cannot be read might match any
+  description, so it is an unusable occurrence for every description asked about.
+- **The analysis reads only the edges of a file;** see the mp3-support brief for its shape. What
+  it finds is exposed even where nothing uses it yet, such as whether a frame ends exactly where
+  the trailing tags start. Its limits on reads have reasonable defaults, to become configurable.
+- **The `incomplete` warning advertises `goro audit`,** even before audit exists.
+- **APEv1 text is read as ISO-8859-1,** as Id3v1 is; recorded in
+  [implementation](../implementation.md#choices-the-specifications-leave-open), and flagged by
+  `goro audit`.
+- **A constant-bitrate MP3 without a summary header is counted from the edges;** see
+  [Real-world test data](#real-world-test-data) and
+  [implementation](../implementation.md#choices-the-specifications-leave-open). Only a
+  variable-bitrate one without a header has an unusable duration.
+- **The first of several Id3v2 tags is the `id3v2` source;** `goro audit` reports the rest.
+- **Bytes after the last MP3 frame are never hashed,** and `goro audit` reports them. A summary
+  header is trusted up to an exact frame end with no frame starting there; recorded in
+  [implementation](../implementation.md#choices-the-specifications-leave-open).
+- **The hash covers the codec's own stream and nothing the container adds;** see
+  [What the hash covers](#what-the-hash-covers).
 
 ### Warning categories
 
@@ -345,9 +541,8 @@ warning?" becomes four.
 
 ## Open questions for the lines
 
-- **mp3-support:** APEv1 text is Latin-1 by its own specification, and a reader can decode it so.
-  The identifier documentation says such values "will not read correctly". Should it?
-- **mp3-support:** should the refinement for junk after the last MP3 frame, above, be part of the
-  first version?
 - **All three lines:** how many files in a real collection get an unusable `file::duration` under
-  these rules? Only a real collection can say, and `goro audit` is the tool that will.
+  these rules? Other projects' test data says many MP3s would; see
+  [Real-world test data](#real-world-test-data) for a way to handle the constant-bitrate ones.
+- **mp3-support, ogg-support, flac-support:** the shapes real files showed that the corpus lacked;
+  see [Real-world test data](#real-world-test-data) and each brief.

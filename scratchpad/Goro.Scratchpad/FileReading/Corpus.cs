@@ -16,6 +16,9 @@ public sealed record Recorded(string Tag, string Key, string? Description, strin
 public sealed record Fixture(string Name, string Group, string Description, Func<byte[]> Build)
 {
     public List<Recorded> Recorded { get; } = [];
+
+    /// <summary>Files in other projects' test data whose shape this fixture rebuilds, as "project@commit path".</summary>
+    public List<string> Mirrors { get; } = [];
 }
 
 /// <summary>
@@ -37,6 +40,7 @@ public static class Corpus
         all.AddRange(Mp3AudioDamage());
         all.AddRange(OggFixtures());
         all.AddRange(FlacFixtures());
+        all.AddRange(RealWorldShapes());
         return all;
     }
 
@@ -50,7 +54,7 @@ public static class Corpus
             File.WriteAllBytes(path, f.Build());
         }
 
-        var manifest = fixtures.Select(f => new { file = f.Name, group = f.Group, description = f.Description, recorded = f.Recorded });
+        var manifest = fixtures.Select(f => new { file = f.Name, group = f.Group, description = f.Description, recorded = f.Recorded, mirrors = f.Mirrors.Count == 0 ? null : f.Mirrors });
         File.WriteAllText(Path.Combine(corpusDir, "manifest.json"),
             JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull }));
         File.WriteAllText(Path.Combine(corpusDir, "README.md"), Readme(fixtures));
@@ -90,7 +94,7 @@ public static class Corpus
             the first link of `ogg-chained-vorbis-opus.ogg`, whose links are 3.300 s and 1.700 s long.
 
             """.Replace("            ", ""));
-        foreach (var format in fixtures.GroupBy(f => f.Name.Split('/')[0]))
+        foreach (var format in fixtures.Where(f => f.Group != "real-world").GroupBy(f => f.Name.Split('/')[0]))
         {
             sb.Append($"\n## {format.Key}\n");
             foreach (var group in format.GroupBy(f => f.Group))
@@ -101,6 +105,25 @@ public static class Corpus
                     sb.Append($"| `{f.Name.Split('/')[1]}` | {f.Description.Replace("|", "\\|")} |\n");
                 }
             }
+        }
+
+        sb.Append("""
+
+            ## Shapes from other projects' test data
+
+            Each file below rebuilds, with Goro's own audio and made-up text, a shape found in another
+            project's test data (see `docs/design/file-reading.md`, "Real-world test data"). The originals
+            are not committed: many hold commercial recordings. `fetch-realworld.sh` fetches them at the
+            commits named. The correspondence was checked by machine, comparing what the prototype
+            reader and mutagen make of each pair; the last column is for checking it by hand, once.
+
+            | File | What it is | Mirrors | Checked by hand |
+            |------|------------|---------|-----------------|
+
+            """.Replace("            ", ""));
+        foreach (var f in fixtures.Where(f => f.Group == "real-world"))
+        {
+            sb.Append($"| `{f.Name}` | {f.Description.Replace("|", "\\|")} | {string.Join("<br>", f.Mirrors.Select(m => $"`{m}`"))} | |\n");
         }
 
         return sb.ToString();
@@ -121,7 +144,10 @@ public static class Corpus
     {
         foreach (var fr in frames)
         {
-            f.Recorded.Add(new Recorded(tag, fr.Id, DescriptionOf(fr), TextOf(fr), Fingerprint(fr.Content)));
+            // An encrypted frame cannot be decrypted, so it has no text and no content: unusable to both.
+            f.Recorded.Add(fr.EncryptionMethod is null
+                ? new Recorded(tag, fr.Id, DescriptionOf(fr), TextOf(fr), Fingerprint(fr.Content))
+                : new Recorded(tag, fr.Id, null, null, "", "encrypted: unusable to field() and bytes()"));
         }
 
         return f;
@@ -156,7 +182,7 @@ public static class Corpus
                 text = null;
             }
 
-            f.Recorded.Add(new Recorded(tag, key, null, text is null ? null : [text], Fingerprint(value),
+            f.Recorded.Add(new Recorded(tag, key, null, text is null || eq < 0 ? null : [text], Fingerprint(value),
                 eq < 0 ? "no '=' separator" : text is null ? "value is not valid UTF-8" : null));
         }
 
@@ -195,17 +221,10 @@ public static class Corpus
             return [];
         }
 
-        var isText = f.Id[0] == 'T' && f.Id is not ("TXXX" or "TXX");
+        var isText = f.Id[0] == 'T' && f.Id is not ("TXXX" or "TXX") || f.Id is "GRP1" or "MVNM" or "MVIN";
         if (isText)
         {
-            var enc = c[0];
-            var s = Decode(enc, c.AsSpan(1));
-            if (s.EndsWith('\0'))
-            {
-                s = s[..^1];
-            }
-
-            return s.Split('\0');
+            return Values(c[0], c.AsSpan(1));
         }
 
         if (f.Id is "TXXX" or "WXXX" or "COMM" or "USLT" or "TXX" or "COM")
@@ -214,8 +233,8 @@ public static class Corpus
             var start = f.Id is "COMM" or "USLT" or "COM" ? 4 : 1;
             var end = FindNul(c, start, enc);
             var valueStart = end + (enc is 1 or 2 ? 2 : 1);
-            var valueEncoding = f.Id is "WXXX" ? (byte)0 : enc;
-            return [Decode(valueEncoding, c.AsSpan(Math.Min(valueStart, c.Length)))];
+            var rest = c.AsSpan(Math.Min(valueStart, c.Length));
+            return f.Id is "WXXX" ? [Latin1.GetString(rest)] : Values(enc, rest);
         }
 
         if (f.Id[0] == 'W')
@@ -224,6 +243,62 @@ public static class Corpus
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The values of a text payload, as the decisions say to read them: split at every terminator
+    /// in any revision, a trailing terminator ending the last, each UTF-16 value decoded by its own
+    /// byte order mark, or the frame's, or little-endian. Written apart from the readers, so that the
+    /// manifest does not share their mistakes.
+    /// </summary>
+    static string[] Values(byte enc, ReadOnlySpan<byte> b)
+    {
+        var width = enc is 1 or 2 ? 2 : 1;
+        var parts = new List<string>();
+        bool? bigEndian = enc == 2 ? true : null;
+        var startAt = 0;
+        for (var i = 0; i + width <= b.Length; i += width)
+        {
+            if (b[i] == 0 && (width == 1 || b[i + 1] == 0))
+            {
+                parts.Add(One(b[startAt..i]));
+                startAt = i + width;
+            }
+        }
+
+        if (startAt < b.Length || parts.Count == 0)
+        {
+            parts.Add(One(b[startAt..]));
+        }
+
+        return parts.ToArray();
+
+        string One(ReadOnlySpan<byte> part)
+        {
+            if (enc is 0)
+            {
+                return Latin1.GetString(part);
+            }
+
+            if (enc is 3)
+            {
+                return Utf8.GetString(part);
+            }
+
+            if (part.Length >= 2 && part[0] == 0xFF && part[1] == 0xFE)
+            {
+                bigEndian = false;
+                part = part[2..];
+            }
+            else if (part.Length >= 2 && part[0] == 0xFE && part[1] == 0xFF)
+            {
+                bigEndian = true;
+                part = part[2..];
+            }
+
+            bigEndian ??= false;
+            return (bigEndian.Value ? Encoding.BigEndianUnicode : Encoding.Unicode).GetString(part);
+        }
     }
 
     static int FindNul(byte[] c, int start, byte enc)
@@ -387,7 +462,7 @@ public static class Corpus
         l.Add("mp3/id3v2-twice.mp3", g, "Two Id3v2 tags back to back (v2.4 then v2.3), as some taggers leave behind.",
                 () => Mp3(cbr(), [Id3v2(4, [new("TIT2", Text(0, "first tag"))]), Id3v2(3, [new("TIT2", Text(0, "second tag"))])], []))
             .Records("id3v2.4", [new("TIT2", Text(0, "first tag"))])
-            .Records("id3v2.3", [new("TIT2", Text(0, "second tag"))]);
+            .Note("id3v2.3", "*", "the second tag is not the id3v2 source; only the first is read");
         l.Add("mp3/id3v24-appended.mp3", g, "An Id3v2.4 tag with a footer appended after the audio (and before an Id3v1 tag), as the format allows.",
                 () => Mp3(cbr(), [], [Id3v2(4, [new("TIT2", Text(0, "appended tag"))], new() { Footer = true }), StandardId3v1()]))
             .Records("id3v2.4", [new("TIT2", Text(0, "appended tag"))]);
@@ -585,6 +660,155 @@ public static class Corpus
             U16BE(entries), U16BE(1), U16BE(2), U16BE(perEntry), Concat(Enumerable.Repeat(U16BE(bytes / entries), entries).ToArray()));
         vbri.CopyTo(f, 36);
         return f;
+    }
+
+    // ================================================================================ shapes from real files
+
+    const string MusicMetadata = "music-metadata@9b71259", Mutagen = "mutagen@ada28b2", TagLib = "taglib@961dd69", TagLibSharp = "taglib-sharp@da41dc3";
+
+    static Fixture Mirror(this Fixture f, string project, params string[] paths)
+    {
+        f.Mirrors.AddRange(paths.Select(p => $"{project} {p}"));
+        return f;
+    }
+
+    static byte[] Utf16LeNoBom(string s) => Encoding.Unicode.GetBytes(s);
+
+    static IEnumerable<Fixture> RealWorldShapes()
+    {
+        var l = new List<Fixture>();
+        const string g = "real-world";
+        var cbr = () => Seed("mp3-cbr-notag.mp3");
+
+        var apple = new List<Frame> { new("TIT2", Text(0, "Constant bitrate, no Info frame")), new("TPE1", Text(0, "Artist")), new("TENC", Text(0, "an encoder writing no Info frame")) };
+        l.Add("mp3/rw-cbr-no-info.mp3", g, "Constant-bitrate MP3 with no Xing, Info or VBRI frame, behind an Id3v2.3 tag and before Id3v1, as Apple's encoders and others write it.",
+                () => Mp3(cbr(), [Id3v2(3, apple)], [StandardId3v1()]))
+            .Records("id3v2.3", apple)
+            .Mirror(MusicMetadata, "test/samples/mp3/Sleep Away.mp3", "test/samples/04 - You Don't Know.mp3", "test/samples/mp3/issue-2574.mp3");
+        l.Add("mp3/rw-cbr-no-info-truncated.mp3", g, "The same file cut 150 bytes into its last frame: the edge method must reject it, since no frame ends where the audio does.",
+                () => Mp3(cbr(), [Id3v2(3, apple)], [])[..^150])
+            .Records("id3v2.3", apple)
+            .Mirror(Mutagen, "tests/data/xing.mp3").Mirror(TagLib, "tests/data/xing.mp3", "tests/data/id3v22-tda.mp3");
+
+        var illegal = new List<Frame>
+        {
+            new("Date", Concat([1, 0xFF, 0xFE], Encoding.Unicode.GetBytes("2010"))),
+            new("TLEN", Text(1, "114000")), new("TPE1", Text(1, "Artist")), new("TALB", Text(1, "Album")),
+            new("TPE2", Text(1, "Album Artist")), new("TIT2", Text(1, "One")), new("TRCK", Text(1, "1")),
+        };
+        l.Add("mp3/rw-illegal-frame-id.mp3", g, "Id3v2.3 whose first frame is named `Date`, lowercase and so illegal, with a good size; six frames follow.",
+                () => Mp3(cbr(), [Id3v2(3, illegal)], []))
+            .Records("id3v2.3", illegal.Skip(1))
+            .Mirror(MusicMetadata, "test/samples/bug-id3v2-unknownframe.mp3");
+
+        // v2.3's frame layout (four-byte sizes, two flag bytes) under v2.2's three-letter names, each
+        // padded to four bytes with a zero.
+        var v22 = new List<Frame> { new("TP1\0", Text(0, "Artist")), new("TP2\0", Text(0, "Artist ")), new("TAL\0", Text(0, "Album")), new("TT2\0", Text(0, "Title")), new("TEN\0", Text(0, "iTunes 12.1.2.27")) };
+        l.Add("mp3/rw-v22-names-in-v23-tag.mp3", g, "Id3v2.3 frames named with v2.2's three-letter identifiers, each padded with a zero byte, as iTunes 12.1 wrote them. Reading them is deferred.",
+                () => Mp3(cbr(), [Id3v2(3, v22)], []))
+            .Note("id3v2.3", "*", "v2.2 names in v2.3 frames; deferred, so the tag yields nothing")
+            .Mirror(MusicMetadata, "test/samples/mp3/issue-795.mp3");
+
+        var noBom = new List<Frame> { new("TIT2", Concat([1], Utf16LeNoBom("Title without a BOM"))), new("TALB", Concat([1], Utf16LeNoBom("XII"))), new("TPE1", Concat([1], Utf16LeNoBom("Ärtist"))) };
+        l.Add("mp3/rw-utf16-no-bom.mp3", g, "Id3v2.3 text frames in encoding 1, little-endian UTF-16 with no byte order mark.",
+                () => Mp3(cbr(), [Id3v2(3, noBom)], []))
+            .Records("id3v2.3", noBom)
+            .Mirror(MusicMetadata, "test/samples/mp3/issue-471.mp3");
+
+        var descNoBom = new List<Frame>
+        {
+            new("TIT2", Text(1, "Tëst")),
+            new("COMM", Concat([1], Ascii("eng"), Encoding.Unicode.GetBytes("Dësc without BOM"), [0, 0], [0xFF, 0xFE], Encoding.Unicode.GetBytes("Tëst"))),
+            new("COMM", Comment(1, "eng", "Dësc with BOM", "Tëst")),
+            new("COMM", Concat([1], Ascii("eng"), [0xFE, 0xFF], Encoding.BigEndianUnicode.GetBytes("Dësc big-endian"), [0, 0], [0xFE, 0xFF], Encoding.BigEndianUnicode.GetBytes("Tëst"))),
+        };
+        l.Add("mp3/rw-utf16-description-no-bom.mp3", g, "Id3v2.4 `COMM` frames whose UTF-16 descriptions have a little-endian mark, none, and a big-endian mark.",
+                () => Mp3(cbr(), [Id3v2(4, descNoBom)], []))
+            .Records("id3v2.4", descNoBom)
+            .Mirror(MusicMetadata, "test/samples/issue-2736-utf16.mp3");
+
+        var secondNoBom = new List<Frame> { new("TIT2", Concat([1, 0xFF, 0xFE], Encoding.Unicode.GetBytes("T"), [0, 0], Encoding.Unicode.GetBytes("T"))) };
+        l.Add("mp3/rw-v23-second-value-no-bom.mp3", g, "Id3v2.3 `TIT2` in UTF-16 holding two values, only the first with a byte order mark.",
+                () => Mp3(cbr(), [Id3v2(3, secondNoBom)], []))
+            .Records("id3v2.3", secondNoBom)
+            .Mirror(TagLibSharp, "tests/TaglibSharp.Tests/samples/corrupt/null_title_v2.mp3");
+
+        var multi = new List<Frame>
+        {
+            new("TPE1", Text(0, "First Artist", "Second Artist")),
+            // In UTF-16 every value has its own byte order mark, as in both originals.
+            new("TXXX", Concat([1], Encode(1, "ARTISTS"), [0, 0], Encode(1, "First Artist"), [0, 0], Encode(1, "Second Artist"))),
+            new("COMM", Concat([1], Ascii("eng"), Encode(1, ""), [0, 0], Encode(1, "[One]"), [0, 0], Encode(1, "[Two]"))),
+        };
+        l.Add("mp3/rw-v23-nul-separated-values.mp3", g, "Id3v2.3 `TPE1`, `TXXX` and `COMM` frames each holding two values separated by a terminator, which v2.3 does not provide for.",
+                () => Mp3(cbr(), [Id3v2(3, multi)], []))
+            .Records("id3v2.3", multi)
+            .Mirror(MusicMetadata, "test/samples/Discogs - Beth Hart - Sinner's Prayer [id3v2.3].mp3", "test/samples/mp3/null-separator.id3v2.3.mp3");
+
+        var appleFrames = new List<Frame> { new("TIT1", Text(3, "Work")), new("GRP1", Text(3, "Grouping")), new("MVNM", Text(3, "Movement Name")), new("MVIN", Text(3, "1/4")) };
+        l.Add("mp3/rw-apple-text-frames.mp3", g, "Id3v2.4 with Apple's text frames `GRP1`, `MVNM` and `MVIN`, beside `TIT1`.",
+                () => Mp3(cbr(), [Id3v2(4, appleFrames)], []))
+            .Records("id3v2.4", appleFrames)
+            .Mirror(MusicMetadata, "test/samples/mp3/herbal-tea-GRP1.mp3", "test/samples/mp3/pr-544-id3v24.mp3");
+
+        var first = new List<Frame> { new("TIT2", Text(0, "First tag title")), new("TPE1", Text(0, "First tag artist")), new("TRCK", Text(0, "1")) };
+        l.Add("mp3/rw-three-id3v2-tags.mp3", g, "Three Id3v2 tags in a row, v2.3 then v2.4 twice, disagreeing about title, artist and track. Only the first is the `id3v2` source.",
+                () => Mp3(cbr(), [
+                    Id3v2(3, first),
+                    Id3v2(4, [new("TIT2", Text(3, "Second tag title")), new("TRCK", Text(3, "1/13"))]),
+                    Id3v2(4, [new("TIT2", Text(3, "Third tag title")), new("TPE1", Text(3, "Third tag artist"))])], []))
+            .Records("id3v2.3", first)
+            .Mirror(MusicMetadata, "test/samples/id3-multi-01.mp3", "test/samples/id3-multi-02.mp3").Mirror(TagLib, "tests/data/duplicate_id3v2.mp3");
+
+        var shortComments = FlacComments().Take(6).ToList();
+        l.Add("flac/rw-comment-block-too-short.flac", "real-world", "FLAC whose `VORBIS_COMMENT` block, the last, declares 48 bytes but holds all its comments; the frames start where the comments end.",
+                () =>
+                {
+                    var f = Seed("flac-minimal.flac");
+                    var (parsed, audio) = Flac.Parse(f);
+                    var vc = VorbisComment(new string('v', 32), shortComments);
+                    return Concat(Ascii("fLaC"), Flac.BlockBytes(0, parsed[0].Data, false), Flac.BlockBytes(4, vc, true, 48), f[audio..]);
+                })
+            .Comments("vorbis", shortComments)
+            .Mirror(Mutagen, "tests/data/52-too-short-block-size.flac");
+
+        l.Add("ogg/rw-vorbis-skeleton.ogg", g, "Ogg Vorbis multiplexed with an Ogg Skeleton v4 stream, an index rather than audio: fishead, the Vorbis identification header, fisbone, the other Vorbis headers, an empty Skeleton end page, then the audio.",
+                () => WithSkeleton(WithComments("ogg-vorbis.ogg", VorbisComments().Take(3).ToList())))
+            .Comments("vorbis", VorbisComments().Take(3))
+            .Mirror(MusicMetadata, "test/samples/ogg/ogg-vorbis-skeleton-v4.ogg", "test/samples/ogg/ogg-vorbis-skeleton-v3.ogg");
+        l.Add("ogg/rw-flac-in-ogg.ogg", g, "Ogg FLAC under the `.ogg` extension: a codec Goro does not read, in a file it would discover.",
+                () => Seed("flac-in-ogg.oga"))
+            .Mirror(MusicMetadata, "test/samples/ogg/audio.flac.ogg").Mirror(TagLib, "tests/data/empty_flac.oga");
+        l.Add("ogg/rw-speex-in-ogg.ogg", g, "Ogg Speex under the `.ogg` extension, as speexenc writes it.",
+                () => Seed("ogg-speex.ogg"))
+            .Mirror(MusicMetadata, "test/samples/ogg/audio.speex.ogg");
+        return l;
+    }
+
+    /// <summary>Multiplexes an Ogg Skeleton v4 stream with a single-stream Vorbis file, laid out as the real files are.</summary>
+    static byte[] WithSkeleton(byte[] vorbis)
+    {
+        var pages = Ogg.Pages(vorbis);
+        var serial = pages[0].Serial;
+        var lastHeaderPage = Ogg.Packets(pages, serial)[2].EndPage;
+        const uint skeleton = 0x5345_4B4C;
+        var fishead = Concat(Ascii("fishead\0"), BitConverter.GetBytes((ushort)4), BitConverter.GetBytes((ushort)0),
+            BitConverter.GetBytes(0L), BitConverter.GetBytes(1000L), BitConverter.GetBytes(0L), BitConverter.GetBytes(1000L),
+            new byte[20], BitConverter.GetBytes(0UL), BitConverter.GetBytes(0UL));
+        var fisbone = Concat(Ascii("fisbone\0"), BitConverter.GetBytes(44u), BitConverter.GetBytes(serial), BitConverter.GetBytes(3u),
+            BitConverter.GetBytes(44100L), BitConverter.GetBytes(1L), BitConverter.GetBytes(0L), BitConverter.GetBytes(2u), [0, 0, 0, 0],
+            Ascii("Content-Type: audio/vorbis\r\nRole: audio/main\r\nName: audio_0\r\n"));
+        byte[] Slice(OggPage p) => vorbis.AsSpan((int)p.Offset, p.Length).ToArray();
+        var parts = new List<byte[]>
+        {
+            Ogg.RenderPage(2, 0, skeleton, 0, [(byte)fishead.Length], fishead),
+            Slice(pages[0]),
+            Ogg.RenderPage(0, 0, skeleton, 1, [(byte)fisbone.Length], fisbone),
+        };
+        parts.AddRange(pages.Skip(1).Take(lastHeaderPage).Select(Slice));
+        parts.Add(Ogg.RenderPage(4, 0, skeleton, 2, [0], []));
+        parts.AddRange(pages.Skip(lastHeaderPage + 1).Select(Slice));
+        return Concat(parts.ToArray());
     }
 
     // ================================================================================ Ogg

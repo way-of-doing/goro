@@ -112,7 +112,7 @@ Unlike other tag formats, APE prescribes no fixed set of item keys and no naming
 
 A key is matched without regard to case. An APE item need not hold text. An item flagged as an external locator holds text, the locator, so `field()` reads it as it reads any other. An item flagged as binary -- a `Cover Art (Front)` item, typically -- has no text to give, and `field()` resolves it to an unusable occurrence. `bytes()` reads an item of any kind, and gives its whole value as a single occurrence, so `ape::bytes(key)` never holds more than one occurrence.
 
-Two quirks are worth knowing. APE forbids a tag from carrying two keys that differ only in case, but files that do so exist, and Goro sees only the last of them. And the earlier revision of the format specified its values as ISO-8859-1 rather than UTF-8; such files are uncommon, but a value in one that uses any character outside ASCII will not read correctly.
+Two quirks are worth knowing. APE forbids a tag from carrying two keys that differ only in case, but files that do so exist, and Goro sees only the last of them. And the earlier revision of the format specified its values as plain ASCII, where the later one specifies UTF-8, and programs writing it stored whatever their local code page held. Goro reads such values as ISO-8859-1, as it reads Id3v1, so a value written in another code page reads as the wrong text, though usable.
 
 ### Source `file`
 
@@ -176,7 +176,7 @@ Reads the Id3v2 tag of a file that carries one. Every concept and every source f
 
 A frame is named by its identifier, four letters or digits such as `TIT2`, matched without regard to case; see [Frame names and tag versions](#frame-names-and-tag-versions) for which identifier that is.
 
-`field()` reads only frames that hold text: those whose identifier begins with `T` or `W`, and `COMM` and `USLT`, and naming any other frame is an error. Four of these, `TXXX`, `WXXX`, `COMM` and `USLT`, carry a description alongside their value, and are told apart by it rather than by their identifier. `field()` gives the value alone. Without a description it reads every such frame, and with one it reads only the frames whose description matches, compared without regard to case: `id3v2::field("TXXX", "MOOD")` reads the user-defined text frames described as `MOOD`, and `id3v2::field("COMM", "")` the comments with no description. Giving a description for any other frame is an error. The language a `COMM` or `USLT` frame records is not part of what `field()` reads.
+`field()` reads only frames that hold text: those whose identifier begins with `T` or `W`, `COMM` and `USLT`, and Apple's `GRP1`, `MVNM` and `MVIN`, and naming any other frame is an error. Four of these, `TXXX`, `WXXX`, `COMM` and `USLT`, carry a description alongside their value, and are told apart by it rather than by their identifier. `field()` gives the value alone. Without a description it reads every such frame, and with one it reads only the frames whose description matches, compared without regard to case: `id3v2::field("TXXX", "MOOD")` reads the user-defined text frames described as `MOOD`, and `id3v2::field("COMM", "")` the comments with no description. Giving a description for any other frame is an error. The language a `COMM` or `USLT` frame records is not part of what `field()` reads.
 
 `bytes()` reads a frame of any kind, and gives one occurrence for each frame, holding its content without the frame header.
 
@@ -194,7 +194,7 @@ Everything in this section applies to every concept and source function of the s
 
 The starting point for every concept is the text of the frame **as recorded in the file**. Goro performs all further interpretation itself rather than inheriting it, which is what allows the result to be independent of the revision the file happens to use.
 
-A value becomes a multivalue for either of two reasons, which are not distinguished from one another. The first is that a frame occurs more than once in the tag: `COMM`, `TXXX` and `WXXX` are told apart by a description rather than by their identifier, so a tag may hold several of each. The second is that a single text frame holds several values, which from v2.4 onwards the format expresses directly.
+A value becomes a multivalue for either of two reasons, which are not distinguished from one another. The first is that a frame occurs more than once in the tag: `COMM`, `TXXX` and `WXXX` are told apart by a description rather than by their identifier, so a tag may hold several of each. The second is that a single text frame holds several values, separated by a terminator. Only v2.4 provides for that, but taggers write earlier revisions the same way, and Goro reads them alike.
 
 #### Genres
 
@@ -211,11 +211,11 @@ The table referred to throughout is the Id3v1 genre table together with its wide
 
 #### Per-version caveats
 
-**Id3v2.2.** Frames are named by their v2.4 equivalents, as described above. A text frame never holds more than one value, so a multivalue can only arise from a repeated frame.
+**Id3v2.2.** Frames are named by their v2.4 equivalents, as described above. The revision gives a text frame one value, but several separated by a terminator are read as several values, as in v2.4.
 
-**Id3v2.3.** A text frame never holds more than one value. The year is recorded in a different frame from the day and month: `TYER` is read as `TDRC`, while `TDAT` and `TIME` keep their names, so `id3v2::year` reads the year of a v2.3 file as it does any other, and the rest of the date is reached through `id3v2::field("TDAT")` and `id3v2::field("TIME")`.
+**Id3v2.3.** The revision gives a text frame one value, but several separated by a terminator are read as several values, as in v2.4. The year is recorded in a different frame from the day and month: `TYER` is read as `TDRC`, while `TDAT` and `TIME` keep their names, so `id3v2::year` reads the year of a v2.3 file as it does any other, and the rest of the date is reached through `id3v2::field("TDAT")` and `id3v2::field("TIME")`.
 
-**Id3v2.4.** A single text frame may hold several values, and this is the only revision in which the format says so. The parenthesized genre conventions belong to the earlier revisions and are not part of this one, but files carrying them are common, since that is what a conversion from an earlier revision leaves behind, and Goro understands them here too.
+**Id3v2.4.** A single text frame may hold several values, and this is the only revision in which the format says so, though Goro reads the earlier ones the same way. The parenthesized genre conventions belong to the earlier revisions and are not part of this one, but files carrying them are common, since that is what a conversion from an earlier revision leaves behind, and Goro understands them here too.
 
 ### Source `vorbis`
 

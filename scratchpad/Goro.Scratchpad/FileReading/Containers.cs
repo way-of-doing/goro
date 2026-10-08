@@ -11,6 +11,9 @@ public readonly record struct MpegHeader(
     public int SamplesPerFrame => Layer switch { 1 => 384, 2 => 1152, _ => Version == 1 ? 1152 : 576 };
     public bool Mono => ChannelMode == 3;
 
+    /// <summary>The mean frame length at this bitrate: what the padding bit keeps a constant-bitrate stream to.</summary>
+    public double AverageFrameLength => (Layer == 1 ? 48.0 : Layer == 3 && Version != 1 ? 72.0 : 144.0) * BitrateKbps * 1000 / SampleRate;
+
     /// <summary>Bytes from the frame start to the Xing/Info tag: header, CRC, side info.</summary>
     public int XingOffset => 4 + (Crc ? 2 : 0) + (Version == 1 ? (Mono ? 17 : 32) : (Mono ? 9 : 17));
 

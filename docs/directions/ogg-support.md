@@ -49,3 +49,26 @@ extension, to a value that survives tag edits, with tests that edit tags and com
 probe does, and with tests that pin what damaged tag data in an Ogg file resolves to.
 
 ## Log
+
+- 2026-10-08 -- The [file-reading](../design/file-reading.md) survey answered several of the
+  questions above, and its decisions hold here too. Goro reads Ogg itself, with no TagLib classes.
+  Chained and multiplexed files are declined (see [limitations](../design/limitations.md)); what
+  declining means operationally, presumably an unreadable file, is still to settle. Measured with
+  ffmpeg: `OpusHead` pre-skip and output gain, and the final granule of both codecs, change the
+  decoded output, while Opus's input sample rate and Vorbis's bitrate fields do not. The survey
+  leans towards hashing packets plus such decode parameters, for every format. A comment on a page
+  failing its CRC is unusable, the structure counting as broken from that page. The damaged-data
+  rules of mp3-support apply, and the corpus already holds damaged comment packets for both
+  codecs, a multipage comment included. Still open: the Vorbis start offset, which the prototype
+  assumes to be 0, and the canonical form of the hashed parameters.
+- 2026-10-08 -- Decided in file-reading: the hash covers every packet of the logical stream except
+  the comment packet, so the identification and setup headers and `OpusHead` are in, and pages,
+  granule positions and comments are out; see
+  [What the hash covers](../design/file-reading.md#what-the-hash-covers). This replaces the
+  leaning towards decode parameters above. Still open: how packet boundaries enter the hash, since
+  concatenated packets would not show a damaged lacing value that moves one.
+- 2026-10-08 -- Real files ([file-reading](../design/file-reading.md#real-world-test-data)) add two
+  questions. Ogg Skeleton, an index stream beside the audio, makes five test files multiplexed, so
+  declining multiplexed files throws them out; should Skeleton be ignored as not audio? And `.ogg`
+  files can hold FLAC, Speex or Theora: declined as audio Goro does not read, presumably, and the
+  prototype gives them 0 s rather than an unusable duration, a bug to avoid.

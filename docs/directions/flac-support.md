@@ -45,3 +45,22 @@ tag edits, with tests that edit tags and compare hashes as the probe does, and w
 pin what damaged tag data in a FLAC file resolves to.
 
 ## Log
+
+- 2026-10-08 -- The [file-reading](../design/file-reading.md) survey answered several of the
+  questions above, and its decisions hold here too. Goro reads FLAC itself, walking the metadata
+  blocks without trusting their lengths, so it finds the audio's start without TagLib. Measured
+  with ffmpeg: STREAMINFO's sample rate changes the stream's rate when frame headers defer to it,
+  and nothing when they do not; its total samples, MD5 and frame size bounds change nothing. The
+  survey leans towards hashing the frames plus the stream parameters. Playing time is STREAMINFO
+  when the last intact frame confirms it, else that frame. The damaged-data rules of mp3-support
+  apply, and the corpus holds damaged comment blocks, broken block chains, and stray Id3v2, APE
+  and Id3v1 tags. Still open: the heuristic telling a damaged tail from a truncation, which rests
+  on two fixtures, and the canonical form of the hashed parameters.
+- 2026-10-08 -- Decided in file-reading: the hash covers the frames, from the first to the end of the
+  last whole frame, and STREAMINFO is left out; see
+  [What the hash covers](../design/file-reading.md#what-the-hash-covers). This replaces the
+  leaning towards the frames plus the stream parameters above.
+- 2026-10-08 -- Real files ([file-reading](../design/file-reading.md#real-world-test-data)) include
+  a `VORBIS_COMMENT` block declaring fewer bytes than it holds, an encoder bug mutagen reads
+  through and the prototype treats as a broken structure. Decide whether to read through it, as a
+  quirk.

@@ -1,0 +1,65 @@
+# Quirks
+
+This file records what Goro does on purpose against a format's specification, because files in
+the world are written that way and reading them as their writers meant serves the people who own
+them. It is the counterpart of [limitations](limitations.md), where Goro does less than it could,
+and of the [implementation notes](../implementation.md)' choices, where a specification is silent
+and Goro has to pick. Each entry says what the specification says, what Goro does instead, and
+what that costs. `goro audit` reports each quirk where a file needs it.
+
+## Several values in an Id3v2.3 or v2.2 text frame
+
+**The specifications:** v2.3 gives a text frame one value, and says that if the text "is followed by
+a termination ($00 (00)) all the following information should be ignored and not be displayed".
+v2.2 is the same. Only v2.4 separates several values with a terminator.
+
+**What Goro does:** reads a terminator inside the text of any revision as separating values, as
+v2.4 does, so `TPE1` holding `A`, NUL, `B` in a v2.3 tag is two artists. Taggers write v2.3 frames
+this way, and mutagen reads them so; other projects' test data has a v2.3 `TXXX` holding two
+artists written exactly like that. In UTF-16 text a later value may lack its own byte order mark,
+and then has the first value's, which is also what v2.4 means when it says all strings in a frame
+"SHALL have the same byteorder".
+
+**What it costs:** a writer that followed v2.3 to the letter and put something after a terminator
+meaning it to be ignored has that read as a further value. No such file has been seen.
+
+## Apple's text frames `GRP1`, `MVNM` and `MVIN`
+
+**The specifications:** no revision of Id3v2 defines them, and Goro's identifier documentation
+otherwise reads text only from frames whose identifier begins with `T` or `W`, and `COMM` and
+`USLT`.
+
+**What Goro does:** reads `GRP1` (grouping), `MVNM` (movement name) and `MVIN` (movement number) as
+the text frames they are laid out as, so `field()` takes them. They are Apple's, introduced with
+iTunes 12.5 when grouping moved out of `TIT1` (by Apple's documented use; not verified here), and
+other tools now write them too: the `GRP1` frame in music-metadata's test data was written by
+ffmpeg.
+
+**What it costs:** nothing that has been seen; the list is closed, and grows only by decision.
+
+## An Id3v2 frame with an illegal identifier
+
+**The specifications:** a frame identifier is made of the capital letters `A` to `Z` and the digits
+`0` to `9`. Both v2.3 and v2.4 give every frame a size so that software can skip frames it does not
+know.
+
+**What Goro does:** steps over a frame whose identifier breaks that rule, by its size, when the
+size lands on another frame, the padding, or the end of the tag. The frames after it are read as
+usual. The frame itself cannot be named by `field()` or `bytes()`, since Goro's identifier check
+rejects its name. Real files carry such frames; one in other projects' test data opens with a
+frame named `Date`, and without this its six other frames would be lost.
+
+**What it costs:** a damaged identifier whose size happens to land on a frame boundary is taken for
+an odd frame rather than a break in the structure, and its frame is not reported as damage, only by
+audit.
+
+## Id3v2.4 frame sizes written as plain integers
+
+**The specification:** v2.4 frame sizes are syncsafe integers, seven bits to a byte.
+
+**What Goro does:** when the frames do not line up read as syncsafe and do read as plain
+integers, it reads the whole tag that way, as iTunes once wrote it, and as TagLib and mutagen
+do.
+
+**What it costs:** nothing that has been seen; the two readings disagree only on frames of 128
+bytes or more, and only one of them lines up.

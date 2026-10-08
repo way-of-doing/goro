@@ -11,7 +11,7 @@ goro/
 ├── docs/                   # Important vision and design instructions   
 │   └── commands/           # Unix man-style description of each command Goro understands
 │   └── concepts/           # Docs that describe cross-cutting concerns etc; linked to by other docs
-│   └── design/             # Design rationale, plus deferred features and open questions
+│   └── design/             # Design rationale, deferred features, limitations, quirks, and open questions
 │   └── directions/         # One brief per line of development: what it is for, its status, and a log of decisions
 │       └── archive/        # Archived briefs for completed or abandoned lines of development
 │   └── features/           # Explanatory text around Goro features 

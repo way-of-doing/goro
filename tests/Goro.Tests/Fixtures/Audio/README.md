@@ -182,3 +182,28 @@ the first link of `ogg-chained-vorbis-opus.ogg`, whose links are 3.300 s and 1.7
 | `dmg-block-length-overrun.flac` | FLAC: the VORBIS_COMMENT block header claims 200 bytes more than the block holds, so the next block header is misread. |
 | `dmg-no-last-block-flag.flac` | FLAC whose metadata blocks never set the last-block flag, so a reader walks into the first frame. |
 | `dmg-zeroed-comment.flac` | FLAC with 64 bytes in the middle of the VORBIS_COMMENT block zeroed. |
+
+## Shapes from other projects' test data
+
+Each file below rebuilds, with Goro's own audio and made-up text, a shape found in another
+project's test data (see `docs/design/file-reading.md`, "Real-world test data"). The originals
+are not committed: many hold commercial recordings. `fetch-realworld.sh` fetches them at the
+commits named. The correspondence was checked by machine, comparing what the prototype
+reader and mutagen make of each pair; the last column is for checking it by hand, once.
+
+| File | What it is | Mirrors | Checked by hand |
+|------|------------|---------|-----------------|
+| `mp3/rw-cbr-no-info.mp3` | Constant-bitrate MP3 with no Xing, Info or VBRI frame, behind an Id3v2.3 tag and before Id3v1, as Apple's encoders and others write it. | `music-metadata@9b71259 test/samples/mp3/Sleep Away.mp3`<br>`music-metadata@9b71259 test/samples/04 - You Don't Know.mp3`<br>`music-metadata@9b71259 test/samples/mp3/issue-2574.mp3` | |
+| `mp3/rw-cbr-no-info-truncated.mp3` | The same file cut 150 bytes into its last frame: the edge method must reject it, since no frame ends where the audio does. | `mutagen@ada28b2 tests/data/xing.mp3`<br>`taglib@961dd69 tests/data/xing.mp3`<br>`taglib@961dd69 tests/data/id3v22-tda.mp3` | |
+| `mp3/rw-illegal-frame-id.mp3` | Id3v2.3 whose first frame is named `Date`, lowercase and so illegal, with a good size; six frames follow. | `music-metadata@9b71259 test/samples/bug-id3v2-unknownframe.mp3` | |
+| `mp3/rw-v22-names-in-v23-tag.mp3` | Id3v2.3 frames named with v2.2's three-letter identifiers, each padded with a zero byte, as iTunes 12.1 wrote them. Reading them is deferred. | `music-metadata@9b71259 test/samples/mp3/issue-795.mp3` | |
+| `mp3/rw-utf16-no-bom.mp3` | Id3v2.3 text frames in encoding 1, little-endian UTF-16 with no byte order mark. | `music-metadata@9b71259 test/samples/mp3/issue-471.mp3` | |
+| `mp3/rw-utf16-description-no-bom.mp3` | Id3v2.4 `COMM` frames whose UTF-16 descriptions have a little-endian mark, none, and a big-endian mark. | `music-metadata@9b71259 test/samples/issue-2736-utf16.mp3` | |
+| `mp3/rw-v23-second-value-no-bom.mp3` | Id3v2.3 `TIT2` in UTF-16 holding two values, only the first with a byte order mark. | `taglib-sharp@da41dc3 tests/TaglibSharp.Tests/samples/corrupt/null_title_v2.mp3` | |
+| `mp3/rw-v23-nul-separated-values.mp3` | Id3v2.3 `TPE1`, `TXXX` and `COMM` frames each holding two values separated by a terminator, which v2.3 does not provide for. | `music-metadata@9b71259 test/samples/Discogs - Beth Hart - Sinner's Prayer [id3v2.3].mp3`<br>`music-metadata@9b71259 test/samples/mp3/null-separator.id3v2.3.mp3` | |
+| `mp3/rw-apple-text-frames.mp3` | Id3v2.4 with Apple's text frames `GRP1`, `MVNM` and `MVIN`, beside `TIT1`. | `music-metadata@9b71259 test/samples/mp3/herbal-tea-GRP1.mp3`<br>`music-metadata@9b71259 test/samples/mp3/pr-544-id3v24.mp3` | |
+| `mp3/rw-three-id3v2-tags.mp3` | Three Id3v2 tags in a row, v2.3 then v2.4 twice, disagreeing about title, artist and track. Only the first is the `id3v2` source. | `music-metadata@9b71259 test/samples/id3-multi-01.mp3`<br>`music-metadata@9b71259 test/samples/id3-multi-02.mp3`<br>`taglib@961dd69 tests/data/duplicate_id3v2.mp3` | |
+| `flac/rw-comment-block-too-short.flac` | FLAC whose `VORBIS_COMMENT` block, the last, declares 48 bytes but holds all its comments; the frames start where the comments end. | `mutagen@ada28b2 tests/data/52-too-short-block-size.flac` | |
+| `ogg/rw-vorbis-skeleton.ogg` | Ogg Vorbis multiplexed with an Ogg Skeleton v4 stream, an index rather than audio: fishead, the Vorbis identification header, fisbone, the other Vorbis headers, an empty Skeleton end page, then the audio. | `music-metadata@9b71259 test/samples/ogg/ogg-vorbis-skeleton-v4.ogg`<br>`music-metadata@9b71259 test/samples/ogg/ogg-vorbis-skeleton-v3.ogg` | |
+| `ogg/rw-flac-in-ogg.ogg` | Ogg FLAC under the `.ogg` extension: a codec Goro does not read, in a file it would discover. | `music-metadata@9b71259 test/samples/ogg/audio.flac.ogg`<br>`taglib@961dd69 tests/data/empty_flac.oga` | |
+| `ogg/rw-speex-in-ogg.ogg` | Ogg Speex under the `.ogg` extension, as speexenc writes it. | `music-metadata@9b71259 test/samples/ogg/audio.speex.ogg` | |

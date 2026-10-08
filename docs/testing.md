@@ -99,7 +99,7 @@ concepts and through source functions.
 | A value with whitespace *inside* it, such as `" AC / DC "` | Must yield `AC / DC`: trimming takes the ends and never the middle |
 | A number-typed field, such as the one behind `id3v2::year`, present but empty or only whitespace | Must yield an unusable occurrence: the frame was written and holds no year |
 | The same frame repeated, with and without distinguishing descriptions | Must yield a multivalue of the expected cardinality |
-| A single v2.4 text frame holding several NUL-separated values | The only spec-sanctioned source of multiple values in one frame |
+| A single text frame holding several NUL-separated values, in each revision | The only spec-sanctioned source of multiple values in one frame in v2.4, and read the same way in v2.2 and v2.3 |
 | A frame the library has no class for, holding text | Must be readable through `field()` |
 | An `APIC` frame holding a picture | Must be a usable blob through `bytes()`, holding the frame's content as recorded, so that a predicate can tell a file that has cover art from one that does not; `id3v2::field("APIC")` must be an error |
 | A `TYER` frame, in a v2.3 tag and in a v2.4 tag | Read as `TDRC` in both: the name depends on the frame and never on the revision the tag declares |

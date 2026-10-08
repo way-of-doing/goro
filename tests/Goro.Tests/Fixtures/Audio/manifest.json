@@ -499,10 +499,8 @@
       {
         "Tag": "id3v2.3",
         "Key": "TPE1",
-        "Values": [
-          "secret artist"
-        ],
-        "BytesHex": "0073656372657420617274697374"
+        "BytesHex": "",
+        "Note": "encrypted: unusable to field() and bytes()"
       }
     ]
   },
@@ -639,11 +637,9 @@
       },
       {
         "Tag": "id3v2.3",
-        "Key": "TIT2",
-        "Values": [
-          "second tag"
-        ],
-        "BytesHex": "007365636f6e6420746167"
+        "Key": "*",
+        "BytesHex": "",
+        "Note": "the second tag is not the id3v2 source; only the first is read"
       }
     ]
   },
@@ -1813,9 +1809,6 @@
       {
         "Tag": "vorbis",
         "Key": "NOEQUALSSIGN",
-        "Values": [
-          ""
-        ],
         "BytesHex": "",
         "Note": "no \u0027=\u0027 separator"
       },
@@ -2135,9 +2128,6 @@
       {
         "Tag": "vorbis",
         "Key": "NOEQUALSSIGN",
-        "Values": [
-          ""
-        ],
         "BytesHex": "",
         "Note": "no \u0027=\u0027 separator"
       },
@@ -2932,9 +2922,6 @@
       {
         "Tag": "vorbis",
         "Key": "NOEQUALSSIGN",
-        "Values": [
-          ""
-        ],
         "BytesHex": "",
         "Note": "no \u0027=\u0027 separator"
       },
@@ -2971,5 +2958,480 @@
     "group": "tag-damage",
     "description": "FLAC with 64 bytes in the middle of the VORBIS_COMMENT block zeroed.",
     "recorded": []
+  },
+  {
+    "file": "mp3/rw-cbr-no-info.mp3",
+    "group": "real-world",
+    "description": "Constant-bitrate MP3 with no Xing, Info or VBRI frame, behind an Id3v2.3 tag and before Id3v1, as Apple\u0027s encoders and others write it.",
+    "recorded": [
+      {
+        "Tag": "id3v2.3",
+        "Key": "TIT2",
+        "Values": [
+          "Constant bitrate, no Info frame"
+        ],
+        "BytesHex": "00436f6e7374616e7420626974726174652c206e6f20496e666f206672616d65"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TPE1",
+        "Values": [
+          "Artist"
+        ],
+        "BytesHex": "00417274697374"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TENC",
+        "Values": [
+          "an encoder writing no Info frame"
+        ],
+        "BytesHex": "00616e20656e636f6465722077726974696e67206e6f20496e666f206672616d65"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/mp3/Sleep Away.mp3",
+      "music-metadata@9b71259 test/samples/04 - You Don\u0027t Know.mp3",
+      "music-metadata@9b71259 test/samples/mp3/issue-2574.mp3"
+    ]
+  },
+  {
+    "file": "mp3/rw-cbr-no-info-truncated.mp3",
+    "group": "real-world",
+    "description": "The same file cut 150 bytes into its last frame: the edge method must reject it, since no frame ends where the audio does.",
+    "recorded": [
+      {
+        "Tag": "id3v2.3",
+        "Key": "TIT2",
+        "Values": [
+          "Constant bitrate, no Info frame"
+        ],
+        "BytesHex": "00436f6e7374616e7420626974726174652c206e6f20496e666f206672616d65"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TPE1",
+        "Values": [
+          "Artist"
+        ],
+        "BytesHex": "00417274697374"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TENC",
+        "Values": [
+          "an encoder writing no Info frame"
+        ],
+        "BytesHex": "00616e20656e636f6465722077726974696e67206e6f20496e666f206672616d65"
+      }
+    ],
+    "mirrors": [
+      "mutagen@ada28b2 tests/data/xing.mp3",
+      "taglib@961dd69 tests/data/xing.mp3",
+      "taglib@961dd69 tests/data/id3v22-tda.mp3"
+    ]
+  },
+  {
+    "file": "mp3/rw-illegal-frame-id.mp3",
+    "group": "real-world",
+    "description": "Id3v2.3 whose first frame is named \u0060Date\u0060, lowercase and so illegal, with a good size; six frames follow.",
+    "recorded": [
+      {
+        "Tag": "id3v2.3",
+        "Key": "TLEN",
+        "Values": [
+          "114000"
+        ],
+        "BytesHex": "01fffe310031003400300030003000"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TPE1",
+        "Values": [
+          "Artist"
+        ],
+        "BytesHex": "01fffe410072007400690073007400"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TALB",
+        "Values": [
+          "Album"
+        ],
+        "BytesHex": "01fffe41006c00620075006d00"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TPE2",
+        "Values": [
+          "Album Artist"
+        ],
+        "BytesHex": "01fffe41006c00620075006d002000410072007400690073007400"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TIT2",
+        "Values": [
+          "One"
+        ],
+        "BytesHex": "01fffe4f006e006500"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TRCK",
+        "Values": [
+          "1"
+        ],
+        "BytesHex": "01fffe3100"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/bug-id3v2-unknownframe.mp3"
+    ]
+  },
+  {
+    "file": "mp3/rw-v22-names-in-v23-tag.mp3",
+    "group": "real-world",
+    "description": "Id3v2.3 frames named with v2.2\u0027s three-letter identifiers, each padded with a zero byte, as iTunes 12.1 wrote them. Reading them is deferred.",
+    "recorded": [
+      {
+        "Tag": "id3v2.3",
+        "Key": "*",
+        "BytesHex": "",
+        "Note": "v2.2 names in v2.3 frames; deferred, so the tag yields nothing"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/mp3/issue-795.mp3"
+    ]
+  },
+  {
+    "file": "mp3/rw-utf16-no-bom.mp3",
+    "group": "real-world",
+    "description": "Id3v2.3 text frames in encoding 1, little-endian UTF-16 with no byte order mark.",
+    "recorded": [
+      {
+        "Tag": "id3v2.3",
+        "Key": "TIT2",
+        "Values": [
+          "Title without a BOM"
+        ],
+        "BytesHex": "015400690074006c006500200077006900740068006f007500740020006100200042004f004d00"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TALB",
+        "Values": [
+          "XII"
+        ],
+        "BytesHex": "01580049004900"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TPE1",
+        "Values": [
+          "\u00C4rtist"
+        ],
+        "BytesHex": "01c40072007400690073007400"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/mp3/issue-471.mp3"
+    ]
+  },
+  {
+    "file": "mp3/rw-utf16-description-no-bom.mp3",
+    "group": "real-world",
+    "description": "Id3v2.4 \u0060COMM\u0060 frames whose UTF-16 descriptions have a little-endian mark, none, and a big-endian mark.",
+    "recorded": [
+      {
+        "Tag": "id3v2.4",
+        "Key": "TIT2",
+        "Values": [
+          "T\u00EBst"
+        ],
+        "BytesHex": "01fffe5400eb0073007400"
+      },
+      {
+        "Tag": "id3v2.4",
+        "Key": "COMM",
+        "Description": "D\u00EBsc without BOM",
+        "Values": [
+          "T\u00EBst"
+        ],
+        "BytesHex": "01656e674400eb0073006300200077006900740068006f0075007400200042004f004d000000fffe5400eb0073007400"
+      },
+      {
+        "Tag": "id3v2.4",
+        "Key": "COMM",
+        "Description": "D\u00EBsc with BOM",
+        "Values": [
+          "T\u00EBst"
+        ],
+        "BytesHex": "01656e67fffe4400eb007300630020007700690074006800200042004f004d000000fffe5400eb0073007400"
+      },
+      {
+        "Tag": "id3v2.4",
+        "Key": "COMM",
+        "Description": "D\u00EBsc big-endian",
+        "Values": [
+          "T\u00EBst"
+        ],
+        "BytesHex": "01656e67feff004400eb007300630020006200690067002d0065006e006400690061006e0000feff005400eb00730074"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/issue-2736-utf16.mp3"
+    ]
+  },
+  {
+    "file": "mp3/rw-v23-second-value-no-bom.mp3",
+    "group": "real-world",
+    "description": "Id3v2.3 \u0060TIT2\u0060 in UTF-16 holding two values, only the first with a byte order mark.",
+    "recorded": [
+      {
+        "Tag": "id3v2.3",
+        "Key": "TIT2",
+        "Values": [
+          "T",
+          "T"
+        ],
+        "BytesHex": "01fffe540000005400"
+      }
+    ],
+    "mirrors": [
+      "taglib-sharp@da41dc3 tests/TaglibSharp.Tests/samples/corrupt/null_title_v2.mp3"
+    ]
+  },
+  {
+    "file": "mp3/rw-v23-nul-separated-values.mp3",
+    "group": "real-world",
+    "description": "Id3v2.3 \u0060TPE1\u0060, \u0060TXXX\u0060 and \u0060COMM\u0060 frames each holding two values separated by a terminator, which v2.3 does not provide for.",
+    "recorded": [
+      {
+        "Tag": "id3v2.3",
+        "Key": "TPE1",
+        "Values": [
+          "First Artist",
+          "Second Artist"
+        ],
+        "BytesHex": "00466972737420417274697374005365636f6e6420417274697374"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TXXX",
+        "Description": "ARTISTS",
+        "Values": [
+          "First Artist",
+          "Second Artist"
+        ],
+        "BytesHex": "01fffe41005200540049005300540053000000fffe4600690072007300740020004100720074006900730074000000fffe5300650063006f006e0064002000410072007400690073007400"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "COMM",
+        "Description": "",
+        "Values": [
+          "[One]",
+          "[Two]"
+        ],
+        "BytesHex": "01656e67fffe0000fffe5b004f006e0065005d000000fffe5b00540077006f005d00"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/Discogs - Beth Hart - Sinner\u0027s Prayer [id3v2.3].mp3",
+      "music-metadata@9b71259 test/samples/mp3/null-separator.id3v2.3.mp3"
+    ]
+  },
+  {
+    "file": "mp3/rw-apple-text-frames.mp3",
+    "group": "real-world",
+    "description": "Id3v2.4 with Apple\u0027s text frames \u0060GRP1\u0060, \u0060MVNM\u0060 and \u0060MVIN\u0060, beside \u0060TIT1\u0060.",
+    "recorded": [
+      {
+        "Tag": "id3v2.4",
+        "Key": "TIT1",
+        "Values": [
+          "Work"
+        ],
+        "BytesHex": "03576f726b"
+      },
+      {
+        "Tag": "id3v2.4",
+        "Key": "GRP1",
+        "Values": [
+          "Grouping"
+        ],
+        "BytesHex": "0347726f7570696e67"
+      },
+      {
+        "Tag": "id3v2.4",
+        "Key": "MVNM",
+        "Values": [
+          "Movement Name"
+        ],
+        "BytesHex": "034d6f76656d656e74204e616d65"
+      },
+      {
+        "Tag": "id3v2.4",
+        "Key": "MVIN",
+        "Values": [
+          "1/4"
+        ],
+        "BytesHex": "03312f34"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/mp3/herbal-tea-GRP1.mp3",
+      "music-metadata@9b71259 test/samples/mp3/pr-544-id3v24.mp3"
+    ]
+  },
+  {
+    "file": "mp3/rw-three-id3v2-tags.mp3",
+    "group": "real-world",
+    "description": "Three Id3v2 tags in a row, v2.3 then v2.4 twice, disagreeing about title, artist and track. Only the first is the \u0060id3v2\u0060 source.",
+    "recorded": [
+      {
+        "Tag": "id3v2.3",
+        "Key": "TIT2",
+        "Values": [
+          "First tag title"
+        ],
+        "BytesHex": "00466972737420746167207469746c65"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TPE1",
+        "Values": [
+          "First tag artist"
+        ],
+        "BytesHex": "0046697273742074616720617274697374"
+      },
+      {
+        "Tag": "id3v2.3",
+        "Key": "TRCK",
+        "Values": [
+          "1"
+        ],
+        "BytesHex": "0031"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/id3-multi-01.mp3",
+      "music-metadata@9b71259 test/samples/id3-multi-02.mp3",
+      "taglib@961dd69 tests/data/duplicate_id3v2.mp3"
+    ]
+  },
+  {
+    "file": "flac/rw-comment-block-too-short.flac",
+    "group": "real-world",
+    "description": "FLAC whose \u0060VORBIS_COMMENT\u0060 block, the last, declares 48 bytes but holds all its comments; the frames start where the comments end.",
+    "recorded": [
+      {
+        "Tag": "vorbis",
+        "Key": "TITLE",
+        "Values": [
+          "Title \u2713"
+        ],
+        "BytesHex": "5469746c6520e29c93"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "AC/DC"
+        ],
+        "BytesHex": "41432f4443"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "Mot\u00F6rhead"
+        ],
+        "BytesHex": "4d6f74c3b67268656164"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ALBUM",
+        "Values": [
+          "Album"
+        ],
+        "BytesHex": "416c62756d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "DATE",
+        "Values": [
+          "1991-01-02"
+        ],
+        "BytesHex": "313939312d30312d3032"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "TRACKNUMBER",
+        "Values": [
+          "3"
+        ],
+        "BytesHex": "33"
+      }
+    ],
+    "mirrors": [
+      "mutagen@ada28b2 tests/data/52-too-short-block-size.flac"
+    ]
+  },
+  {
+    "file": "ogg/rw-vorbis-skeleton.ogg",
+    "group": "real-world",
+    "description": "Ogg Vorbis multiplexed with an Ogg Skeleton v4 stream, an index rather than audio: fishead, the Vorbis identification header, fisbone, the other Vorbis headers, an empty Skeleton end page, then the audio.",
+    "recorded": [
+      {
+        "Tag": "vorbis",
+        "Key": "TITLE",
+        "Values": [
+          "Title \u2713"
+        ],
+        "BytesHex": "5469746c6520e29c93"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "AC/DC"
+        ],
+        "BytesHex": "41432f4443"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "Mot\u00F6rhead"
+        ],
+        "BytesHex": "4d6f74c3b67268656164"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/ogg/ogg-vorbis-skeleton-v4.ogg",
+      "music-metadata@9b71259 test/samples/ogg/ogg-vorbis-skeleton-v3.ogg"
+    ]
+  },
+  {
+    "file": "ogg/rw-flac-in-ogg.ogg",
+    "group": "real-world",
+    "description": "Ogg FLAC under the \u0060.ogg\u0060 extension: a codec Goro does not read, in a file it would discover.",
+    "recorded": [],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/ogg/audio.flac.ogg",
+      "taglib@961dd69 tests/data/empty_flac.oga"
+    ]
+  },
+  {
+    "file": "ogg/rw-speex-in-ogg.ogg",
+    "group": "real-world",
+    "description": "Ogg Speex under the \u0060.ogg\u0060 extension, as speexenc writes it.",
+    "recorded": [],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/ogg/audio.speex.ogg"
+    ]
   }
 ]

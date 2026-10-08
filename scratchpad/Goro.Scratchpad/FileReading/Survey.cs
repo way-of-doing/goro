@@ -10,6 +10,8 @@ namespace Goro.Scratchpad.FileReading;
 ///   read <file>...        the prototype's duration evidence and problems for each file
 ///   bench <mp3>...        what a full MP3 scan costs next to the libraries
 ///   taglib-hook           what TagLibSharp's FrameFactory hook is handed
+///   realworld <dir> <out>  dump what the prototype reads from every audio file under a directory
+///   boundaries            where the candidate edges of each MP3's audio fall
 ///   fuzz [rounds]         truncate and overwrite every corpus file; the readers must not throw
 /// </summary>
 public static class Survey
@@ -32,6 +34,26 @@ public static class Survey
                 break;
             case "bench":
                 ScanBench.Run(args[1..]);
+                break;
+            case "candidates":
+                foreach (var path in args[1..])
+                {
+                    Console.WriteLine($"== {Path.GetFileName(path)}");
+                    foreach (var (name, run) in Candidates.All(Path.GetExtension(path).ToLowerInvariant()))
+                    {
+                        var r = run(path);
+                        var fields = r.Fields.Where(f => f.Key is "TIT2" or "TALB" or "TPE1" or "Title" or "Album" or "Artist" or "COMM")
+                            .Select(f => $"{f.Key}{(f.Description is null ? "" : $"[{f.Description}]")}={string.Join("|", (f.Values ?? []).Select(v => v?.Replace("\0", "\\0") ?? "null"))}");
+                        Console.WriteLine($"   {name,-22} {r.Error ?? string.Join("  ", fields)}");
+                    }
+                }
+
+                break;
+            case "realworld":
+                RealWorld.Run(args[1], args[2]);
+                break;
+            case "boundaries":
+                Boundaries.Run(CorpusDir);
                 break;
             case "fuzz":
                 Fuzz.Run(CorpusDir, int.Parse(args.ElementAtOrDefault(1) ?? "200"));
