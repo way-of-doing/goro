@@ -14,6 +14,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Candidates weighed by FileReading/ against the audio fixture corpus. None is used by src/. -->
+    <PackageReference Include="Concentus.Oggfile" Version="1.0.7" />
+    <PackageReference Include="NLayer" Version="3.0.0" />
+    <PackageReference Include="NVorbis" Version="0.10.5" />
+    <PackageReference Include="TagLibSharp2" Version="0.6.0" />
+    <PackageReference Include="z440.atl.core" Version="7.18.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- So that experiments can measure Goro's own code beside the candidates it was chosen from. -->
     <ProjectReference Include="..\..\src\Goro\Goro.csproj" />
   </ItemGroup>
