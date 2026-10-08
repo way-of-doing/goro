@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: broad
 touches: features/builtins/identifiers.md, concepts/warnings.md, concepts/exit-codes.md, commands/hash.md, design/rationale.md, implementation.md, testing.md, faq.md, src/Goro/Predicates/Identifiers, src/Goro/Hashing, src/Goro/Warnings, src/Goro/Goro.csproj
 after: sources-and-fields
-branch:
+branch: line/mp3-support
 ---
 # MP3 files, read by Goro
 
