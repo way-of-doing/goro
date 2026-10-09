@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: active
 size: focused
 touches: commands/hash.md, concepts/pathspecs.md, design/rationale.md, testing.md, src/Goro/Hashing, src/Goro/Discovery
 after: file-discovery-scope
-branch:
+branch: line/flac-support
 ---
 # FLAC files
 
