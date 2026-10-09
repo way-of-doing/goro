@@ -32,7 +32,7 @@ Goro hashes today takes in every metadata block and changes with every tag edit.
 - How the boundary is found: by parsing the metadata block chain ourselves, or through anything
   TagLib exposes.
 - Damaged tag data, which is definitely part of this line. Whatever
-  [mp3-support](mp3-support.md) settles about what a damaged tag resolves to has to
+  [mp3-support](archive/mp3-support.md) settles about what a damaged tag resolves to has to
   hold for FLAC too: repeat its probe on damaged Vorbis comment blocks, on other damaged metadata
   blocks, and on the stray Id3v2 and APE tags above, and confirm that each yields what the
   specification says.

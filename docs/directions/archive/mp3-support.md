@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: broad
 touches: features/builtins/identifiers.md, concepts/warnings.md, concepts/exit-codes.md, commands/hash.md, design/rationale.md, implementation.md, testing.md, faq.md, src/Goro/Predicates/Identifiers, src/Goro/Hashing, src/Goro/Warnings, src/Goro/Goro.csproj
 after: sources-and-fields
@@ -15,16 +15,16 @@ nothing today, to real data. It also replaces TagLibSharp, which today finds bot
 `goro hash` hashes and `file::duration`. MP3 is the only format discovery admits, so once this
 line lands TagLibSharp leaves `src/`.
 
-The promise to keep comes from [sources-and-fields](archive/sources-and-fields.md): `field()` and
-`bytes()` give the data as recorded. [file-reading](../design/file-reading.md) showed that no
+The promise to keep comes from [sources-and-fields](sources-and-fields.md): `field()` and
+`bytes()` give the data as recorded. [file-reading](../../design/file-reading.md) showed that no
 .NET library keeps it, and recorded what was decided as a result. This line writes those
 decisions into the normative documents and builds them for MP3.
-[flac-support](flac-support.md) and [ogg-support](ogg-support.md) then do the same for their
+[flac-support](../flac-support.md) and [ogg-support](../ogg-support.md) then do the same for their
 formats.
 
 ## Settled by the survey
 
-Each point is in [file-reading](../design/file-reading.md#decisions), with the evidence behind it.
+Each point is in [file-reading](../../design/file-reading.md#decisions), with the evidence behind it.
 
 - **The reader is Goro's own,** for Id3v2 (all three revisions), APE (v1 and v2) and Id3v1. Frames
   are listed by their identifier on disk, so the rename table of sources-and-fields applies on
@@ -59,31 +59,31 @@ Each point is in [file-reading](../design/file-reading.md#decisions), with the e
   asked about.
 - **The hash covers `[D, E)`:** the frames from the first audio frame to the end of the last whole
   frame, without the Info frame or anything after `E`, by the rule for every format in
-  [file-reading](../design/file-reading.md#what-the-hash-covers). The range changes from
+  [file-reading](../../design/file-reading.md#what-the-hash-covers). The range changes from
   TagLibSharp's for many files, which is harmless only while no hash has been stored anywhere; the
   rationale should say so.
 - **Junk after the last frame** is never hashed, and `goro audit` reports it. A summary header is
   trusted up to an exact frame end with no frame starting there, so such junk does not cost the
-  file its duration; see [implementation](../implementation.md#choices-the-specifications-leave-open).
+  file its duration; see [implementation](../../implementation.md#choices-the-specifications-leave-open).
 - **Several Id3v2 tags in a row:** the `id3v2` source is the first, as players and other readers
   take it; `goro audit` reports the others.
 - **A constant-bitrate MP3 without a summary header** is counted from the edges, by checks
-  recorded in [implementation](../implementation.md#choices-the-specifications-leave-open), with
+  recorded in [implementation](../../implementation.md#choices-the-specifications-leave-open), with
   all of an MP3's duration logic in a single type.
-- **Shapes found in real files** ([file-reading](../design/file-reading.md#real-world-test-data)),
+- **Shapes found in real files** ([file-reading](../../design/file-reading.md#real-world-test-data)),
   decided on 2026-10-08:
   - UTF-16 without a byte order mark is read as little-endian, an implementation choice;
   - terminator-separated values are read in every revision, a later UTF-16 value inheriting the
-    first's byte order mark; recorded in [quirks](../design/quirks.md), and identifiers.md now
+    first's byte order mark; recorded in [quirks](../../design/quirks.md), and identifiers.md now
     says so;
   - a frame with an illegal identifier is stepped over by its size, a quirk audit surfaces;
   - `GRP1`, `MVNM` and `MVIN` are text frames for `field()`, a quirk, and identifiers.md now says
     so. The binder's check, `Id3v2Frames.HoldsText`, still refuses them: a one-line change for
     this line;
   - v2.2 frame names in a v2.3 tag (iTunes 12.1) are left out for now, recorded in
-    [deferred](../design/deferred.md).
+    [deferred](../../design/deferred.md).
 - **APEv1 text is read as ISO-8859-1,** as Id3v1 is. The specification says ASCII, and real files
-  hold local code pages; see [implementation](../implementation.md#choices-the-specifications-leave-open).
+  hold local code pages; see [implementation](../../implementation.md#choices-the-specifications-leave-open).
   The identifier documentation's claim that APEv1 is ISO-8859-1 by specification needs correcting.
 - **Warning categories.** A new `incomplete` category, exit code `12`, between `unanswered` and
   `file`, which becomes `13`. It is one warning per run, a count, and it advertises `goro audit`
@@ -99,7 +99,7 @@ Agreed in discussion on 2026-10-08; the types are an outline, not a specificatio
 
 **An edge analysis, shared by every command.** One step reads only the edges of a file and
 returns a `FileLayout`: the tags found and an index of their fields, the gaps (junk before the
-audio, bytes after it), the audio's positions (`A` to `H` in [mp3-layout](../design/mp3-layout.md)),
+audio, bytes after it), the audio's positions (`A` to `H` in [mp3-layout](../../design/mp3-layout.md)),
 the duration outcome, and the conditions found. It never throws over what a file contains, only
 over input and output: "audio not found" is part of the layout, and each command decides what it
 means. Everything it learns is exposed, even where nothing uses it yet, such as whether a frame
@@ -212,7 +212,7 @@ layout and finds `E` as it reads the frames.
 
 - 2026-10-07 -- Split from sources-and-fields, which specifies the source functions and leaves
   reading to this line.
-- 2026-10-08 -- Refreshed after the [file-reading](../design/file-reading.md) survey, which
+- 2026-10-08 -- Refreshed after the [file-reading](../../design/file-reading.md) survey, which
   answered most of the original questions and recorded the decisions above. The survey's prototype
   readers in `scratchpad/Goro.Scratchpad/FileReading` are reference material, not code to copy;
   the survey says what keeps them from production quality. Proposed steps, each able to land on
@@ -227,7 +227,7 @@ layout and finds `E` as it reads the frames.
 - 2026-10-08 -- Agreed the reader's shape (above): an edge analysis returning a `FileLayout`
   through bounded, tracked reads, tag values read on demand, and a disposable loader the runtime
   owns behind `FileData`. Narrowed the unreadable rule to files whose audio cannot be found.
-  Chained Ogg declined, recorded in [limitations](../design/limitations.md). The hash range leans
+  Chained Ogg declined, recorded in [limitations](../../design/limitations.md). The hash range leans
   towards audio plus decode parameters, measured for every format in file-reading.
 - 2026-10-08 -- Decided: the hash covers `[D, E)`, by a rule for every format, hashing the codec's
   own stream and nothing the container adds. APEv1 text is read as ISO-8859-1. A summary header is
@@ -418,3 +418,8 @@ layout and finds `E` as it reads the frames.
   decision none are committed. The open question is closed, and file-reading.md and the fetch
   script now say why; the brief had wrongly called the samples MIT-licensed. The line's code and
   docs are complete. Next step: review the line as a whole and land it on main with a merge commit.
+- 2026-10-09 -- Landed on main with a merge commit, and moved to the archive. Goro reads MP3 tags,
+  playing time and the hash range itself, and no longer depends on TagLibSharp. What it set aside
+  for others: Ogg and FLAC (ogg-support, flac-support), the findings for goro-audit, and in
+  deferred.md, v2.2 names in v2.3 tags and deciding a header-less file's playing time only when
+  asked.

@@ -1,6 +1,6 @@
 # The layout of an MP3 file
 
-This is working material for [mp3-support](../directions/mp3-support.md), made to settle what
+This is working material for [mp3-support](../directions/archive/mp3-support.md), made to settle what
 `goro hash` covers at the edges of an MP3's audio. It describes how an MP3 file is laid out, where
 each kind of tag sits, and what goes wrong at each edge. Every mishap is tied to a lettered
 position in the diagrams, and most to a file in the fixture corpus (`tests/Goro.Tests/Fixtures/Audio/mp3`).
