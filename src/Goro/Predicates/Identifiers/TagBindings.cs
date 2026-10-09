@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Goro.Predicates.Identifiers.Interpretation;
 using Goro.Predicates.Values;
 using Goro.Reading.Tags;
 
@@ -11,30 +12,37 @@ namespace Goro.Predicates.Identifiers;
 /// <remarks>
 /// Every binding reads the file's tags through <see cref="TagsFacet"/>, so a file in which no audio
 /// can be found is unreadable whichever binding asks. A source reads only its source tag: the first
-/// of its format in the file, and nothing from a tag that cannot be read at all. The concepts are
-/// bound to <see cref="NotImplemented{T}"/> until they interpret what they read (step 2c of
-/// docs/directions/mp3-support.md).
+/// of its format in the file, and nothing from a tag that cannot be read at all. A cell reads what
+/// the source function for its field reads, and interprets it.
 /// </remarks>
 internal static class TagBindings
 {
-    public static IdentifierBinding<T> NotImplemented<T>(DeclaredName name) where T : notnull =>
-        new NotImplementedBinding<T>(name);
+    /// <summary>The binding of a concept's cell: <paramref name="field"/> of <paramref name="source"/>, interpreted.</summary>
+    public static IdentifierBinding<T> Cell<T>(string source, string field, ConceptInterpretation<T> interpretation) where T : notnull =>
+        source switch
+        {
+            SourceNames.Id3v2 => new Id3v2Cell<T>(field, interpretation.Id3v2 ?? interpretation.Text),
+            SourceNames.Ape => new ApeCell<T>(field, interpretation.Text),
+            SourceNames.Id3v1 => new Id3v1Cell<T>(field, interpretation),
+            SourceNames.Vorbis => new NoVorbisComments<T>(),
+            _ => throw new ArgumentException($"The {source} source has no concepts."),
+        };
 
     /// <summary>The binding of <c>field()</c> for a source.</summary>
     public static Func<SourceCallName, IdentifierBinding<string>> Field(string source) => source switch
     {
-        "id3v2" => call => new Id3v2Field(call.Arguments[0], call.Arguments.Length > 1 ? call.Arguments[1] : null),
-        "ape" => call => new ApeField(call.Arguments[0]),
-        "vorbis" => _ => new NoVorbisComments<string>(),
+        SourceNames.Id3v2 => call => new Id3v2Field(call.Arguments[0], call.Arguments.Length > 1 ? call.Arguments[1] : null),
+        SourceNames.Ape => call => new ApeField(call.Arguments[0]),
+        SourceNames.Vorbis => _ => new NoVorbisComments<string>(),
         _ => throw new ArgumentException($"The {source} source has no field()."),
     };
 
     /// <summary>The binding of <c>bytes()</c> for a source.</summary>
     public static Func<SourceCallName, IdentifierBinding<Blob>> Bytes(string source) => source switch
     {
-        "id3v2" => call => new Id3v2Bytes(call.Arguments[0]),
-        "ape" => call => new ApeBytes(call.Arguments[0]),
-        "vorbis" => _ => new NoVorbisComments<Blob>(),
+        SourceNames.Id3v2 => call => new Id3v2Bytes(call.Arguments[0]),
+        SourceNames.Ape => call => new ApeBytes(call.Arguments[0]),
+        SourceNames.Vorbis => _ => new NoVorbisComments<Blob>(),
         _ => throw new ArgumentException($"The {source} source has no bytes()."),
     };
 
@@ -137,9 +145,69 @@ internal static class TagBindings
         }
     }
 
-    private sealed class NotImplementedBinding<T>(DeclaredName name) : IdentifierBinding<T> where T : notnull
+    /// <summary>
+    /// Every value of the frames a cell reads, interpreted. A frame that cannot be read is one
+    /// unusable occurrence, as it is to <c>field()</c>.
+    /// </summary>
+    private static IEnumerable<Occurrence<T>> Interpret<T>(
+        FileTags tags, FieldEntry field, Origin origin, Func<string, Origin, IEnumerable<Occurrence<T>>> interpret) where T : notnull =>
+        tags.Values.Text(field) is FieldText.Readable(var values, _)
+            ? values.SelectMany(value => interpret(value, origin))
+            : [new Unusable<T>(origin)];
+
+    /// <summary>An Id3v2 concept: every frame named <paramref name="frame"/>, interpreted.</summary>
+    private sealed class Id3v2Cell<T>(string frame, Func<string, Origin, IEnumerable<Occurrence<T>>> interpret) : IdentifierBinding<T>
+        where T : notnull
     {
-        public override Value<T> Resolve(FileData file, Origin origin) =>
-            throw new NotSupportedException($"Reading tags is not implemented yet, so {name} cannot be read.");
+        public override Value<T> Resolve(FileData file, Origin origin)
+        {
+            var tags = file.Get(TagsFacet.Instance);
+            return tags.Source(TagFormat.Id3v2) is { } tag
+                ? Value<T>.Of(tag.Fields.Where(f => f.Key == frame).SelectMany(field => Interpret(tags, field, origin, interpret)))
+                : Value<T>.Absent;
+        }
+    }
+
+    /// <summary>An APE concept: the item <c>ape::field()</c> would read under its key, interpreted.</summary>
+    private sealed class ApeCell<T>(string key, Func<string, Origin, IEnumerable<Occurrence<T>>> interpret) : IdentifierBinding<T>
+        where T : notnull
+    {
+        public override Value<T> Resolve(FileData file, Origin origin)
+        {
+            var tags = file.Get(TagsFacet.Instance);
+            return ApeItem(tags, key) is { } item ? Value<T>.Of(Interpret(tags, item, origin, interpret)) : Value<T>.Absent;
+        }
+    }
+
+    /// <summary>
+    /// An Id3v1 concept. Every field is present in every tag, so one that is padding all the way
+    /// through records nothing, and is absent whatever the concept's type (docs/features/builtins/identifiers.md,
+    /// "A fixed structure"). A field recorded as a byte is interpreted as one.
+    /// </summary>
+    private sealed class Id3v1Cell<T>(string field, ConceptInterpretation<T> interpretation) : IdentifierBinding<T>
+        where T : notnull
+    {
+        public override Value<T> Resolve(FileData file, Origin origin)
+        {
+            var tags = file.Get(TagsFacet.Instance);
+            if (tags.Source(TagFormat.Id3v1)?.Fields.FirstOrDefault(f => f.Key == field) is not { } entry)
+            {
+                // Id3v1.0 has no track field at all.
+                return Value<T>.Absent;
+            }
+
+            if (entry.Form == FieldForm.Id3v1Byte)
+            {
+                var read = tags.Values.Bytes(entry) is FieldContent.Readable(var bytes) && bytes.Length == 1 ? bytes.Span[0] : (byte?)null;
+                return read is { } value && interpretation.Id3v1Byte?.Invoke(value, origin) is { } occurrence
+                    ? Value<T>.Single(occurrence)
+                    : Value<T>.Absent;
+            }
+
+            // The reader has already left out the padding, so nothing at all means padding all through.
+            return tags.Values.Text(entry) is FieldText.Readable([var text], _) && text.Length == 0
+                ? Value<T>.Absent
+                : Value<T>.Of(Interpret(tags, entry, origin, interpretation.Text));
+        }
     }
 }

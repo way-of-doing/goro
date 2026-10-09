@@ -208,25 +208,6 @@ public class BuiltInCatalogTests
         Assert.That(((SourceCallName)resolved.Declaration.Name).Arguments, Is.EqualTo(new[] { "Album Artist" }));
     }
 
-    [TestCase("artist")]
-    [TestCase("id3v1::genre")]
-    [TestCase("ape::year")]
-    public void Resolve_TagIdentifier_IsNotImplementedYet(string identifier)
-    {
-        var declaration = Found(Lookup(identifier));
-        var file = TestFiles.Data("/music/track.mp3");
-        var origin = new Origin(new SourceId(0), identifier, 0);
-
-        TestDelegate resolve = declaration switch
-        {
-            IdentifierDeclaration<string> typed => () => typed.Binding.Resolve(file, origin),
-            IdentifierDeclaration<decimal> typed => () => typed.Binding.Resolve(file, origin),
-            _ => throw new AssertionException($"Unexpected declaration {declaration}"),
-        };
-
-        Assert.That(resolve, Throws.TypeOf<NotSupportedException>().With.Message.Contains("not implemented yet"));
-    }
-
     [Test]
     public void Resolve_SourceFunction_ReadsTheFilesTags()
     {

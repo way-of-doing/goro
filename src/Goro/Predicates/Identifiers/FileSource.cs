@@ -13,7 +13,6 @@ namespace Goro.Predicates.Identifiers;
 /// </summary>
 internal static class FileSource
 {
-    public const string Name = "file";
 
     public static ImmutableArray<IdentifierDeclaration> Concepts { get; } =
     [
@@ -31,7 +30,7 @@ internal static class FileSource
     private static Value<T> One<T>(T datum) where T : notnull => Value<T>.Single(new Usable<T>(datum));
 
     private static IdentifierDeclaration<T> Concept<T>(string name, Bounds bounds, Func<FileData, Value<T>> resolve) where T : notnull =>
-        new(new IdentifierName(Name, name), bounds, new Binding<T>(resolve));
+        new(new IdentifierName(SourceNames.File, name), bounds, new Binding<T>(resolve));
 
     // A file concept never produces an unusable occurrence, so the origin goes unused.
     private sealed class Binding<T>(Func<FileData, Value<T>> resolve) : IdentifierBinding<T> where T : notnull

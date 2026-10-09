@@ -26,18 +26,18 @@ public static class Id3v1Index
 
         List<FieldEntry> fields =
         [
-            Field("title", FieldForm.Id3v1Text, 3, 30),
-            Field("artist", FieldForm.Id3v1Text, 33, 30),
-            Field("album", FieldForm.Id3v1Text, 63, 30),
-            Field("year", FieldForm.Id3v1Text, 93, 4),
-            Field("comment", FieldForm.Id3v1Text, 97, v11 ? 28 : 30),
+            Field(Id3v1Fields.Title, FieldForm.Id3v1Text, 3, 30),
+            Field(Id3v1Fields.Artist, FieldForm.Id3v1Text, 33, 30),
+            Field(Id3v1Fields.Album, FieldForm.Id3v1Text, 63, 30),
+            Field(Id3v1Fields.Year, FieldForm.Id3v1Text, 93, 4),
+            Field(Id3v1Fields.Comment, FieldForm.Id3v1Text, 97, v11 ? 28 : 30),
         ];
         if (v11)
         {
-            fields.Add(Field("track", FieldForm.Id3v1Byte, 126, 1));
+            fields.Add(Field(Id3v1Fields.Track, FieldForm.Id3v1Byte, 126, 1));
         }
 
-        fields.Add(Field("genre", FieldForm.Id3v1Byte, 127, 1));
+        fields.Add(Field(Id3v1Fields.Genre, FieldForm.Id3v1Byte, 127, 1));
         return new TagRead(new TagIndex(kind, new Region(at, Length), TagState.Intact, [.. fields]), [], SizeTrusted: true);
     }
 }

@@ -10,15 +10,27 @@ internal static class Id3v2Bytes
 {
     public sealed record Frame(string Id, byte[] Content, ushort Flags = 0);
 
-    /// <summary>A v2.3 or v2.4 tag holding <paramref name="frames"/>, followed by <paramref name="padding"/> zero bytes.</summary>
+    /// <summary>
+    /// A tag of revision <paramref name="major"/> holding <paramref name="frames"/>, followed by
+    /// <paramref name="padding"/> zero bytes. A v2.2 frame has a three-character identifier, a
+    /// three-byte size and no flags.
+    /// </summary>
     public static byte[] Tag(int major, IEnumerable<Frame> frames, int padding = 0, byte flags = 0)
     {
         using var body = new MemoryStream();
         foreach (var frame in frames)
         {
             body.Write(Encoding.ASCII.GetBytes(frame.Id));
-            body.Write(major == 4 ? Syncsafe(frame.Content.Length) : BigEndian(frame.Content.Length));
-            body.Write([(byte)(frame.Flags >> 8), (byte)frame.Flags]);
+            if (major == 2)
+            {
+                body.Write(BigEndian(frame.Content.Length)[1..]);
+            }
+            else
+            {
+                body.Write(major == 4 ? Syncsafe(frame.Content.Length) : BigEndian(frame.Content.Length));
+                body.Write([(byte)(frame.Flags >> 8), (byte)frame.Flags]);
+            }
+
             body.Write(frame.Content);
         }
 
@@ -33,6 +45,16 @@ internal static class Id3v2Bytes
     public static byte[] Text(byte encoding, params byte[] text) => [encoding, .. text];
 
     public static byte[] Utf8(string text) => Encoding.UTF8.GetBytes(text);
+
+    /// <summary>A text frame's content in UTF-8, its values separated by NUL.</summary>
+    public static byte[] Utf8Text(params string[] values) => [3, .. Encoding.UTF8.GetBytes(string.Join('\0', values))];
+
+    /// <summary>A text frame's content in ISO-8859-1, which every revision defines.</summary>
+    public static byte[] Latin1Text(params string[] values) => [0, .. Encoding.Latin1.GetBytes(string.Join('\0', values))];
+
+    /// <summary>The identifier a frame has in <paramref name="major"/>: its v2.2 name in v2.2, where it has one.</summary>
+    public static string Named(int major, string frame) =>
+        major == 2 ? Goro.Reading.Tags.Id3v2FrameNames.Renamed.Single(pair => pair.Value == frame && pair.Key.Length == 3).Key : frame;
 
     public static byte[] Syncsafe(int value) =>
         [(byte)((value >> 21) & 0x7F), (byte)((value >> 14) & 0x7F), (byte)((value >> 7) & 0x7F), (byte)(value & 0x7F)];

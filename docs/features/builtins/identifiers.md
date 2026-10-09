@@ -162,7 +162,7 @@ Every text field has a fixed width of 30 bytes, and a tagger writing a longer va
 
 #### Genre
 
-The Id3v1 genre is a single byte holding an index into the genre table -- the same 148-entry table, original entries together with the widely adopted extensions, that the Id3v2 genre conventions refer to. It resolves as follows:
+The Id3v1 genre is a single byte holding an index into the [genre table](genres.md) -- the same 148-entry table, original entries together with the widely adopted extensions, that the Id3v2 genre conventions refer to. It resolves as follows:
 
 - the value 255 is the convention for "no genre recorded", and is absent
 - a value that indexes an entry the table defines resolves to the name of that genre, as a string
@@ -212,12 +212,12 @@ The `TCON` frame has accumulated more conventions than any other, and `id3v2::ge
 
 1. The value is split on forward slashes and semicolons. This applies to genres only: in other frames, such as the one behind `id3v2::artist`, a slash is part of the value.
 2. A parenthesized reference `(n)` is replaced by the name of Id3v1 genre `n`. Several references may appear in sequence, and each becomes a separate value. A doubled opening parenthesis is an escape for a literal one.
-3. Text following a reference is a refinement, and becomes a value of its own in addition to the name of the reference. So `(17)Post-Rock` yields both `Rock` and `Post-Rock`, and matches a predicate written against either.
+3. Text following a reference is a refinement, and becomes a value of its own in addition to the name of the reference. So `(17)Post-Rock` yields both `Rock` and `Post-Rock`, and matches a predicate written against either. A refinement that only repeats the reference's name, compared without regard to case, adds no value, so `(17)Rock` yields `Rock` once; taggers wrote it that way so that readers not knowing the table would still show a name. The name may be the one the table gives today or the one the original list gave, so `(67)Psychadelic` yields only `Psychedelic`.
 4. A value consisting only of digits is also a reference to the Id3v1 genre table, and is replaced by the corresponding name.
 5. The reserved values `RX` and `CR`, with or without parentheses, become `Remix` and `Cover`.
 6. A reference to a table position that has no genre assigned to it is left as recorded.
 
-The table referred to throughout is the Id3v1 genre table together with its widely adopted extensions, 148 entries in total.
+The table referred to throughout is the Id3v1 genre table together with its widely adopted extensions, 148 entries in total, listed in [the genre table](genres.md).
 
 #### Per-version caveats
 

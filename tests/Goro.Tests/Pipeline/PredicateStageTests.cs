@@ -237,20 +237,6 @@ public class PredicateStageTests
 
     // --- defects ---
 
-    // A tag identifier cannot be read yet. That is not a bad file but a missing feature, and must
-    // fail the run rather than be reported as something wrong with the file.
-    [Test]
-    public void ATagIdentifierThatCannotBeReadYet_Propagates()
-    {
-        var sources = new Sources();
-        var artist = sources.Identifier<string>(IdentifierName.Plain("artist"), "artist");
-        var predicate = sources.Compile(new ComparisonTest<string>(
-            new(artist, Quantifier.Existential), ComparisonOperator.Equal,
-            new(new Literal<string>("x"), Quantifier.Existential), StringOrder.Normalized));
-
-        Assert.ThrowsAsync<NotSupportedException>(() => new PredicateStage(predicate).ExecuteAsync("/music/a.mp3", CancellationToken.None));
-    }
-
     [Test]
     public void Cancellation_IsNotAnOutcome()
     {

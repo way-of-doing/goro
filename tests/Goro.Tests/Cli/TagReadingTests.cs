@@ -120,4 +120,34 @@ public class TagReadingTests
         Assert.That(Lines(stdErr)[0], Is.EqualTo(new DataWarning(file, """id3v2::field("TPE1")""").ToString()));
         Assert.That(stdErr, Does.Not.Contain("goro audit"));
     }
+
+    [Test]
+    public async Task AConceptWrittenWithoutASource_FindsTheFilesWhicheverTagHoldsIt()
+    {
+        var id3v2 = Fixture("mp3/id3v24.mp3");
+        var ape = Fixture("mp3/ape2.mp3");
+        Fixture("mp3/id3v22.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", """--filter=artist == "motorhead" """, _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(Lines(stdOut), Is.EquivalentTo(new[] { id3v2, ape }), "Motörhead is one of two artists in each, and comparison ignores the accent");
+        Assert.That(stdErr, Is.Empty);
+    }
+
+    [Test]
+    public async Task YearAndGenre_AreInterpreted()
+    {
+        var v24 = Fixture("mp3/id3v24.mp3");
+        var v23 = Fixture("mp3/id3v23.mp3");
+        var v22 = Fixture("mp3/id3v22.mp3");
+
+        var byYear = await RunAsync("list", "--filter=year == 1991", _collection.Root);
+        var byGenre = await RunAsync("list", """--filter=genre == "post-rock" """, _collection.Root);
+        var rock = await RunAsync("list", """--filter=genre == "rock" """, _collection.Root);
+
+        Assert.That(Lines(byYear.StdOut), Is.EquivalentTo(new[] { v24, v23, v22 }));
+        Assert.That(Lines(byGenre.StdOut), Is.EqualTo(new[] { v24 }), "(17)Post-Rock refines Rock");
+        Assert.That(Lines(rock.StdOut), Is.EquivalentTo(new[] { v24, v23, v22 }), "(17), (17)Post-Rock and Rock/Metal");
+    }
 }

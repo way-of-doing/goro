@@ -81,6 +81,7 @@ through concepts and through source functions.
 | A genre written as a bare number, `17` | Must expand to the named genre on every version |
 | A genre written as a reference, `(17)` | The parenthesised form is legal in v2.2 and v2.3 and out of spec in v2.4, but occurs there after a version migration |
 | A genre reference with a refinement, `(17)Post-Rock` | Must yield both the referenced name and the refinement, on every version |
+| A genre reference followed by its own name, `(17)Rock`, and by its original spelling, `(67)Psychadelic` | One genre, not two: the repeat adds no value |
 | Several genre references, `(51)(39)` | Every reference must be expanded, not only the first |
 | A genre reference with an escaped parenthesis, `(17)((weird)` | The doubled parenthesis must be unescaped, on every version |
 | `(RX)` and a bare `RX`, and the same for `CR` | Both must map to the same result |

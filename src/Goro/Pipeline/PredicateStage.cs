@@ -25,9 +25,8 @@ namespace Goro.Pipeline;
 /// that file and dropped with it. Evaluation is synchronous (decision D2) and runs on whichever
 /// thread-pool thread the executor gave this invocation.
 ///
-/// Only <see cref="UnreadableFileException"/> is caught. Anything else, such as the
-/// <see cref="NotSupportedException"/> of a tag identifier that cannot be read yet, is a defect
-/// rather than a bad file, and fails the run.
+/// Only <see cref="UnreadableFileException"/> is caught. Anything else is a defect rather than a
+/// bad file, and fails the run.
 /// </remarks>
 public sealed class PredicateStage(CompiledPredicate predicate, ReadPolicy? policy = null) : IPipelineStage<string, FileOutcome<ListResult>>
 {

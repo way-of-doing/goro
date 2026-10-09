@@ -77,3 +77,34 @@ Taggers are reported to write UTF-8 into v2.3 tags, which are still the most wid
 
 **What it costs:** nothing that has been seen. No revision gives `$02` or `$03` another meaning,
 so the only text read differently is text that a strict reader would have refused.
+
+## Genre names as they are spelled today
+
+**The specifications:** Id3v2.3's Appendix A lists the 80 original Id3v1 genres, and Winamp's
+extensions as far as entry 125; later Winamp releases added entries to 147. Several names are
+misspelt or written in the abbreviations of the time, and entry 133 is an ethnic slur.
+
+**What Goro does:** names every entry of the [genre table](../features/builtins/genres.md) as
+TagLib names it today, so that a genre one file records by number compares equal to the same genre
+another file records as text. The names that differ from the original lists by more than letter
+case are:
+
+| Index | Original      | Goro
+|-------|---------------|-----------------
+| 29    | `Jazz+Funk`   | `Jazz-Funk`
+| 40    | `AlternRock`  | `Alternative Rock`
+| 67    | `Psychadelic` | `Psychedelic`
+| 81    | `Folk-Rock`   | `Folk Rock`
+| 85    | `Bebob`       | `Bebop`
+| 90    | `Avantgarde`  | `Avant-garde`
+| 125   | `Dance Hall`  | `Dancehall`
+| 129   | `Hardcore`    | `Hardcore Techno`
+| 133   | the slur      | `Worldbeat`
+
+Entries 123 (`A cappella`) and 132 (`BritPop`) differ only in case, which comparisons ignore. A
+refinement after a reference that repeats the original name, as in `(67)Psychadelic`, is still
+recognised as a repeat (see the identifier documentation's genre rules).
+
+**What it costs:** a predicate written with an original spelling, `genre == "alternrock"`, no
+longer matches a file that records the genre as number 40, though it still matches one that
+records the text.

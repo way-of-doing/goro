@@ -336,3 +336,36 @@ layout and finds `E` as it reads the frames.
   Run over the corpus, `goro list --filter 'id3v2::field("TIT2") == "Title v2.2"'` lists the one
   file, warns about the two titles that do not decode and the file that ends inside its tag, and
   counts 10 of 69 files as read only in part. Next step: review of 2b, then plan 2c.
+- 2026-10-09 -- Step 2b committed (`1af6935`, with PJ's syntax change). Step 2c written, awaiting
+  review: the concepts. Decided with PJ:
+  - the genre table takes TagLib's spellings (`Alternative Rock`, `Psychedelic`, `Bebop`, ...), so
+    that a genre recorded by number matches the same genre recorded as text; recorded in quirks.md;
+  - entry 133 is `Worldbeat`, as current TagLib has it (TagLibSharp 2.3.0 still had the original
+    slur, which first led me to ask the question on a wrong premise);
+  - a refinement that only repeats its reference's name, without regard to case, adds no value, so
+    `(17)Rock` is one genre, and the original spelling counts as a repeat too (`(67)Psychadelic`).
+    identifiers.md's genre rule 3 now says so.
+
+  Source of the table: TagLib's `id3v1genres.cpp`, entries 0 to 147. The original spellings came
+  from Id3v2.3's Appendix A (to 125) and TagLib's table of legacy names (129, 133). The table is
+  now listed in a new normative `features/builtins/genres.md`, generated from the code.
+  - `Predicates/Identifiers/Interpretation/`: `Genres` (table and `TCON` resolution),
+    `TrackNumbers`, `DateShapes`, and `ConceptInterpretation`, which says per concept how recorded
+    text becomes occurrences, with a convention per source where there is one (`TCON` for Id3v2, a
+    byte for Id3v1). A trimming helper was planned and turned out to be one line within it.
+  - Every cell is bound through `TagBindings.Cell`. `NotImplemented` is gone, with the tests that
+    expected it. Vorbis cells are absent in an MP3.
+
+  Over the corpus, `genre == "rock"` and `year == 1991` list the expected files, and warn where a
+  genre or year is damaged.
+
+  From review:
+  - the catalog's table names each cell's field by a constant, such as
+    `ConceptFieldMapping.Id3v2.Artist`, which shows the order of a row;
+  - source names are `SourceNames` constants wherever they are mapped to anything, which retired
+    `FileSource.Name` and the catalog's private strings;
+  - Id3v1's field names are `Id3v1Fields`, shared by the reader and the mapping;
+  - `DateShapes`' digit parsing goes through `int.TryParse`, and checks its bounds, so it cannot
+    overflow whatever it is asked to read.
+
+  Next step: review of 2c; then step 3, `file::duration` from the reader.
