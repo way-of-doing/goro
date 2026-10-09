@@ -164,4 +164,18 @@ public class TagReadingTests
         Assert.That(exitCode, Is.EqualTo(12), "the file with no playing time is still counted as incomplete");
         Assert.That(Lines(stdErr), Is.EqualTo(new[] { new IncompleteWarning(1, 3).ToString() }));
     }
+
+    [Test]
+    public async Task Hash_AFileWithADamagedTag_HashesAsTheHealthyOne_AndIsReportedAsIncomplete()
+    {
+        var damaged = Fixture("mp3/dmg-id3v24-frame-overrun.mp3");
+        var healthy = Fixture("mp3/id3v24.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("hash", "--strict-exit-code", _collection.Root);
+
+        var hashes = Lines(stdOut).ToDictionary(line => line[..line.IndexOf(" md5 ", StringComparison.Ordinal)], line => line[(line.LastIndexOf(' ') + 1)..]);
+        Assert.That(exitCode, Is.EqualTo(12));
+        Assert.That(hashes[damaged], Is.EqualTo(hashes[healthy]).And.Length.EqualTo(32));
+        Assert.That(Lines(stdErr), Is.EqualTo(new[] { new IncompleteWarning(1, 2).ToString() }));
+    }
 }

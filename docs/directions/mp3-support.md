@@ -179,11 +179,9 @@ layout and finds `E` as it reads the frames.
 
 ## Questions
 
-- **How `goro hash` finds `E` without a trusted summary header.** Walking the frames resynchronises
-  over damage, but random bytes after the audio can hold chance frame headers, and resynchronising
-  onto them would hash part of the junk. One answer is to end at the last frame followed by a run
-  of good frames or by `F`. The duration is unusable for such a file anyway; only the hash needs
-  this.
+- **How `goro hash` finds `E` without a trusted summary header.** Answered on 2026-10-09: the walk
+  resynchronises over damage, and a frame counts only when it ends at the limit or belongs to a run
+  of three; two passes, headers then bytes. See implementation.md, "Finding where the audio ends".
 - **Committing real test files.** None are committed, their licences unweighed. music-metadata's
   samples are MIT-licensed, which permits it with the notice kept, and Goro is now MIT-licensed
   too.
@@ -390,3 +388,24 @@ layout and finds `E` as it reads the frames.
   opens a header-less file. Deciding it only when asked is recorded in deferred.md as a thing to
   explore. Next step: review of step 3, then step 4, the hash range from the reader and
   TagLibSharp removed.
+- 2026-10-09 -- Step 3 committed (`8ba137b`). Step 4 written, awaiting review: the hash range from
+  Goro's reader, and TagLibSharp removed from `src/`. Decided with PJ: `E` is the end of the last
+  frame that ends at the walk's limit or belongs to a run of three consecutive frames, found by a
+  walk that resynchronises over damage, in a first pass before the hash.
+  - `Reading/Mp3/Mp3AudioRange` finds `[D, E)`.
+  - `Hashing/Mp3AudioHasher` replaces `TagLibAudioHasher`, and `IAudioHasher` returns an
+    `AudioHash` with `Incomplete`, so `goro hash` now counts damaged tags like `goro list`.
+  - The `TagLibSharp` package reference is gone. Two comments in `src/` cite TagLib as prior art.
+
+  Over the corpus:
+  - the CBR seed, with and without its Info frame, shares one hash with the 59 fixtures built from
+    either, whatever their tags or junk;
+  - the VBR seed shares one with its versions without a header, with a doubled Xing count, and with
+    VBRI;
+  - only damaged audio and different encodings hash differently.
+
+  At PJ's request, the goro-audit brief now lists, among its MP3 findings, a hash span whose end
+  the walk had to settle by its own judgement.
+
+  Every item of Done when is now met. What remains before the line can land: review of this step,
+  and the open question on committing real test files, which the MIT licence now bears on.

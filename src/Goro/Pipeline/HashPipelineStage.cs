@@ -16,14 +16,13 @@ public sealed class HashPipelineStage(IAudioHasher audioHasher, HashAlgorithmKin
         try
         {
             var hash = await audioHasher.ComputeHashAsync(filePath, algorithm, cancellationToken);
-            return FileOutcome<HashResult>.Matched(new HashResult(filePath, algo, hash), reading: FileReading.Read);
+            return FileOutcome<HashResult>.Matched(
+                new HashResult(filePath, algo, hash.Hex), reading: hash.Incomplete ? FileReading.ReadInPart : FileReading.Read);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Reading the file is all the hasher does, so anything it throws means the file cannot
-            // be read: gone, refused, damaged, or not in a form Goro understands. TagLibSharp is
-            // known to throw more than its own exception types on malformed input, so this does not
-            // try to enumerate them.
+            // be read: gone, refused, or holding no audio.
             return FileOutcome<HashResult>.Unreadable(FileWarning.From(filePath, ex), new HashResult(filePath, algo, null));
         }
     }

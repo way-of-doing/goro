@@ -44,7 +44,7 @@ public sealed class GoroApp
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileDiscoveryService, FileDiscoveryService>();
-        services.AddSingleton<IAudioHasher, TagLibAudioHasher>();
+        services.AddSingleton<IAudioHasher, Mp3AudioHasher>();
         services.AddSingleton(ReadPolicy.Default);
         services.AddSingleton<IPipelinePlanner, PipelinePlanner>();
         services.AddSingleton<IExecutor, ConcurrentExecutor>();

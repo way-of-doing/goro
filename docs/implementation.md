@@ -95,6 +95,28 @@ predicate read first. The payload limit is also the cap on decompressing an Id3v
 compressed frame that would inflate past it is treated as one that cannot be decompressed, and is
 unusable.
 
+### Finding where the audio ends
+
+`goro hash` hashes `[D, E)` of [mp3-layout](design/mp3-layout.md): from the first audio frame,
+the one after a summary frame where there is one, to the end of the last whole frame. `E` is found
+by walking every frame header from `D` to a limit. The limit is where the trailing tags start, or,
+for a summary header trusted up to an exact frame end, where it says the audio ends.
+
+The walk resynchronises over damage, a byte at a time, so that bit rot in the middle of the audio
+stays inside the range and changes the hash rather than shortening it. Junk after the audio can
+hold chance frame headers, and two can even confirm each other, so a frame counts towards `E` only
+when it ends exactly at the limit or belongs to a run of three frames, each starting where the
+last ended. Real audio always comes in such runs, and junk practically never does. A stream too
+short to make a run and not ending at the limit ends at its last frame. The last frame of a
+free-format stream, having no next header to measure its length by, takes its predecessor's where
+that ends at the limit.
+
+The walk and the hash are two passes over the audio: the frame headers first, to find `E`, then
+the bytes of `[D, E)`. One pass would have to hold back everything after the last frame known to
+count, which has no bound across a long damaged stretch. The second pass usually comes from the
+operating system's cache. Neither pass is held to the analysis budgets, since hashing reads the
+audio by definition.
+
 ### The reader never throws over what a file holds
 
 Reading a file can fail over input and output, and over nothing else. Whatever a file contains,

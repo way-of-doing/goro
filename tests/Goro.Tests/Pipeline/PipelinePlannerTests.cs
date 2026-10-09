@@ -16,11 +16,11 @@ public class PipelinePlannerTests
 
         public HashAlgorithmKind? LastAlgorithm { get; private set; }
 
-        public Task<string> ComputeHashAsync(string filePath, HashAlgorithmKind algorithm, CancellationToken cancellationToken)
+        public Task<AudioHash> ComputeHashAsync(string filePath, HashAlgorithmKind algorithm, CancellationToken cancellationToken)
         {
             LastFilePath = filePath;
             LastAlgorithm = algorithm;
-            return failure is null ? Task.FromResult("deadbeef") : Task.FromException<string>(failure);
+            return failure is null ? Task.FromResult(new AudioHash("deadbeef", Incomplete: false)) : Task.FromException<AudioHash>(failure);
         }
     }
 
@@ -60,7 +60,7 @@ public class PipelinePlannerTests
     {
         yield return new TestCaseData(new FileNotFoundException("Could not find file '/music/bad.mp3'."), "no such file or directory");
         yield return new TestCaseData(new UnauthorizedAccessException("Access to the path is denied."), "permission denied");
-        yield return new TestCaseData(new TagLib.CorruptFileException("MPEG audio header not found."), "MPEG audio header not found.");
+        yield return new TestCaseData(new InvalidDataException("no MPEG audio found"), "no MPEG audio found");
         yield return new TestCaseData(new IndexOutOfRangeException("Index was outside the bounds of the array."), "Index was outside the bounds of the array.");
     }
 

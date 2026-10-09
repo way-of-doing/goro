@@ -1,3 +1,4 @@
+using Goro.Reading;
 using Goro.Reading.Bytes;
 using Goro.Reading.Mp3;
 using Goro.Reading.Tags;
@@ -9,8 +10,8 @@ namespace Goro.Tests.Reading;
 /// The reader never throws over what a file holds (docs/implementation.md). Passing the corpus does
 /// not show it: the prototype passed it, and a fuzzer damaging its files still found 16 exceptions.
 /// So every MP3 in the corpus is truncated and overwritten at random, with a fixed seed so that a
-/// failure can be repeated, and read whole: the analysis, and every field's bytes, text and
-/// description. Half the runs use tiny windows, so that reads outside them, and refusals, are met too.
+/// failure can be repeated, and read whole: the analysis, the hash range, and every field's bytes,
+/// text and description. Half the runs use tiny windows, so that reads outside them, and refusals, are met too.
 /// </summary>
 public class ReaderFuzzTests
 {
@@ -52,8 +53,16 @@ public class ReaderFuzzTests
 
     private static void ReadEverything(byte[] bytes, ReadPolicy policy)
     {
-        var reader = new BoundedReader(new MemoryByteSource(bytes), policy);
+        var source = new MemoryByteSource(bytes);
+        var reader = new BoundedReader(source, policy);
         var layout = Mp3Analysis.Analyse(reader);
+        if (layout.Audio is AudioLocation.Found)
+        {
+            var range = Mp3AudioRange.Find(source, layout);
+            Assert.That(range.Start, Is.GreaterThanOrEqualTo(0).And.LessThanOrEqualTo(range.End));
+            Assert.That(range.End, Is.LessThanOrEqualTo(bytes.Length));
+        }
+
         var values = new TagValues(reader);
         foreach (var field in layout.Tags.SelectMany(tag => tag.Fields))
         {
