@@ -57,6 +57,8 @@ Every string an operator compares is prepared by normalization in the operator's
 
 This component reads audio files themselves, tags and audio alike, without a tag library. For each file it analyses the edges: the tags at either end, each indexed down to where every field lies, and where the audio starts. It never reads a value until one is asked for, and it describes a damaged file rather than failing on it: a tag that breaks off, a tag that cannot be read at all, audio that cannot be found are all findings, typed, for whoever asked to interpret. It throws only when the file itself cannot be read.
 
+The reader is shared by every command, and is built from pieces each command composes for what it needs, so that none pays for what it does not use: a predicate on tags runs the edge analysis and reads the values it asks for, `goro hash` adds the walk that finds where the audio ends, and a command that needs more of the file opts into more. Everything a piece learns is exposed, even where nothing uses it yet.
+
 Every read goes through one bounded reader per file. It serves the head and tail of the file from windows read once, and holds every other read to the file's allowance, which it takes from a policy shared by every file: a budget for each purpose of the analysis, and a limit on each value. A read the allowance does not cover is refused, and the refusal is reported rather than ignored, so the analysis of any file costs at most the two windows and its budgets, whatever the file holds. See [implementation](implementation.md) for the limits, and [file-reading](design/file-reading.md) for why Goro reads files itself.
 
 ## Pipeline planner
