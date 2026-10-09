@@ -35,7 +35,8 @@ whether or not the option was given.
 | `2`  | no          | The run never started: the command line, a pathspec, or the predicate was rejected, and nothing was processed
 | `10` | yes         | The run completed, and at least one **data** warning was emitted
 | `11` | yes         | The run completed, and the predicate could not be answered for at least one file: the **unanswered** warning was emitted
-| `12` | yes         | The run completed, and at least one **file** warning was emitted: a file could not be read and was therefore not processed
+| `12` | yes         | The run completed, and part of at least one file could not be read: the **incomplete** warning was emitted
+| `13` | yes         | The run completed, and at least one **file** warning was emitted: a file could not be read and was therefore not processed
 | `20` | yes         | The run completed; files were examined, but none of them matched
 | `21` | yes         | The run completed; the pathspecs matched no files at all
 
@@ -64,18 +65,20 @@ rather than enumerate the values it happens to know about.
 ### When more than one applies
 
 A single run can qualify for several informational codes at once -- it may emit data warnings,
-leave predicates unanswered, emit file warnings, and match nothing, all at once. Two rules decide which is returned:
+leave predicates unanswered, read only part of some files, emit file warnings, and match nothing,
+all at once. Two rules decide which is returned:
 
 - **A code in the `1`x group takes precedence over one in the `2`x group.**
 - **Within a group, the higher-numbered code wins.**
 
-So the order today is `12`, then `11`, then `10`, then `20` or `21`. The `1`x codes are numbered
-by how much they tell a caller to distrust the result: data that was disregarded, then answers
-that the command had to decide for itself, then files that were not processed at all. Codes `20`
-and `21` cannot both apply, since either files were examined or none were found, and a file that
-could not be read does not count as examined for the purposes of `20`: a run whose only discovered
-file was unreadable returns `12` rather than `20`. A file whose predicate could not be answered,
-by contrast, was read and examined, and counts towards `20` like any other file that was not
+So the order today is `13`, then `12`, then `11`, then `10`, then `20` or `21`. The `1`x codes are
+numbered by how much they tell a caller to distrust the result: data that was disregarded, then
+answers that the command had to decide for itself, then files of which only part could be read,
+then files that were not processed at all. Codes `20` and `21` cannot both apply, since either
+files were examined or none were found, and a file that could not be read does not count as
+examined for the purposes of `20`: a run whose only discovered file was unreadable returns `13`
+rather than `20`. A file whose predicate could not be answered, or only part of which could be
+read, by contrast, was read and examined, and counts towards `20` like any other file that was not
 listed.
 
 ### Suppressed warnings and the exit code
@@ -83,7 +86,8 @@ listed.
 A warning suppressed with `--no-warn` was not produced, so it contributes nothing to the exit code
 either. Suppressing a whole category removes the corresponding code from the outcomes a run can
 return: under `--no-warn=data` a run never returns `10`, under `--no-warn=unanswered` it never
-returns `11`, and under `--no-warn=file` it never returns `12`. The categories are independent: a
+returns `11`, under `--no-warn=incomplete` it never returns `12`, and under `--no-warn=file` it
+never returns `13`. The categories are independent: a
 run whose data warnings are suppressed still returns `11` if that data left a predicate without an
 answer.
 

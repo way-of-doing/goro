@@ -188,6 +188,37 @@ public class PredicateStageTests
         Assert.That(outcome.Warnings, Is.Empty);
     }
 
+    // --- Whether the file was opened, which the incomplete warning counts ---
+
+    [Test]
+    public async Task APredicateOnTheNameAlone_OpensNothing()
+    {
+        var outcome = await Run(NumberOfNameGreaterThanOne(), "/music/5");
+
+        Assert.That(outcome.Reading, Is.EqualTo(FileReading.NotOpened));
+    }
+
+    [Test]
+    public async Task APredicateOnTheSize_OpensNothing_TheFileSystemHavingTheAnswer()
+    {
+        var good = _collection.Mp3("good.mp3");
+
+        var outcome = await Run(SizeAtLeastZero(), good);
+
+        Assert.That(outcome.Disposition, Is.EqualTo(FileDisposition.Matched));
+        Assert.That(outcome.Reading, Is.EqualTo(FileReading.NotOpened));
+    }
+
+    [Test]
+    public async Task APredicateOnTheDuration_OpensTheFile()
+    {
+        var good = _collection.Mp3("good.mp3");
+
+        var outcome = await Run(DurationAtLeastZero(new Sources()), good);
+
+        Assert.That(outcome.Reading, Is.EqualTo(FileReading.Read));
+    }
+
     // D3: a file that was not processed has nothing to say about its data.
     [Test]
     public async Task UnusableDataMetBeforeTheFileTurnsOutUnreadable_IsDropped_LeavingOnlyTheFileWarning()
@@ -205,20 +236,6 @@ public class PredicateStageTests
     }
 
     // --- defects ---
-
-    // A tag identifier cannot be read yet. That is not a bad file but a missing feature, and must
-    // fail the run rather than be reported as something wrong with the file.
-    [Test]
-    public void ATagIdentifierThatCannotBeReadYet_Propagates()
-    {
-        var sources = new Sources();
-        var artist = sources.Identifier<string>(IdentifierName.Plain("artist"), "artist");
-        var predicate = sources.Compile(new ComparisonTest<string>(
-            new(artist, Quantifier.Existential), ComparisonOperator.Equal,
-            new(new Literal<string>("x"), Quantifier.Existential), StringOrder.Normalized));
-
-        Assert.ThrowsAsync<NotSupportedException>(() => new PredicateStage(predicate).ExecuteAsync("/music/a.mp3", CancellationToken.None));
-    }
 
     [Test]
     public void Cancellation_IsNotAnOutcome()

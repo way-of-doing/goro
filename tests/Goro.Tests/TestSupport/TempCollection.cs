@@ -14,16 +14,16 @@ internal sealed class TempCollection : IDisposable
 
     public string PathOf(params string[] relativePath) => Path.GetFullPath(Path.Combine([Root, .. relativePath]));
 
-    /// <summary>A small, valid MP3, which TagLibSharp reads and Goro can hash.</summary>
+    /// <summary>A small, valid MP3, which Goro can read and hash.</summary>
     public string Mp3(params string[] relativePath) =>
         Write(SyntheticMp3Builder.BuildMp3(SyntheticMp3Builder.BuildAudioFrames(), SyntheticMp3Builder.BuildId3V2(20)), relativePath);
 
-    /// <summary>A file named as an MP3 that holds text, which TagLibSharp rejects.</summary>
+    /// <summary>A file named as an MP3 that holds text, and so no audio.</summary>
     public string NotAudio(params string[] relativePath) =>
         Write("not audio at all\n"u8.ToArray(), relativePath);
 
     /// <summary>
-    /// An MP3 cut short inside its Id3v2 tag, so that no audio follows, which TagLibSharp rejects. A
+    /// An MP3 cut short inside its Id3v2 tag, so that no audio follows. A
     /// file cut short part way through its last audio frame is read without complaint, and is not
     /// what this is.
     /// </summary>

@@ -41,6 +41,8 @@ A concept whose type is string then yields the text it has. One of any other typ
 
 **Data that is not text.** Some tag data is not text: an APE item flagged as binary, and every Id3v2 frame other than a text, URL, comment or lyrics frame. `bytes()` reads it, as a blob. `field()` does not: `id3v2::field()` naming a frame that does not hold text is an error, since the frame identifier says so, while an APE item is known to be binary only once the file is read, so `ape::field()` resolves one to an unusable occurrence.
 
+**Damaged data.** A tag can be damaged, by a faulty tagger or by a file decaying on disk, and a damaged tag still gives whatever it holds that can be read. Where the tag clearly records a datum that cannot be read, the datum is an **unusable occurrence**, for `bytes()` as for `field()` and every concept: a frame or item whose recorded size runs past the end of its tag, and, for `field()` and the concepts, a value that does not decode in the encoding the tag declares for it, or whose declared encoding the format does not define. Where the structure of a tag breaks off part way, so that nothing beyond the break can be found, whatever lay there is **absent**, as it would be had it never been written. A tag that cannot be read at all, its own header being damaged, records nothing, and every concept and source function of its source is absent. The data of other tags in the same file is unaffected, and none of this makes a file unreadable; a file whose tag is broken off or cannot be read at all is reported by the [`incomplete`](../../concepts/warnings.md) warning.
+
 #### Parsing dates
 
 The concept `year` is a number, while the underlying tag data can be any arbitrary string. The rules for extracting a value out of such _date-shaped_ data are as follows:
@@ -120,7 +122,7 @@ Describes the file itself.
 
 | Concept           | Type       | Description  |
 |-------------------|------------|--------------|
-| `file::duration`  | duration   | The playtime duration of the audio file, truncated to whole seconds
+| `file::duration`  | duration   | The playing time of the audio, truncated to whole seconds
 | `file::extension` | string     | The part of the file name after its last dot, without the dot, such as `mp3`
 | `file::name`      | string     | The file name, extension included, such as `01 Intro.mp3`
 | `file::path`      | string     | The absolute path of the file
@@ -128,11 +130,19 @@ Describes the file itself.
 
 A path is the one the file was discovered under: symbolic links are not resolved. It is written with `/` as the separator on every platform, so that a file Windows calls `C:\Music\01 Intro.mp3` has the `file::path` `C:/Music/01 Intro.mp3`. `file::extension` is absent when the name has no dot, when its only dot is the first character, or when nothing follows its last dot; `file::path` and `file::name` are never absent. None of the three is ever unusable, and none needs anything read from the file. `file::size`, by contrast, describes the file itself rather than how it was reached, so for a file reached through a symbolic link it is the size of the file the link leads to.
 
+`file::duration` is the length of the audio's timeline: how long it plays from start to end,
+leaving out the silence an encoder adds at either end wherever the file records how much that is.
+Damage inside the audio does not shorten it, while a file cut short ends where its audio does.
+Where a file does not record its playing time in a form Goro can verify, as an MP3 sometimes
+does not, `file::duration` is an unusable occurrence: Goro does not read through the whole of a
+file to work it out.
+
 `file::path`, `file::name`, `file::size` and `file::duration` are
-[exactly one](../../concepts/predicates.md#exactly-one): each resolves to exactly one usable
-occurrence for every file a predicate is evaluated against, since a file whose size or audio
-properties cannot be had is a [file that cannot be read](../../concepts/warnings.md), and is not
-evaluated at all. `file::extension` can be absent, and never holds more than one occurrence.
+[exactly one](../../concepts/predicates.md#exactly-one): each resolves to exactly one occurrence
+for every file a predicate is evaluated against, since a file whose size cannot be had, or in which
+no audio can be found, is a [file that cannot be read](../../concepts/warnings.md), and is not
+evaluated at all. The first three are always usable, and `file::duration` is usable wherever the
+playing time can be had. `file::extension` can be absent, and never holds more than one occurrence.
 
 ### Source `id3v1`
 
@@ -152,7 +162,7 @@ Every text field has a fixed width of 30 bytes, and a tagger writing a longer va
 
 #### Genre
 
-The Id3v1 genre is a single byte holding an index into the genre table -- the same 148-entry table, original entries together with the widely adopted extensions, that the Id3v2 genre conventions refer to. It resolves as follows:
+The Id3v1 genre is a single byte holding an index into the [genre table](genres.md) -- the same 148-entry table, original entries together with the widely adopted extensions, that the Id3v2 genre conventions refer to. It resolves as follows:
 
 - the value 255 is the convention for "no genre recorded", and is absent
 - a value that indexes an entry the table defines resolves to the name of that genre, as a string
@@ -166,7 +176,7 @@ Id3v1 specifies its text as ISO-8859-1, and Goro reads it as such. Taggers in th
 
 ### Source `id3v2`
 
-Reads the Id3v2 tag of a file that carries one. Every concept and every source function of this source can resolve to a multivalue, for the reasons given under [Common behaviour](#common-behaviour). `id3v2::genre` is described under [Genres](#genres) below.
+Reads the Id3v2 tag of a file that carries one. A file can carry several, and the source then reads the first of them, as players do. Every concept and every source function of this source can resolve to a multivalue, for the reasons given under [Common behaviour](#common-behaviour). `id3v2::genre` is described under [Genres](#genres) below.
 
 | Source function                          | Type   | Description  |
 |------------------------------------------|--------|--------------|
@@ -176,9 +186,9 @@ Reads the Id3v2 tag of a file that carries one. Every concept and every source f
 
 A frame is named by its identifier, four letters or digits such as `TIT2`, matched without regard to case; see [Frame names and tag versions](#frame-names-and-tag-versions) for which identifier that is.
 
-`field()` reads only frames that hold text: those whose identifier begins with `T` or `W`, `COMM` and `USLT`, and Apple's `GRP1`, `MVNM` and `MVIN`, and naming any other frame is an error. Four of these, `TXXX`, `WXXX`, `COMM` and `USLT`, carry a description alongside their value, and are told apart by it rather than by their identifier. `field()` gives the value alone. Without a description it reads every such frame, and with one it reads only the frames whose description matches, compared without regard to case: `id3v2::field("TXXX", "MOOD")` reads the user-defined text frames described as `MOOD`, and `id3v2::field("COMM", "")` the comments with no description. Giving a description for any other frame is an error. The language a `COMM` or `USLT` frame records is not part of what `field()` reads.
+`field()` reads only frames that hold text: those whose identifier begins with `T` or `W`, `COMM` and `USLT`, and Apple's `GRP1`, `MVNM` and `MVIN`, and naming any other frame is an error. Four of these, `TXXX`, `WXXX`, `COMM` and `USLT`, carry a description alongside their value, and are told apart by it rather than by their identifier. `field()` gives the value alone. Without a description it reads every such frame, and with one it reads only the frames whose description matches, compared without regard to case: `id3v2::field("TXXX", "MOOD")` reads the user-defined text frames described as `MOOD`, and `id3v2::field("COMM", "")` the comments with no description. Giving a description for any other frame is an error. The language a `COMM` or `USLT` frame records is not part of what `field()` reads. A frame whose description cannot be read might have any description, so it is an unusable occurrence for every description asked about, as well as without one.
 
-`bytes()` reads a frame of any kind, and gives one occurrence for each frame, holding its content without the frame header.
+`bytes()` reads a frame of any kind, and gives one occurrence for each frame, holding its content without the frame header. The content is as it would be stored plainly: unsynchronisation and compression are undone, and the bytes a frame's flags add in front of its content -- a group identifier, an encryption method, a data length -- are left out. An encrypted frame, or a compressed one that cannot be decompressed, has no content Goro can give, and is an unusable occurrence for `bytes()` as for `field()`.
 
 #### Frame names and tag versions
 
@@ -202,12 +212,12 @@ The `TCON` frame has accumulated more conventions than any other, and `id3v2::ge
 
 1. The value is split on forward slashes and semicolons. This applies to genres only: in other frames, such as the one behind `id3v2::artist`, a slash is part of the value.
 2. A parenthesized reference `(n)` is replaced by the name of Id3v1 genre `n`. Several references may appear in sequence, and each becomes a separate value. A doubled opening parenthesis is an escape for a literal one.
-3. Text following a reference is a refinement, and becomes a value of its own in addition to the name of the reference. So `(17)Post-Rock` yields both `Rock` and `Post-Rock`, and matches a predicate written against either.
+3. Text following a reference is a refinement, and becomes a value of its own in addition to the name of the reference. So `(17)Post-Rock` yields both `Rock` and `Post-Rock`, and matches a predicate written against either. A refinement that only repeats the reference's name, compared without regard to case, adds no value, so `(17)Rock` yields `Rock` once; taggers wrote it that way so that readers not knowing the table would still show a name. The name may be the one the table gives today or the one the original list gave, so `(67)Psychadelic` yields only `Psychedelic`.
 4. A value consisting only of digits is also a reference to the Id3v1 genre table, and is replaced by the corresponding name.
 5. The reserved values `RX` and `CR`, with or without parentheses, become `Remix` and `Cover`.
 6. A reference to a table position that has no genre assigned to it is left as recorded.
 
-The table referred to throughout is the Id3v1 genre table together with its widely adopted extensions, 148 entries in total.
+The table referred to throughout is the Id3v1 genre table together with its widely adopted extensions, 148 entries in total, listed in [the genre table](genres.md).
 
 #### Per-version caveats
 
@@ -226,4 +236,4 @@ Reads the Vorbis comments of a file that carries them. Since every Vorbis field 
 | `vorbis::field(name)`  | string | The values of every comment whose field name is `name`
 | `vorbis::bytes(name)`  | blob   | The value of every comment whose field name is `name`, as recorded
 
-A field name is matched without regard to case, so `vorbis::field("mood")` reads a field recorded as `MOOD`. Each comment gives one occurrence, and `field()` is never unusable, Vorbis comment values being text by definition.
+A field name is matched without regard to case, so `vorbis::field("mood")` reads a field recorded as `MOOD`. Each comment gives one occurrence. Vorbis comment values are text by definition, so `field()` is unusable only for a comment that is [damaged](#absent-usable-and-unusable-data).

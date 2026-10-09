@@ -10,8 +10,8 @@ warning - a remark about the data a run met, which does not stop the run
 
 A warning reports something about the data Goro was asked to work with that deserves a person's
 attention and that Goro cannot settle on their behalf: a tag field holding something that is not
-what it should be, a predicate left without an answer because of one, or a file that cannot be
-read at all. A warning is not an error. **It never
+what it should be, a predicate left without an answer because of one, a file only part of which
+could be read, or a file that cannot be read at all. A warning is not an error. **It never
 interrupts a run, and it never changes what the run produces for any other file.**
 
 Every condition Goro can detect is one of two things. An **error** is reported before
@@ -22,7 +22,7 @@ There is no third category, and nothing about one file is ever allowed to become
 
 ### What warns
 
-Every warning belongs to exactly one of three categories, which `--no-warn` and the exit code
+Every warning belongs to exactly one of four categories, which `--no-warn` and the exit code
 refer to.
 
 **Data that cannot be interpreted -- the `data` category.** A tag field holding something that cannot be read as the kind
@@ -44,23 +44,37 @@ default, as `FALLBACK(condition, TRUE)` does, always has an answer, so this warn
 command's defaults and never the author's. A file that cannot be read is not counted, having a
 warning of its own.
 
-This is the one warning about a run rather than about a file. It comes after every other warning
-the run emits, and a run that is interrupted never emits it. It is a count and nothing more: it
-does not say which files were affected, and `(P) IS UNUSABLE`, where `P` is the predicate, is how
-to select exactly those.
+This warning and the `incomplete` one below are the warnings about a run rather than about a file.
+They come after every other warning the run emits, this one first, and a run that is interrupted
+emits neither. This one is a count and nothing more: it does not say which files were affected,
+and `(P) IS UNUSABLE`, where `P` is the predicate, is how to select exactly those.
+
+**A file only part of which could be read -- the `incomplete` category.** Damage inside a file
+does not make it unreadable, and neither does a playing time that cannot be had. A tag whose structure breaks off part way still gives what lies
+before the break, a tag that cannot be read at all is simply absent, and a file whose playing time
+cannot be had has an unusable `file::duration`; [Built-in identifiers](../features/builtins/identifiers.md)
+says what each of these resolves to. Such a file is processed like any other, but part of what it
+holds could not be read, and that can go unnoticed: a field lost beyond a break is absent rather
+than unusable, so a predicate can be false for the file without anything else having warned.
+
+Once every file has been processed, a run that opened any such file emits **one warning** saying
+how many files it was, out of how many opened, and that `goro audit` describes what it found in
+them. A file counts once the run has opened it, whatever the run needed from it: a predicate
+asking only about the artist still counts a file whose playing time cannot be had. A file that
+cannot be read is not counted, having a warning of its own, while a file can be counted both here
+and in the `unanswered` warning. Like that warning, this one is a count, and comes last of all.
 
 **A file that cannot be read -- the `file` category.** Where Goro must read a file to do what was asked and cannot -- the
-file has gone since it was discovered, permission is refused, or its contents are damaged or not
-in a form Goro understands -- that file yields **one warning** and the run continues with the next
-file.
+file has gone since it was discovered, permission is refused, or no audio can be found in it --
+that file yields **one warning** and the run continues with the next file.
 
 Which files this can happen to depends on what the command needs from each one. A predicate
 mentioning only `file::path`, `file::name`, `file::extension` or `file::size` needs nothing but the
-file's metadata; one mentioning `file::duration` needs the audio's properties read; one mentioning
-a tag concept or a source function needs the tags read; `goro hash` needs the audio itself. A file that a run never
-had to open cannot fail to be read. A file whose tags cannot be parsed, even if only one of them
-is damaged, is a file that cannot be read, and so is a file whose audio properties cannot be
-parsed when `file::duration` needs them.
+file's metadata; one mentioning `file::duration`, a tag concept or a source function needs the
+file opened and read; `goro hash` needs the audio itself. A file that a run never had to open
+cannot fail to be read. Once a file is opened, damage to its tags or its audio does not make it
+unreadable, as described under `incomplete` above; only a file in which no audio can be found at
+all is, such as one that is not audio or one that ends inside its tags.
 
 A file that warned this way has not been processed. What a command's output shows for it is
 specified by each command: `goro list` with a predicate leaves it out, and `goro hash` includes it
@@ -88,6 +102,7 @@ suppress, attached with `=` or as the next argument, like any other option value
 ```
 --no-warn=data           suppress data warnings only
 --no-warn=unanswered     suppress the warning about predicates that could not be answered
+--no-warn=incomplete     suppress the warning about files only partly read
 --no-warn=file           suppress file warnings only
 --no-warn=data,file      data and file warnings, leaving the unanswered one
 --no-warn=all            every category, however many there are
@@ -113,5 +128,6 @@ format or one file.
 A warning does not by itself make a command fail. A run that warned is still a run that completed,
 and reporting that fact through the exit code is opt-in. With `--strict-exit-code` a run that
 emitted at least one data warning returns `10`, one that emitted the warning about predicates that
-could not be answered returns `11`, and one that emitted at least one file warning returns `12`. See [Exit codes](exit-codes.md) for the codes, for which of them takes precedence,
+could not be answered returns `11`, one that emitted the warning about files only partly read
+returns `12`, and one that emitted at least one file warning returns `13`. See [Exit codes](exit-codes.md) for the codes, for which of them takes precedence,
 and for what suppressing a category does to them.

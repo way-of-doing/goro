@@ -112,6 +112,19 @@ lesser one holds something usable, so no warning tells you about the junk it rou
 find it, ask the format directly: `ANY(vorbis::year) IS UNUSABLE` finds the files whose Vorbis
 date fields need attention.
 
+### Why does `file::duration` warn for some files?
+
+Some files, mostly MP3s without the summary frame an encoder writes ahead of the audio, do not
+record their playing time in a form Goro can verify, and their `file::duration` cannot be read. A
+comparison with it then warns and has no answer, as for any other data that cannot be read. To
+pass over those files silently, guard the comparison:
+
+```
+file::duration IS USABLE AND file::duration > 10m
+```
+
+The run's `incomplete` warning still counts them.
+
 ### How do I find Id3v1 tags with a junk genre?
 
 `id3v1::genre IS UNUSABLE` finds the files whose genre byte is an index the genre table never
@@ -174,14 +187,15 @@ predicate without an answer for some files, and `goro list` left them out. Suppr
 warnings does not hide that, since it is a different thing to be told; `--no-warn=unanswered`
 does, if you really do not mind.
 
-### Why does `12` outrank `11`, and `11` outrank `10`?
+### Why are the codes from `10` to `13` in that order?
 
-Because each says more about how far to trust the result. A data warning means some data was
-disregarded, which may have changed nothing. An unanswered predicate means it did change
-something: `goro list` decided for itself to leave some files out. A file warning means some file
-was not processed at all, so the output is incomplete and anything concluded from it may be wrong
-for a reason it does not show. That is the most serious thing to learn, and one a script may well
-want to branch on separately.
+Because each says more about how far to trust the result. A data warning (`10`) means some data
+was disregarded, which may have changed nothing. An unanswered predicate (`11`) means it did change
+something: `goro list` decided for itself to leave some files out. An incomplete file (`12`) was
+processed without part of what it holds, and that can change an answer with no other warning to
+show for it. A file warning (`13`) means some file was not processed at all, so the output is
+incomplete and anything concluded from it may be wrong for a reason it does not show. That is the
+most serious thing to learn, and one a script may well want to branch on separately.
 
 ### Why does an interrupted run not return a code of Goro's own?
 

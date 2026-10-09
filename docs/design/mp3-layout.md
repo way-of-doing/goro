@@ -1,6 +1,6 @@
 # The layout of an MP3 file
 
-This is working material for [mp3-support](../directions/mp3-support.md), made to settle what
+This is working material for [mp3-support](../directions/archive/mp3-support.md), made to settle what
 `goro hash` covers at the edges of an MP3's audio. It describes how an MP3 file is laid out, where
 each kind of tag sits, and what goes wrong at each edge. Every mishap is tied to a lettered
 position in the diagrams, and most to a file in the fixture corpus (`tests/Goro.Tests/Fixtures/Audio/mp3`).
@@ -47,8 +47,11 @@ tag's encoder delay and padding change what a gapless decoder outputs. Zeroing t
 `seeds/mp3-cbr.mp3` changes ffmpeg's output from 145,530 to 146,927 samples. Editing the byte
 count field in the same frame changes nothing.
 
-**Today's hash range** is TagLibSharp's `[InvariantStartPosition, InvariantEndPosition)`. On every
-corpus file TagLibSharp could read, that is `[B, F)`: it includes both gaps, and the Info frame.
+**The hash range** was TagLibSharp's `[InvariantStartPosition, InvariantEndPosition)` until
+mp3-support's step 4. On every corpus file TagLibSharp could read, that was `[B, F)`: both gaps,
+and the Info frame. It is now `[D, E)`, as [file-reading](file-reading.md#what-the-hash-covers)
+decided. The mishaps below still describe what each edge holds; the "Today" remarks in them
+describe TagLibSharp's range.
 
 ## Variation 1: no tags
 

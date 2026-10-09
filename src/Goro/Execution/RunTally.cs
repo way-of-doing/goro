@@ -14,6 +14,8 @@ public sealed class RunTally(IWarningSink warnings)
     private int _examined;
     private int _matched;
     private int _unanswered;
+    private int _opened;
+    private int _incomplete;
 
     public void Record<TResult>(FileOutcome<TResult> outcome)
         where TResult : class
@@ -27,6 +29,21 @@ public sealed class RunTally(IWarningSink warnings)
         if (outcome.IsUnanswered)
         {
             Interlocked.Increment(ref _unanswered);
+        }
+
+        switch (outcome.Reading)
+        {
+            case FileReading.NotOpened:
+                break;
+            case FileReading.Read:
+                Interlocked.Increment(ref _opened);
+                break;
+            case FileReading.ReadInPart:
+                Interlocked.Increment(ref _opened);
+                Interlocked.Increment(ref _incomplete);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(outcome), outcome.Reading, "Unknown file reading.");
         }
 
         switch (outcome.Disposition)
@@ -51,5 +68,7 @@ public sealed class RunTally(IWarningSink warnings)
         Volatile.Read(ref _examined),
         Volatile.Read(ref _matched),
         warnings.Produced,
-        Volatile.Read(ref _unanswered));
+        Volatile.Read(ref _unanswered),
+        Volatile.Read(ref _opened),
+        Volatile.Read(ref _incomplete));
 }

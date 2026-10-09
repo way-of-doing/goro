@@ -1,20 +1,21 @@
 using System.Security.Cryptography;
 using System.Text;
 using Goro.Hashing;
+using Goro.Reading.Bytes;
 using Goro.Tests.TestSupport;
 
 namespace Goro.Tests.Hashing;
 
-public class TagLibAudioHasherTests
+public class Mp3AudioHasherTests
 {
     private DirectoryInfo _tempDir = null!;
-    private TagLibAudioHasher _hasher = null!;
+    private Mp3AudioHasher _hasher = null!;
 
     [SetUp]
     public void SetUp()
     {
         _tempDir = Directory.CreateTempSubdirectory("goro-hash-tests-");
-        _hasher = new TagLibAudioHasher();
+        _hasher = new Mp3AudioHasher(ReadPolicy.Default);
     }
 
     [TearDown]
@@ -37,7 +38,7 @@ public class TagLibAudioHasherTests
         var hashA = await _hasher.ComputeHashAsync(fileA, HashAlgorithmKind.Md5, CancellationToken.None);
         var hashB = await _hasher.ComputeHashAsync(fileB, HashAlgorithmKind.Md5, CancellationToken.None);
 
-        Assert.That(hashA, Is.EqualTo(hashB));
+        Assert.That(hashA.Hex, Is.EqualTo(hashB.Hex));
     }
 
     [Test]
@@ -54,7 +55,7 @@ public class TagLibAudioHasherTests
         var hashA = await _hasher.ComputeHashAsync(fileA, HashAlgorithmKind.Md5, CancellationToken.None);
         var hashB = await _hasher.ComputeHashAsync(fileB, HashAlgorithmKind.Md5, CancellationToken.None);
 
-        Assert.That(hashA, Is.Not.EqualTo(hashB));
+        Assert.That(hashA.Hex, Is.Not.EqualTo(hashB.Hex));
     }
 
     [Test]
@@ -69,9 +70,8 @@ public class TagLibAudioHasherTests
         var expectedMd5 = Convert.ToHexString(MD5.HashData(audio)).ToLowerInvariant();
         var expectedSha1 = Convert.ToHexString(SHA1.HashData(audio)).ToLowerInvariant();
 
-        Assert.That(md5, Is.EqualTo(expectedMd5));
-        Assert.That(sha1, Is.EqualTo(expectedSha1));
-        Assert.That(md5, Is.Not.EqualTo(sha1));
+        Assert.That(md5.Hex, Is.EqualTo(expectedMd5), "frames without a summary header, and nothing after them: the hash covers all of them");
+        Assert.That(sha1.Hex, Is.EqualTo(expectedSha1));
     }
 
     [Test]
@@ -79,7 +79,18 @@ public class TagLibAudioHasherTests
     {
         var file = WriteFile("not-audio.mp3", Encoding.UTF8.GetBytes("this is not a valid mpeg stream at all"));
 
-        Assert.ThrowsAsync<TagLib.CorruptFileException>(() =>
-            _hasher.ComputeHashAsync(file, HashAlgorithmKind.Md5, CancellationToken.None));
+        Assert.That(() => _hasher.ComputeHashAsync(file, HashAlgorithmKind.Md5, CancellationToken.None),
+            Throws.TypeOf<InvalidDataException>().With.Message.EqualTo("no MPEG audio found"));
+    }
+
+    [Test]
+    public async Task ComputeHashAsync_DamagedTag_HashesAsTheHealthyFile_AndSaysPartOfItCouldNotBeRead()
+    {
+        var damaged = await _hasher.ComputeHashAsync(AudioCorpus.PathOf("mp3/dmg-id3v24-frame-overrun.mp3"), HashAlgorithmKind.Md5, CancellationToken.None);
+        var healthy = await _hasher.ComputeHashAsync(AudioCorpus.PathOf("mp3/id3v24.mp3"), HashAlgorithmKind.Md5, CancellationToken.None);
+
+        Assert.That(damaged.Hex, Is.EqualTo(healthy.Hex));
+        Assert.That(damaged.Incomplete, Is.True);
+        Assert.That(healthy.Incomplete, Is.False);
     }
 }

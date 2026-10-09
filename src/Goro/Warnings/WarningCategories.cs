@@ -15,6 +15,7 @@ public static class WarningCategories
     [
         ("data", WarningCategory.Data),
         ("unanswered", WarningCategory.Unanswered),
+        ("incomplete", WarningCategory.Incomplete),
         ("file", WarningCategory.File),
     ];
 

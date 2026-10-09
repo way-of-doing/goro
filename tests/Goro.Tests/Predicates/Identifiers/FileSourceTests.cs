@@ -1,6 +1,7 @@
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
 using Goro.Tests.TestSupport;
+using Goro.Reading.Bytes;
 
 namespace Goro.Tests.Predicates.Identifiers;
 
@@ -35,8 +36,11 @@ public class FileSourceTests
         return declaration.Binding.Resolve(file, new Origin(new SourceId(0), $"file::{identifier}", 0));
     }
 
-    private static Value<T> Resolve<T>(string identifier, string path) where T : notnull =>
-        Resolve<T>(identifier, new FileData(path));
+    private static Value<T> Resolve<T>(string identifier, string path) where T : notnull
+    {
+        using var loader = new FileDataLoader(path, ReadPolicy.Default);
+        return Resolve<T>(identifier, new FileData(path, loader));
+    }
 
     private static T SingleDatum<T>(Value<T> value) where T : notnull
     {
@@ -176,9 +180,8 @@ public class FileSourceTests
     [Test]
     public void Duration_OfAnMp3WithADamagedId3v2Tag_StillResolves()
     {
-        // A TIT2 frame claiming a size far beyond the tag. warnings.md: a file is unreadable for
-        // file::duration when its audio properties cannot be parsed, not when its tags cannot.
-        // TagLibSharp parses the tags on the way to the audio, so this guards its tolerance.
+        // A TIT2 frame claiming a size far beyond the tag. Damage to a tag never makes a file
+        // unreadable (docs/concepts/warnings.md), and the playing time is read from the audio.
         var tag = SyntheticMp3Builder.BuildId3V2(64);
         "TIT2"u8.CopyTo(tag.AsSpan(10));
         tag[14] = 0x7F;
@@ -210,7 +213,9 @@ public class FileSourceTests
     [Test]
     public void SizeAndDuration_ShareTheFilesData_AndFailIndependently()
     {
-        var file = new FileData(WriteFile("not audio"u8.ToArray(), "list.mp3"));
+        var path = WriteFile("not audio"u8.ToArray(), "list.mp3");
+        using var loader = new FileDataLoader(path, ReadPolicy.Default);
+        var file = new FileData(path, loader);
 
         Assert.Throws<UnreadableFileException>(() => Resolve<Duration>("duration", file));
 

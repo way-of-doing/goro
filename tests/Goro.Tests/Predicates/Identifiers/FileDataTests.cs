@@ -1,4 +1,5 @@
 using Goro.Predicates.Identifiers;
+using Goro.Tests.TestSupport;
 
 namespace Goro.Tests.Predicates.Identifiers;
 
@@ -11,14 +12,14 @@ public class FileDataTests
     {
         var facet = new CountingFacet<string>(path => $"loaded {path}");
 
-        Assert.That(new FileData(FilePath).Get(facet), Is.EqualTo($"loaded {FilePath}"));
+        Assert.That(TestFiles.Data(FilePath).Get(facet), Is.EqualTo($"loaded {FilePath}"));
     }
 
     [Test]
     public void Get_SameFacetTwice_LoadsItOnce()
     {
         var facet = new CountingFacet<object>(_ => new object());
-        var file = new FileData(FilePath);
+        var file = TestFiles.Data(FilePath);
 
         var first = file.Get(facet);
         var second = file.Get(facet);
@@ -33,7 +34,7 @@ public class FileDataTests
         var asked = new CountingFacet<int>(_ => 1);
         var notAsked = new CountingFacet<int>(_ => 2);
 
-        new FileData(FilePath).Get(asked);
+        TestFiles.Data(FilePath).Get(asked);
 
         Assert.That(notAsked.Loads, Is.Zero);
     }
@@ -43,8 +44,8 @@ public class FileDataTests
     {
         var facet = new CountingFacet<string>(path => path);
 
-        new FileData("/music/a.mp3").Get(facet);
-        new FileData("/music/b.mp3").Get(facet);
+        TestFiles.Data("/music/a.mp3").Get(facet);
+        TestFiles.Data("/music/b.mp3").Get(facet);
 
         Assert.That(facet.Loads, Is.EqualTo(2));
     }
@@ -55,7 +56,7 @@ public class FileDataTests
         var cause = new IOException("the disk is on fire");
         var facet = new CountingFacet<int>(_ => throw cause);
 
-        var exception = Assert.Throws<UnreadableFileException>(() => new FileData(FilePath).Get(facet));
+        var exception = Assert.Throws<UnreadableFileException>(() => TestFiles.Data(FilePath).Get(facet));
 
         Assert.That(exception.Path, Is.EqualTo(FilePath));
         Assert.That(exception.Reason, Is.EqualTo("the disk is on fire"));
@@ -66,7 +67,7 @@ public class FileDataTests
     public void Get_FacetThatFailed_IsNotLoadedAgainAndFailsTheSameWay()
     {
         var facet = new CountingFacet<int>(_ => throw new IOException("gone"));
-        var file = new FileData(FilePath);
+        var file = TestFiles.Data(FilePath);
 
         var first = Assert.Throws<UnreadableFileException>(() => file.Get(facet));
         var second = Assert.Throws<UnreadableFileException>(() => file.Get(facet));
@@ -80,7 +81,7 @@ public class FileDataTests
     {
         var failing = new CountingFacet<int>(_ => throw new IOException("damaged tags"));
         var working = new CountingFacet<int>(_ => 42);
-        var file = new FileData(FilePath);
+        var file = TestFiles.Data(FilePath);
 
         Assert.Throws<UnreadableFileException>(() => file.Get(failing));
 
@@ -93,7 +94,7 @@ public class FileDataTests
         var thrown = new UnreadableFileException(FilePath, "already explained");
         var facet = new CountingFacet<int>(_ => throw thrown);
 
-        var exception = Assert.Throws<UnreadableFileException>(() => new FileData(FilePath).Get(facet));
+        var exception = Assert.Throws<UnreadableFileException>(() => TestFiles.Data(FilePath).Get(facet));
 
         Assert.That(exception, Is.SameAs(thrown));
     }
@@ -102,10 +103,10 @@ public class FileDataTests
     {
         public int Loads { get; private set; }
 
-        public override T Load(string path)
+        public override T Load(FileData file)
         {
             Loads++;
-            return load(path);
+            return load(file.Path);
         }
     }
 }

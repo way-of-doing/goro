@@ -1,7 +1,8 @@
 #!/bin/sh
 # Fetches other projects' audio test data, pinned to the commits the file-reading survey used, into
-# a directory outside the repository. Their licences (GPL-2.0, LGPL-2.1/MPL-1.1, LGPL-2.1, MIT)
-# have not been weighed for committing any of it, so it stays outside.
+# a directory outside the repository, where it stays: three projects' licences are copyleft, and
+# music-metadata's MIT licence covers its code, not the commercial recordings and users' bug-report
+# files most of its samples are.
 #
 # Usage: fetch-realworld.sh <dir>, then:
 #   dotnet run -c Release --project scratchpad/Goro.Scratchpad -- realworld <dir> <dir>/proto.jsonl

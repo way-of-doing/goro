@@ -78,7 +78,12 @@ holding bytes outside ASCII, read as ISO-8859-1 and possibly the wrong text.
   - whether its byte count agrees with the audio found;
   - whether the LAME tag's CRC passes;
   - the encoder delay and padding;
-  - and so why `file::duration` was, or was not, usable.
+  - and so why `file::duration` was, or was not, usable;
+  - whether the end of the hash's span, `E`, had to be settled by the walk's own judgement rather
+    than read off the edges: the walk resynchronised over damage, or `E` falls short of where the
+    trailing tags start, or only the run of three decided it (implementation.md, "Finding where the
+    audio ends"). The same causes mostly surface as other findings here, such as junk after the
+    audio or a header that disagrees. This is listed so that the walk itself is not forgotten.
 - **FLAC:** STREAMINFO against the last intact frame. Covers a total of 0, a total that disagrees,
   truncation, and a damaged tail.
 - **Ogg:**

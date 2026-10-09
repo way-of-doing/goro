@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Goro.Reading.Tags;
 
 namespace Goro.Predicates.Identifiers;
 
@@ -17,38 +18,19 @@ namespace Goro.Predicates.Identifiers;
 public static class Id3v2Frames
 {
     /// <summary>The frames read under another identifier: those of v2.2, and three of v2.3.</summary>
-    public static FrozenDictionary<string, string> Renamed { get; } = new Dictionary<string, string>
-    {
-        // v2.3 frames that v2.4 replaced with one holding the same data in the same form.
-        ["IPLS"] = "TIPL", ["TORY"] = "TDOR", ["TYER"] = "TDRC",
+    public static FrozenDictionary<string, string> Renamed => Id3v2FrameNames.Renamed;
 
-        // v2.2 frames, whose three-character identifiers v2.3 lengthened.
-        ["BUF"] = "RBUF", ["CNT"] = "PCNT", ["COM"] = "COMM", ["CRA"] = "AENC", ["ETC"] = "ETCO",
-        ["GEO"] = "GEOB", ["IPL"] = "TIPL", ["MCI"] = "MCDI", ["MLL"] = "MLLT", ["POP"] = "POPM",
-        ["REV"] = "RVRB", ["SLT"] = "SYLT", ["STC"] = "SYTC", ["TAL"] = "TALB", ["TBP"] = "TBPM",
-        ["TCM"] = "TCOM", ["TCO"] = "TCON", ["TCR"] = "TCOP", ["TDY"] = "TDLY", ["TEN"] = "TENC",
-        ["TFT"] = "TFLT", ["TKE"] = "TKEY", ["TLA"] = "TLAN", ["TLE"] = "TLEN", ["TMT"] = "TMED",
-        ["TOA"] = "TOPE", ["TOF"] = "TOFN", ["TOL"] = "TOLY", ["TOR"] = "TDOR", ["TOT"] = "TOAL",
-        ["TP1"] = "TPE1", ["TP2"] = "TPE2", ["TP3"] = "TPE3", ["TP4"] = "TPE4", ["TPA"] = "TPOS",
-        ["TPB"] = "TPUB", ["TRC"] = "TSRC", ["TRK"] = "TRCK", ["TSS"] = "TSSE", ["TT1"] = "TIT1",
-        ["TT2"] = "TIT2", ["TT3"] = "TIT3", ["TXT"] = "TEXT", ["TXX"] = "TXXX", ["TYE"] = "TDRC",
-        ["UFI"] = "UFID", ["ULT"] = "USLT", ["WAF"] = "WOAF", ["WAR"] = "WOAR", ["WAS"] = "WOAS",
-        ["WCM"] = "WCOM", ["WCP"] = "WCOP", ["WPB"] = "WPUB", ["WXX"] = "WXXX",
-    }.ToFrozenDictionary();
-
-    /// <summary>
-    /// The v2.2 frames with no counterpart of the same form, which keep their three-character
-    /// identifiers. The v2.3 frames in the same position need no list, having four characters
-    /// like any other.
-    /// </summary>
-    public static FrozenSet<string> KeptFromV22 { get; } =
-        new[] { "CRM", "EQU", "LNK", "PIC", "RVA", "TDA", "TIM", "TRD", "TSI" }.ToFrozenSet();
+    /// <summary>The v2.2 frames with no counterpart of the same form, which keep their three-character identifiers.</summary>
+    public static FrozenSet<string> KeptFromV22 => Id3v2FrameNames.KeptFromV22;
 
     /// <summary>The frames told apart by a description, which <c>field()</c> can select by.</summary>
     public static FrozenSet<string> Described { get; } = new[] { "TXXX", "WXXX", "COMM", "USLT" }.ToFrozenSet();
 
-    /// <summary>Whether the frame holds text that <c>field()</c> can read: a text or URL frame, a comment, or lyrics.</summary>
-    public static bool HoldsText(string frame) => frame[0] is 'T' or 'W' || frame is "COMM" or "USLT";
+    /// <summary>
+    /// Whether the frame holds text that <c>field()</c> can read: a text or URL frame, a comment,
+    /// lyrics, or one of Apple's three text frames not named <c>T…</c> (docs/design/quirks.md).
+    /// </summary>
+    public static bool HoldsText(string frame) => frame[0] is 'T' or 'W' || frame is "COMM" or "USLT" or "GRP1" or "MVNM" or "MVIN";
 
     /// <summary>The arguments of <c>id3v2::field()</c>: a frame that holds text, and a description where it carries one.</summary>
     public static ArgumentCheck CheckField(ImmutableArray<string> arguments)

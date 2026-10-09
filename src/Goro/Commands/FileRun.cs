@@ -11,7 +11,7 @@ namespace Goro.Commands;
 /// <summary>
 /// The shape every file-processing command's run takes, once its options have been read: resolve
 /// the pathspecs, discover, run the pipeline over each file, render, report any predicates that could
-/// not be answered, and choose the exit code from what the run found.
+/// not be answered and any files read only in part, and choose the exit code from what the run found.
 /// </summary>
 internal sealed class FileRun(IFileDiscoveryService fileDiscovery, IExecutor executor, IErrorMessages messages)
 {
@@ -46,13 +46,19 @@ internal sealed class FileRun(IFileDiscoveryService fileDiscovery, IExecutor exe
 
         await renderer.RenderAsync(results, Console.Out, cancellationToken);
 
-        // Once every file has been processed, so that it comes after every other warning, and never
-        // for a run that was interrupted, since an interrupted run does not get this far. The sink
-        // suppresses it like any other, which is what keeps its code out of the outcome too.
+        // Once every file has been processed, so that they come after every other warning, and never
+        // for a run that was interrupted, since an interrupted run does not get this far. They come
+        // in the order of their exit codes. The sink suppresses them like any other, which is what
+        // keeps their codes out of the outcome too.
         var counted = tally.Outcome;
         if (counted.Unanswered > 0 && unanswered is not null)
         {
             warnings.Emit([unanswered(counted.Unanswered, counted.Examined)]);
+        }
+
+        if (counted.Incomplete > 0)
+        {
+            warnings.Emit([new IncompleteWarning(counted.Incomplete, counted.Opened)]);
         }
 
         return ExitCodes.For(tally.Outcome, settings.StrictExitCode);

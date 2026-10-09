@@ -260,6 +260,10 @@
       {
         "Tag": "id3v2.3",
         "Key": "IPLS",
+        "Values": [
+          "producer",
+          "Someone"
+        ],
         "BytesHex": "0070726f647563657200536f6d656f6e65"
       },
       {

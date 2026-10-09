@@ -3,7 +3,7 @@ namespace Goro.Tests.TestSupport;
 /// <summary>
 /// Builds minimal-but-structurally-valid MP3 byte streams for tests, so tests don't
 /// depend on a real audio fixture file. Frames carry no real encoded audio (their
-/// body is arbitrary bytes) — TagLibSharp only needs a valid frame header sequence
+/// body is arbitrary bytes) — Goro's reader only needs a valid frame header sequence
 /// to locate the audio range; it doesn't decode the audio itself.
 /// </summary>
 internal static class SyntheticMp3Builder

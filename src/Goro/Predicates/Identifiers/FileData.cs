@@ -6,7 +6,8 @@ namespace Goro.Predicates.Identifiers;
 /// <summary>
 /// One file's data, loaded only as far as an evaluation asks for it. Each facet is loaded at most
 /// once, on first use; if loading fails, the file is unreadable, and every later request for that
-/// facet fails the same way.
+/// facet fails the same way. What lies inside the file is reached through its
+/// <see cref="Loader"/>, which the runtime owns and disposes.
 /// </summary>
 /// <remarks>
 /// A <see cref="FileData"/> belongs to one evaluation of one file, which runs on one thread from
@@ -21,9 +22,16 @@ public sealed class FileData
     private readonly Dictionary<object, object> loaded = new(ReferenceEqualityComparer.Instance);
 
     /// <param name="path">The file's full path, as discovered.</param>
-    public FileData(string path) => Path = path;
+    /// <param name="loader">How the file's contents are reached, for the facets that need them.</param>
+    public FileData(string path, IFileDataLoader loader)
+    {
+        Path = path;
+        Loader = loader;
+    }
 
     public string Path { get; }
+
+    public IFileDataLoader Loader { get; }
 
     /// <exception cref="UnreadableFileException">The facet cannot be loaded.</exception>
     public T Get<T>(FileFacet<T> facet) where T : notnull
@@ -46,7 +54,7 @@ public sealed class FileData
     {
         try
         {
-            return facet.Load(Path);
+            return facet.Load(this);
         }
         catch (UnreadableFileException exception)
         {

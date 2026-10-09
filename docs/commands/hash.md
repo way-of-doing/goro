@@ -16,6 +16,14 @@ A file whose audio cannot be read has no hash. It still appears in the output, w
 reported as absent, and one warning is emitted for it; see [Warnings](../concepts/warnings.md).
 This differs from `goro list`, which leaves out a file it cannot read.
 
+# What is hashed
+
+The hash covers a file's encoded audio stream and nothing the container around it adds, so that
+no edit to a file's tags changes it. For an MP3 that is its audio frames, from the first to the
+end of the last whole frame. Left out are the tags at either end, the frame some encoders write
+ahead of the audio to describe it (Xing, Info or VBRI), and anything else before the first frame
+or after the last. A file in which no audio frame can be found cannot be read, and has no hash.
+
 # Pathspecs
 
 This command accepts one or more pathspecs. See [Pathspecs](../concepts/pathspecs.md) for which files are considered, and for resolution and deduplication rules.

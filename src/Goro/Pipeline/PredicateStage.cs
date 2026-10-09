@@ -3,6 +3,7 @@ using Goro.Predicates;
 using Goro.Predicates.Evaluation;
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
+using Goro.Reading.Bytes;
 using Goro.Warnings;
 
 namespace Goro.Pipeline;
@@ -24,12 +25,13 @@ namespace Goro.Pipeline;
 /// that file and dropped with it. Evaluation is synchronous (decision D2) and runs on whichever
 /// thread-pool thread the executor gave this invocation.
 ///
-/// Only <see cref="UnreadableFileException"/> is caught. Anything else, such as the
-/// <see cref="NotSupportedException"/> of a tag identifier that cannot be read yet, is a defect
-/// rather than a bad file, and fails the run.
+/// Only <see cref="UnreadableFileException"/> is caught. Anything else is a defect rather than a
+/// bad file, and fails the run.
 /// </remarks>
-public sealed class PredicateStage(CompiledPredicate predicate) : IPipelineStage<string, FileOutcome<ListResult>>
+public sealed class PredicateStage(CompiledPredicate predicate, ReadPolicy? policy = null) : IPipelineStage<string, FileOutcome<ListResult>>
 {
+    private readonly ReadPolicy policy = policy ?? ReadPolicy.Default;
+
     public CompiledPredicate Predicate { get; } = predicate;
 
     public Task<FileOutcome<ListResult>> ExecuteAsync(string filePath, CancellationToken cancellationToken)
@@ -40,7 +42,9 @@ public sealed class PredicateStage(CompiledPredicate predicate) : IPipelineStage
 
     private FileOutcome<ListResult> Decide(string filePath)
     {
-        var context = new EvaluationContext(new FileData(filePath), Predicate.Sources.Count);
+        // One loader serves every facet of the file, and closes it when the file is done.
+        using var loader = new FileDataLoader(filePath, policy);
+        var context = new EvaluationContext(new FileData(filePath, loader), Predicate.Sources.Count);
 
         Truth truth;
         try
@@ -53,9 +57,10 @@ public sealed class PredicateStage(CompiledPredicate predicate) : IPipelineStage
         }
 
         var warnings = context.Reported.Select(origin => new DataWarning(filePath, origin.Text));
+        var reading = !loader.Opened ? FileReading.NotOpened : loader.Layout.IsIncomplete ? FileReading.ReadInPart : FileReading.Read;
         return truth == Truth.True
-            ? FileOutcome<ListResult>.Matched(new ListResult(filePath), warnings)
-            : FileOutcome<ListResult>.Unmatched(warnings, unanswered: truth == Truth.Unusable);
+            ? FileOutcome<ListResult>.Matched(new ListResult(filePath), warnings, reading: reading)
+            : FileOutcome<ListResult>.Unmatched(warnings, unanswered: truth == Truth.Unusable, reading: reading);
     }
 
     /// <summary>

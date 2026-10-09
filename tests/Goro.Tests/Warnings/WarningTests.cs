@@ -31,6 +31,18 @@ public class WarningTests
         Assert.That(warning.ToString(), Is.EqualTo("goro: warning: the predicate could not be answered for the one file examined, which was not listed"));
     }
 
+    [TestCase(1, 1, "goro: warning: the one file opened could be read only in part; goro audit can say what it holds")]
+    [TestCase(1, 40, "goro: warning: 1 of the 40 files opened could be read only in part; goro audit can say what it holds")]
+    [TestCase(3, 3, "goro: warning: none of the 3 files opened could be read in full; goro audit can say what they hold")]
+    [TestCase(3, 40, "goro: warning: 3 of the 40 files opened could be read only in part; goro audit can say what they hold")]
+    public void IncompleteWarning_NamesNoPath_AndCountsTheFilesInWholeSentences(int incomplete, int opened, string expected)
+    {
+        var warning = new IncompleteWarning(incomplete, opened);
+
+        Assert.That(warning.Category, Is.EqualTo(WarningCategory.Incomplete));
+        Assert.That(warning.ToString(), Is.EqualTo(expected));
+    }
+
     [Test]
     public void FileWarning_From_DescribesCommonCausesWithoutRepeatingThePath()
     {

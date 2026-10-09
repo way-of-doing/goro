@@ -1,5 +1,6 @@
 // Owned by the identifier catalog group (G7) of the predicate-runtime-architecture line.
 using System.Collections.Immutable;
+using Goro.Predicates.Identifiers.Interpretation;
 using Goro.Predicates.Values;
 
 namespace Goro.Predicates.Identifiers;
@@ -9,30 +10,45 @@ namespace Goro.Predicates.Identifiers;
 /// </summary>
 /// <remarks>
 /// <see cref="Table"/> follows that document's table of concepts, row by row and cell by cell, so
-/// the two can be checked against each other by eye. Every cell, and every source function, is bound
-/// to a <see cref="TagBindings.NotImplemented{T}"/> binding: the line that reads tags replaces those
-/// bindings, and nothing else here. A concept written without a source is a
+/// the two can be checked against each other by eye. Each row also says how its concept interprets
+/// what it reads. The source functions and the cells are bound to the file's tags through
+/// <see cref="TagBindings"/>. A concept written without a source is a
 /// <see cref="PreferredBinding{T}"/> over its cells, in <see cref="TagSources"/> order.
 /// </remarks>
 public sealed class BuiltInCatalog : IIdentifierCatalog
 {
-    private const string Ape = "ape";
-    private const string Id3v1 = "id3v1";
-    private const string Id3v2 = "id3v2";
-    private const string Vorbis = "vorbis";
+    private const string Ape = SourceNames.Ape;
+    private const string Id3v1 = SourceNames.Id3v1;
+    private const string Id3v2 = SourceNames.Id3v2;
+    private const string Vorbis = SourceNames.Vorbis;
 
     /// <summary>The tag sources, most preferred first, which is also the order of each row's cells.</summary>
     private static readonly string[] TagSources = [Vorbis, Ape, Id3v2, Id3v1];
 
-    /// <summary>The concepts of the tag sources, and the field each source's cell reads.</summary>
+    /// <summary>
+    /// The concepts of the tag sources, the field each source's cell reads, and how the concept
+    /// interprets it. The fields of a row are in <see cref="TagSources"/> order.
+    /// </summary>
     private static readonly ImmutableArray<ConceptRow> Table =
     [
-        new ConceptRow<string>("artist", ["ARTIST", "Artist", "TPE1", "artist"]),
-        new ConceptRow<string>("album", ["ALBUM", "Album", "TALB", "album"]),
-        new ConceptRow<string>("genre", ["GENRE", "Genre", "TCON", "genre"]),
-        new ConceptRow<string>("title", ["TITLE", "Title", "TIT2", "title"]),
-        new ConceptRow<decimal>("track", ["TRACKNUMBER", "Track", "TRCK", "track"]),
-        new ConceptRow<decimal>("year", ["DATE", "Year", "TDRC", "year"]),
+        new ConceptRow<string>("artist",
+            [ConceptFieldMapping.Vorbis.Artist, ConceptFieldMapping.Ape.Artist, ConceptFieldMapping.Id3v2.Artist, ConceptFieldMapping.Id3v1.Artist],
+            ConceptInterpretations.Strings),
+        new ConceptRow<string>("album",
+            [ConceptFieldMapping.Vorbis.Album, ConceptFieldMapping.Ape.Album, ConceptFieldMapping.Id3v2.Album, ConceptFieldMapping.Id3v1.Album],
+            ConceptInterpretations.Strings),
+        new ConceptRow<string>("genre",
+            [ConceptFieldMapping.Vorbis.Genre, ConceptFieldMapping.Ape.Genre, ConceptFieldMapping.Id3v2.Genre, ConceptFieldMapping.Id3v1.Genre],
+            ConceptInterpretations.Genres),
+        new ConceptRow<string>("title",
+            [ConceptFieldMapping.Vorbis.Title, ConceptFieldMapping.Ape.Title, ConceptFieldMapping.Id3v2.Title, ConceptFieldMapping.Id3v1.Title],
+            ConceptInterpretations.Strings),
+        new ConceptRow<decimal>("track",
+            [ConceptFieldMapping.Vorbis.Track, ConceptFieldMapping.Ape.Track, ConceptFieldMapping.Id3v2.Track, ConceptFieldMapping.Id3v1.Track],
+            ConceptInterpretations.Tracks),
+        new ConceptRow<decimal>("year",
+            [ConceptFieldMapping.Vorbis.Year, ConceptFieldMapping.Ape.Year, ConceptFieldMapping.Id3v2.Year, ConceptFieldMapping.Id3v1.Year],
+            ConceptInterpretations.Years),
     ];
 
     private static readonly ImmutableArray<CatalogSource> Sources =
@@ -42,7 +58,7 @@ public sealed class BuiltInCatalog : IIdentifierCatalog
             Field(Ape, 1),
             Bytes(Ape, Bounds.AtMostOne),
         ]),
-        new(FileSource.Name, FileSource.Concepts, []),
+        new(SourceNames.File, FileSource.Concepts, []),
         new(Id3v1, Cells(Id3v1), []),
         new(Id3v2, Cells(Id3v2),
         [
@@ -76,8 +92,8 @@ public sealed class BuiltInCatalog : IIdentifierCatalog
                 return new IdentifierLookup.Found(plain);
             }
 
-            return SourceOf(FileSource.Name).Concept(name.Name) is not null
-                ? new IdentifierLookup.NeedsSource(FileSource.Name)
+            return SourceOf(SourceNames.File).Concept(name.Name) is not null
+                ? new IdentifierLookup.NeedsSource(SourceNames.File)
                 : new IdentifierLookup.UnknownIdentifier([.. Plain.Values.Select(Concept)]);
         }
 
@@ -127,13 +143,13 @@ public sealed class BuiltInCatalog : IIdentifierCatalog
 
     /// <summary><c>field()</c>: the data as text, as recorded, one occurrence for each value the format records.</summary>
     private static SourceFunction Field(string source, int maximumArguments, Func<ImmutableArray<string>, ArgumentCheck>? check = null) =>
-        new SourceFunction<string>(source, "field", 1, maximumArguments, Bounds.Any, TagBindings.NotImplemented<string>, check);
+        new SourceFunction<string>(source, "field", 1, maximumArguments, Bounds.Any, TagBindings.Field(source), check);
 
     /// <summary><c>bytes()</c>: the data as recorded, one occurrence for each item, frame or comment.</summary>
     private static SourceFunction Bytes(string source, Bounds bounds, Func<ImmutableArray<string>, ArgumentCheck>? check = null) =>
-        new SourceFunction<Blob>(source, "bytes", 1, 1, bounds, TagBindings.NotImplemented<Blob>, check);
+        new SourceFunction<Blob>(source, "bytes", 1, 1, bounds, TagBindings.Bytes(source), check);
 
-    /// <summary>A row of the table of concepts: a concept's name, its type, and the field each tag source's cell reads.</summary>
+    /// <summary>A row of the table of concepts: a concept's name, its type, and the field each tag source's cell reads, in <see cref="TagSources"/> order.</summary>
     private abstract record ConceptRow(string Name, ImmutableArray<string> Fields)
     {
         public abstract IdentifierDeclaration Cell(string source, Bounds bounds);
@@ -142,12 +158,13 @@ public sealed class BuiltInCatalog : IIdentifierCatalog
         public abstract IdentifierDeclaration Plain(IEnumerable<IdentifierDeclaration> cells);
     }
 
-    private sealed record ConceptRow<T>(string Name, ImmutableArray<string> Fields) : ConceptRow(Name, Fields) where T : notnull
+    private sealed record ConceptRow<T>(string Name, ImmutableArray<string> Fields, ConceptInterpretation<T> Interpretation)
+        : ConceptRow(Name, Fields) where T : notnull
     {
         public override IdentifierDeclaration Cell(string source, Bounds bounds)
         {
-            var name = new IdentifierName(source, Name);
-            return new IdentifierDeclaration<T>(name, bounds, TagBindings.NotImplemented<T>(name));
+            var field = Fields[Array.IndexOf(TagSources, source)];
+            return new IdentifierDeclaration<T>(new IdentifierName(source, Name), bounds, TagBindings.Cell(source, field, Interpretation));
         }
 
         public override IdentifierDeclaration Plain(IEnumerable<IdentifierDeclaration> cells)
