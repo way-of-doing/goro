@@ -2964,6 +2964,292 @@
     "recorded": []
   },
   {
+    "file": "flac/dmg-id3v2-size-short.flac",
+    "group": "tag-damage",
+    "description": "An Id3v2.4 tag before fLaC whose size field is 300 bytes too short, so that the rest of the tag lies where fLaC should be.",
+    "recorded": [
+      {
+        "Tag": "vorbis",
+        "Key": "TITLE",
+        "Values": [
+          "Title \u2713"
+        ],
+        "BytesHex": "5469746c6520e29c93"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "AC/DC"
+        ],
+        "BytesHex": "41432f4443"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "Mot\u00F6rhead"
+        ],
+        "BytesHex": "4d6f74c3b67268656164"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ALBUM",
+        "Values": [
+          "Album"
+        ],
+        "BytesHex": "416c62756d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "DATE",
+        "Values": [
+          "1991-01-02"
+        ],
+        "BytesHex": "313939312d30312d3032"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "TRACKNUMBER",
+        "Values": [
+          "3"
+        ],
+        "BytesHex": "33"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "GENRE",
+        "Values": [
+          "Rock"
+        ],
+        "BytesHex": "526f636b"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "mood",
+        "Values": [
+          "calm"
+        ],
+        "BytesHex": "63616c6d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "COMMENT",
+        "Values": [
+          "  padded  "
+        ],
+        "BytesHex": "20207061646465642020"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "EMPTY",
+        "Values": [
+          ""
+        ],
+        "BytesHex": ""
+      }
+    ]
+  },
+  {
+    "file": "flac/id3v2-junk-before-marker.flac",
+    "group": "layout",
+    "description": "An Id3v2.4 tag, then 1000 zero bytes its size does not cover, then fLaC.",
+    "recorded": [
+      {
+        "Tag": "id3v2.4",
+        "Key": "TIT2",
+        "Values": [
+          "Title \u2713 \u2013 \u00DCn\u00EFc\u00F8d\u00E9"
+        ],
+        "BytesHex": "035469746c6520e29c9320e2809320c39c6ec3af63c3b864c3a9"
+      },
+      {
+        "Tag": "id3v2.4",
+        "Key": "TPE1",
+        "Values": [
+          "AC/DC",
+          "Mot\u00F6rhead"
+        ],
+        "BytesHex": "0341432f4443004d6f74c3b67268656164"
+      },
+      {
+        "Tag": "id3v2.4",
+        "Key": "TALB",
+        "Values": [
+          "Album (UTF-16)"
+        ],
+        "BytesHex": "01fffe41006c00620075006d00200028005500540046002d00310036002900"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "TITLE",
+        "Values": [
+          "Title \u2713"
+        ],
+        "BytesHex": "5469746c6520e29c93"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "AC/DC"
+        ],
+        "BytesHex": "41432f4443"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "Mot\u00F6rhead"
+        ],
+        "BytesHex": "4d6f74c3b67268656164"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ALBUM",
+        "Values": [
+          "Album"
+        ],
+        "BytesHex": "416c62756d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "DATE",
+        "Values": [
+          "1991-01-02"
+        ],
+        "BytesHex": "313939312d30312d3032"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "TRACKNUMBER",
+        "Values": [
+          "3"
+        ],
+        "BytesHex": "33"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "GENRE",
+        "Values": [
+          "Rock"
+        ],
+        "BytesHex": "526f636b"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "mood",
+        "Values": [
+          "calm"
+        ],
+        "BytesHex": "63616c6d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "COMMENT",
+        "Values": [
+          "  padded  "
+        ],
+        "BytesHex": "20207061646465642020"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "EMPTY",
+        "Values": [
+          ""
+        ],
+        "BytesHex": ""
+      }
+    ]
+  },
+  {
+    "file": "flac/dmg-application-length-overrun.flac",
+    "group": "tag-damage",
+    "description": "FLAC whose APPLICATION block declares 200 bytes more than it holds: a block that does not state its own extent, so the chain is lost there.",
+    "recorded": [
+      {
+        "Tag": "vorbis",
+        "Key": "TITLE",
+        "Values": [
+          "Title \u2713"
+        ],
+        "BytesHex": "5469746c6520e29c93"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "AC/DC"
+        ],
+        "BytesHex": "41432f4443"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "Mot\u00F6rhead"
+        ],
+        "BytesHex": "4d6f74c3b67268656164"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ALBUM",
+        "Values": [
+          "Album"
+        ],
+        "BytesHex": "416c62756d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "DATE",
+        "Values": [
+          "1991-01-02"
+        ],
+        "BytesHex": "313939312d30312d3032"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "TRACKNUMBER",
+        "Values": [
+          "3"
+        ],
+        "BytesHex": "33"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "GENRE",
+        "Values": [
+          "Rock"
+        ],
+        "BytesHex": "526f636b"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "mood",
+        "Values": [
+          "calm"
+        ],
+        "BytesHex": "63616c6d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "COMMENT",
+        "Values": [
+          "  padded  "
+        ],
+        "BytesHex": "20207061646465642020"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "EMPTY",
+        "Values": [
+          ""
+        ],
+        "BytesHex": ""
+      }
+    ]
+  },
+  {
     "file": "mp3/rw-cbr-no-info.mp3",
     "group": "real-world",
     "description": "Constant-bitrate MP3 with no Xing, Info or VBRI frame, behind an Id3v2.3 tag and before Id3v1, as Apple\u0027s encoders and others write it.",
@@ -3382,6 +3668,220 @@
     ],
     "mirrors": [
       "mutagen@ada28b2 tests/data/52-too-short-block-size.flac"
+    ]
+  },
+  {
+    "file": "flac/rw-picture-block-and-comment.flac",
+    "group": "real-world",
+    "description": "FLAC holding a picture twice over and differently: a front cover in a \u0060METADATA_BLOCK_PICTURE\u0060 comment, and a picture of type Other in a PICTURE block.",
+    "recorded": [
+      {
+        "Tag": "vorbis",
+        "Key": "TITLE",
+        "Values": [
+          "Title \u2713"
+        ],
+        "BytesHex": "5469746c6520e29c93"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "AC/DC"
+        ],
+        "BytesHex": "41432f4443"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "Mot\u00F6rhead"
+        ],
+        "BytesHex": "4d6f74c3b67268656164"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ALBUM",
+        "Values": [
+          "Album"
+        ],
+        "BytesHex": "416c62756d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "DATE",
+        "Values": [
+          "1991-01-02"
+        ],
+        "BytesHex": "313939312d30312d3032"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "TRACKNUMBER",
+        "Values": [
+          "3"
+        ],
+        "BytesHex": "33"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "GENRE",
+        "Values": [
+          "Rock"
+        ],
+        "BytesHex": "526f636b"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "mood",
+        "Values": [
+          "calm"
+        ],
+        "BytesHex": "63616c6d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "COMMENT",
+        "Values": [
+          "  padded  "
+        ],
+        "BytesHex": "20207061646465642020"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "EMPTY",
+        "Values": [
+          ""
+        ],
+        "BytesHex": ""
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "METADATA_BLOCK_PICTURE",
+        "Values": [
+          "AAAAAwAAAAlpbWFnZS9wbmcAAAAFY292ZXIAAAABAAAAAQAAABgAAAAAAAAARYlQTkcNChoKAAAADUlIRFIAAAABAAAAAQgCAAAAkHdT3gAAAAxJREFUeJxj\u002BM/AAAADAQEAyf6S7wAAAABJRU5ErkJggg=="
+        ],
+        "BytesHex": "414141414177414141416c706257466e5a533977626d634141414146593239325a58494141414142414141414151414141426741414141414141414152596c51546b634e43686f4b4141414144556c4952464941414141424141414141516743414141416b486454336741414141784a52454655654a786a2b4d2f41414141444151454179663653377741414141424a52553545726b4a6767673d3d"
+      }
+    ],
+    "mirrors": [
+      "music-metadata@9b71259 test/samples/issue-266.flac"
+    ]
+  },
+  {
+    "file": "flac/rw-picture-block-length-zero.flac",
+    "group": "real-world",
+    "description": "FLAC whose PICTURE block declares 0 bytes and holds a whole picture; PADDING, the last block, follows the picture.",
+    "recorded": [
+      {
+        "Tag": "vorbis",
+        "Key": "TITLE",
+        "Values": [
+          "Title \u2713"
+        ],
+        "BytesHex": "5469746c6520e29c93"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "AC/DC"
+        ],
+        "BytesHex": "41432f4443"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "Mot\u00F6rhead"
+        ],
+        "BytesHex": "4d6f74c3b67268656164"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ALBUM",
+        "Values": [
+          "Album"
+        ],
+        "BytesHex": "416c62756d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "DATE",
+        "Values": [
+          "1991-01-02"
+        ],
+        "BytesHex": "313939312d30312d3032"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "TRACKNUMBER",
+        "Values": [
+          "3"
+        ],
+        "BytesHex": "33"
+      }
+    ],
+    "mirrors": [
+      "mutagen@ada28b2 tests/data/106-short-picture-block-size.flac"
+    ]
+  },
+  {
+    "file": "flac/rw-streaminfo-short.flac",
+    "group": "real-world",
+    "description": "FLAC whose STREAMINFO block is 18 bytes, every field but the MD5, and declares so; the chain is otherwise sound.",
+    "recorded": [
+      {
+        "Tag": "vorbis",
+        "Key": "TITLE",
+        "Values": [
+          "Title \u2713"
+        ],
+        "BytesHex": "5469746c6520e29c93"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "AC/DC"
+        ],
+        "BytesHex": "41432f4443"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ARTIST",
+        "Values": [
+          "Mot\u00F6rhead"
+        ],
+        "BytesHex": "4d6f74c3b67268656164"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "ALBUM",
+        "Values": [
+          "Album"
+        ],
+        "BytesHex": "416c62756d"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "DATE",
+        "Values": [
+          "1991-01-02"
+        ],
+        "BytesHex": "313939312d30312d3032"
+      },
+      {
+        "Tag": "vorbis",
+        "Key": "TRACKNUMBER",
+        "Values": [
+          "3"
+        ],
+        "BytesHex": "33"
+      }
+    ],
+    "mirrors": [
+      "mutagen@ada28b2 tests/data/106-invalid-streaminfo.flac"
     ]
   },
   {

@@ -208,7 +208,7 @@ public static class Mp3Duration
 
         var delay = frame[at + 21] << 4 | frame[at + 22] >> 4;
         var padding = (frame[at + 22] & 0x0F) << 8 | frame[at + 23];
-        var crcPasses = at + 36 > frame.Length || Binary.Crc16Arc(frame[..(at + 34)]) == Binary.U16BigEndian(frame[(at + 34)..]);
+        var crcPasses = at + 36 > frame.Length || Checksums.Crc16Arc(frame[..(at + 34)]) == Binary.U16BigEndian(frame[(at + 34)..]);
         return new LameTag(delay, padding, crcPasses);
     }
 }

@@ -1,5 +1,6 @@
 using Goro.Reading;
 using Goro.Reading.Bytes;
+using Goro.Reading.Flac;
 using Goro.Reading.Mp3;
 using Goro.Reading.Tags;
 using Goro.Tests.TestSupport;
@@ -69,6 +70,54 @@ public class ReaderFuzzTests
             values.Bytes(field);
             values.Text(field);
             values.Description(field);
+        }
+    }
+
+    private static IEnumerable<TestCaseData> FlacFiles() =>
+        AudioCorpus.FlacFiles.Select((file, index) => new TestCaseData(file, index).SetName($"fuzz: {file}"));
+
+    /// <summary>
+    /// The FLAC parsing pieces never throw: the metadata chain, the comment index and values, and the
+    /// first and last frames walked by header and body. Half the damage lands in the metadata, where
+    /// nearly all the structure is.
+    /// </summary>
+    [TestCaseSource(nameof(FlacFiles))]
+    public void FlacDamagedAtRandom_TheParsingPiecesNeverThrow(string file, int seed)
+    {
+        var original = AudioCorpus.Bytes(file);
+        var random = new Random(seed);
+        for (var run = 0; run < RunsPerFile * 2; run++)
+        {
+            var damaged = run % 2 == 0 ? Damage(original, random) : Damage(original[..Math.Min(original.Length, 6000)], random).Concat(original.Skip(6000)).ToArray();
+            var policy = run % 4 < 2 ? ReadPolicy.Default : Tiny;
+            Assert.DoesNotThrow(() => ReadFlacPieces(damaged, policy), $"run {run}");
+        }
+    }
+
+    private static void ReadFlacPieces(byte[] bytes, ReadPolicy policy)
+    {
+        var reader = new BoundedReader(new MemoryByteSource(bytes), policy);
+        var marker = bytes.AsSpan().IndexOf("fLaC"u8);
+        var metadata = FlacMetadata.Read(reader, marker < 0 ? 0 : marker + 4);
+        var values = new TagValues(reader);
+        foreach (var block in metadata.Blocks.Where(b => b.Comments is not null))
+        {
+            foreach (var field in VorbisCommentIndex.Index(block.Comments!, block.Payload).Tag.Fields)
+            {
+                values.Bytes(field);
+                values.Text(field);
+            }
+        }
+
+        foreach (var at in (long[])[metadata.End ?? 0, Math.Max(0, bytes.Length - 2000)])
+        {
+            for (var i = at; i < Math.Min(bytes.Length, at + 2000); i++)
+            {
+                if (FlacFrameHeader.TryParse(bytes.AsSpan((int)i), out var header))
+                {
+                    FlacFrameBody.FindEnd(bytes.AsSpan((int)i), header, metadata.StreamInfo?.BitDepth ?? 0);
+                }
+            }
         }
     }
 

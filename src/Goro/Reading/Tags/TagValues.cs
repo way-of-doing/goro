@@ -56,6 +56,8 @@ public sealed class TagValues(BoundedReader reader)
                 return new FieldText.Readable([.. Encoding.Latin1.GetString(bytes).Split('\0')]);
             case FieldForm.Id3v1Text:
                 return new FieldText.Readable([Id3v1Text(bytes)]);
+            case FieldForm.VorbisComment:
+                return Utf8Value(bytes);
         }
 
         // An Id3v2 frame holding text: an encoding byte, perhaps a language and a description, then the values.
@@ -224,6 +226,19 @@ public sealed class TagValues(BoundedReader reader)
         try
         {
             return new FieldText.Readable([.. StrictUtf8.GetString(bytes).Split('\0')]);
+        }
+        catch (DecoderFallbackException)
+        {
+            return new FieldText.Unreadable(UnreadableReason.DoesNotDecode);
+        }
+    }
+
+    /// <summary>A Vorbis comment's value: one value, however many NUL bytes it holds.</summary>
+    private static FieldText Utf8Value(ReadOnlySpan<byte> bytes)
+    {
+        try
+        {
+            return new FieldText.Readable([StrictUtf8.GetString(bytes)]);
         }
         catch (DecoderFallbackException)
         {

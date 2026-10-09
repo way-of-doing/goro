@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Goro.Reading;
 using Goro.Reading.Bytes;
+using Goro.Reading.Flac;
 using Goro.Reading.Mp3;
 using Goro.Reading.Tags;
 
@@ -24,6 +25,27 @@ internal static class AudioCorpus
         Directory.EnumerateFiles(Root, "*.mp3", SearchOption.AllDirectories)
             .Select(path => Path.GetRelativePath(Root, path).Replace('\\', '/'))
             .Order(StringComparer.Ordinal);
+
+    /// <summary>Every FLAC file in the corpus, seeds included, by its path relative to the corpus.</summary>
+    public static IEnumerable<string> FlacFiles =>
+        Directory.EnumerateFiles(Root, "*.flac", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(Root, path).Replace('\\', '/'))
+            .Order(StringComparer.Ordinal);
+
+    /// <summary>A reader over a corpus file, for the parsing pieces that work below a whole analysis.</summary>
+    public static BoundedReader Reader(string relative, ReadPolicy? policy = null) =>
+        new(new MemoryByteSource(Bytes(relative)), policy ?? ReadPolicy.Default);
+
+    /// <summary>
+    /// The metadata of a corpus FLAC file, its chain walked from just after the first <c>fLaC</c> in it;
+    /// finding the marker behind a damaged tag is the analysis's business, not this helper's.
+    /// </summary>
+    public static (FlacMetadata Metadata, BoundedReader Reader) FlacMetadataOf(string relative)
+    {
+        var bytes = Bytes(relative);
+        var reader = new BoundedReader(new MemoryByteSource(bytes), ReadPolicy.Default);
+        return (FlacMetadata.Read(reader, bytes.AsSpan().IndexOf("fLaC"u8) + 4), reader);
+    }
 
     private static readonly Lazy<IReadOnlyList<ManifestEntry>> LazyManifest = new(() =>
         JsonSerializer.Deserialize<List<ManifestEntry>>(File.ReadAllText(PathOf("manifest.json")), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!);

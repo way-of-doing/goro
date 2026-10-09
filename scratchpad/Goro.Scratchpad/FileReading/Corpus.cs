@@ -773,6 +773,32 @@ public static class Corpus
             .Comments("vorbis", shortComments)
             .Mirror(Mutagen, "tests/data/52-too-short-block-size.flac");
 
+        var bothPictures = VorbisComments();
+        l.Add("flac/rw-picture-block-and-comment.flac", g, "FLAC holding a picture twice over and differently: a front cover in a `METADATA_BLOCK_PICTURE` comment, and a picture of type Other in a PICTURE block.",
+                () => FlacWith(b => [(Flac.StreamInfo, b[0].Data), (Flac.VorbisComment, FlacVorbisComment(bothPictures)), (Flac.Picture, OtherPicture(Png)), (Flac.Padding, new byte[1024])]))
+            .Comments("vorbis", bothPictures)
+            .Mirror(MusicMetadata, "test/samples/issue-266.flac");
+        l.Add("flac/rw-picture-block-length-zero.flac", g, "FLAC whose PICTURE block declares 0 bytes and holds a whole picture; PADDING, the last block, follows the picture.",
+                () =>
+                {
+                    var f = Seed("flac.flac");
+                    var (parsed, audio) = Flac.Parse(f);
+                    return Concat(Ascii("fLaC"), Flac.BlockBytes(0, parsed[0].Data, false), Flac.BlockBytes(4, FlacVorbisComment(shortComments), false),
+                        Flac.BlockBytes(6, FlacPicture(Png), false, 0), Flac.BlockBytes(1, new byte[1024], true), f[audio..]);
+                })
+            .Comments("vorbis", shortComments)
+            .Mirror(Mutagen, "tests/data/106-short-picture-block-size.flac");
+        l.Add("flac/rw-streaminfo-short.flac", g, "FLAC whose STREAMINFO block is 18 bytes, every field but the MD5, and declares so; the chain is otherwise sound.",
+                () =>
+                {
+                    var f = Seed("flac.flac");
+                    var (parsed, audio) = Flac.Parse(f);
+                    return Concat(Ascii("fLaC"), Flac.BlockBytes(0, parsed[0].Data[..18], false), Flac.BlockBytes(4, FlacVorbisComment(shortComments), false),
+                        Flac.BlockBytes(1, new byte[1024], true), f[audio..]);
+                })
+            .Comments("vorbis", shortComments)
+            .Mirror(Mutagen, "tests/data/106-invalid-streaminfo.flac");
+
         l.Add("ogg/rw-vorbis-skeleton.ogg", g, "Ogg Vorbis multiplexed with an Ogg Skeleton v4 stream, an index rather than audio: fishead, the Vorbis identification header, fisbone, the other Vorbis headers, an empty Skeleton end page, then the audio.",
                 () => WithSkeleton(WithComments("ogg-vorbis.ogg", VorbisComments().Take(3).ToList())))
             .Comments("vorbis", VorbisComments().Take(3))
@@ -1029,6 +1055,31 @@ public static class Corpus
                 Array.Clear(f, at - 10, 64);
                 return f;
             });
+        l.Add("flac/dmg-id3v2-size-short.flac", "tag-damage", "An Id3v2.4 tag before fLaC whose size field is 300 bytes too short, so that the rest of the tag lies where fLaC should be.",
+                () =>
+                {
+                    var tag = Id3v2(4, V24Frames());
+                    return Concat(Id3v2(4, V24Frames(), new() { SizeOverride = (uint)(tag.Length - 10 - 300) }), FlacWith(Standard));
+                })
+            .Comments("vorbis", FlacComments());
+        l.Add("flac/id3v2-junk-before-marker.flac", "layout", "An Id3v2.4 tag, then 1000 zero bytes its size does not cover, then fLaC.",
+                () => Concat(Id3v2(4, V24Frames().Take(3)), new byte[1000], FlacWith(Standard)))
+            .Records("id3v2.4", V24Frames().Take(3)).Comments("vorbis", FlacComments());
+        l.Add("flac/dmg-application-length-overrun.flac", "tag-damage", "FLAC whose APPLICATION block declares 200 bytes more than it holds: a block that does not state its own extent, so the chain is lost there.",
+            () =>
+            {
+                var f = Seed("flac.flac");
+                var (parsed, audio) = Flac.Parse(f);
+                var app = Concat(Ascii("goro"), Ascii("application data"));
+                return Concat(Ascii("fLaC"), Flac.BlockBytes(0, parsed[0].Data, false), Flac.BlockBytes(4, FlacVorbisComment(FlacComments()), false),
+                    Flac.BlockBytes(2, app, false, (uint)app.Length + 200), Flac.BlockBytes(6, FlacPicture(Png), false), Flac.BlockBytes(1, new byte[1024], true), f[audio..]);
+            })
+            .Comments("vorbis", FlacComments());
         return l;
     }
+
+    /// <summary>A FLAC picture of type 0, Other, unlike the front cover <see cref="TagWriters.FlacPicture"/> makes.</summary>
+    static byte[] OtherPicture(byte[] png) => Concat(
+        U32BE(0), U32BE(9), Ascii("image/png"), U32BE(5), Ascii("other"),
+        U32BE(1), U32BE(1), U32BE(24), U32BE(0), U32BE((uint)png.Length), png);
 }
