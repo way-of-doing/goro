@@ -1,7 +1,7 @@
 ---
 status: active
 size: focused
-touches: commands/hash.md, concepts/pathspecs.md, design/rationale.md, testing.md, src/Goro/Hashing, src/Goro/Discovery
+touches: commands/hash.md, concepts/pathspecs.md, features/builtins/identifiers.md, design/rationale.md, design/flac-layout.md, implementation.md, testing.md, src/Goro/Reading, src/Goro/Hashing, src/Goro/Discovery, src/Goro/Predicates/Identifiers
 after: file-discovery-scope
 branch: line/flac-support
 ---
@@ -14,35 +14,58 @@ vision, that the hash changes if and only if the audio does, and then add FLAC t
 considers. Goro will not hash a format it cannot give that guarantee for, so this line is
 what admits `.flac` to discovery.
 
+## Settled
+
+The questions this brief first asked, each answered by the [file-reading](../design/file-reading.md)
+survey or by [flac-layout](../design/flac-layout.md), which measures each claim:
+
+- **Where the audio begins:** at the end of the metadata block flagged last, `K`, confirmed by a
+  frame header there; Goro walks the block chain itself, trusting no length. Every tagger edit
+  tried, metaflac's and ffmpeg's, moved the frames without changing a byte of them.
+- **STREAMINFO is not hashed:** the hash covers `[D, E)`, the frames from the first to the end of
+  the last whole one ([What the hash covers](../design/file-reading.md#what-the-hash-covers)). No
+  edit tried rewrote STREAMINFO, and metaflac has no option to.
+- **Stray Id3v2, APE and Id3v1 tags** lie outside `[D, E)`: in front of `fLaC`, and behind the last
+  frame. Seen in a real file, a 190 KB Id3v2 tag in front and Id3v1 behind.
+- **Damaged tag data** resolves by the rules mp3-support wrote into identifiers.md; the corpus holds
+  damaged comment blocks, broken block chains and the stray tags, and flac-layout lists what each
+  yields from libFLAC, ffmpeg and the .NET libraries.
+
 ## Questions
 
-What is known so far comes from `scratchpad/Goro.Scratchpad/FormatSupport/HashStabilityProbe.cs`
-and the 2026-10-05 entry in the [file-discovery-scope](file-discovery-scope.md) Log. TagLibSharp
-2.3.0 reads FLAC through `Flac.File`, but reports `InvariantStartPosition` as 0, so the range
-Goro hashes today takes in every metadata block and changes with every tag edit.
+From [flac-layout](../design/flac-layout.md#questions-for-flac-support), which numbers ten
+questions and gives the evidence for each. Decided on 2026-10-09:
 
-- Where the audio begins: after the metadata block that carries the last-block flag, it would
-  seem, which Goro would have to find itself since TagLib does not report it. Confirm that nothing
-  a tagger writes can land after that point, and that padding is always a metadata block.
-- Whether `STREAMINFO` belongs in the hash. It is metadata, but a decoder needs it whenever a
-  frame header defers to it for sample rate or sample size, and it carries the MD5 of the
-  decoded audio. Does any tool rewrite it while leaving the audio alone?
-- An Id3v2 tag before `fLaC`, and an Id3v1 or APE tag after the last frame, are not standard but
-  exist in the wild. Confirm the boundaries hold with them present.
-- How the boundary is found: by parsing the metadata block chain ourselves, or through anything
-  TagLib exposes.
-- Damaged tag data, which is definitely part of this line. Whatever
-  [mp3-support](archive/mp3-support.md) settles about what a damaged tag resolves to has to
-  hold for FLAC too: repeat its probe on damaged Vorbis comment blocks, on other damaged metadata
-  blocks, and on the stray Id3v2 and APE tags above, and confirm that each yields what the
-  specification says.
+- **1 and 3. A block's recorded length wrong,** too long or too short: wherever the contents are
+  recovered, by the chain walking cleanly from where they end, the file is read as though the length
+  were right. Everyday commands say nothing and the file is not incomplete; `goro audit` and `goro
+  explore` surface it, and quirks.md records it. A chain that is lost is a broken structure.
+- **2. Bytes left over at the end of a comment block** are a broken structure.
+- **4. The last frame's end** is found by parsing the frame body, not by scanning for a CRC-16 match.
+- **5. Playing time.** STREAMINFO's total when the last frame confirms it; the last intact frame
+  when a frame cut off by the end of the audio proves truncation, or a short final block proves a
+  natural end; otherwise, with bytes and no header after the last intact frame, `file::duration` is
+  unusable and the file incomplete.
+- **6. The `id3v2`, `ape` and `id3v1` sources** are read in a FLAC file.
+- **7. Of two VORBIS_COMMENT blocks,** the first is the `vorbis` source.
+- **8. A FLAC PICTURE block** is reached by `flac::picture()`, apart from the `vorbis` source, since
+  a file can hold a different picture in a `METADATA_BLOCK_PICTURE` comment; a concept spanning
+  every format's cover art follows.
+- **9. A comment without `=`** is absent, and `goro audit` reports it as a finding.
+- **10. The audio frames' CRCs** are checked by every command that reads the whole file (`goro
+  hash`, `goro audit`, `goro explore`), not by `goro list`. The walk of the whole file reports each
+  failure: the frame, where it is, and which check failed.
+
+Every question is settled. `goro hash` stays silent about failing CRCs (10), and the search for the
+end of a block that does not describe itself is left out (3).
 
 ## Done when
 
-The answers are recorded in the rationale, `goro hash` says what it hashes for a FLAC file, the
-pathspec documentation admits `.flac`, and the code hashes FLAC files to a value that survives
-tag edits, with tests that edit tags and compare hashes as the probe does, and with tests that
-pin what damaged tag data in a FLAC file resolves to.
+The answers are recorded in the rationale; identifiers.md says what the sources of a FLAC file
+read; `goro hash` says what it hashes for a FLAC file; the pathspec documentation admits `.flac`;
+and the code reads FLAC tags, playing time and the hash range with Goro's own reader. The tests
+edit tags and compare hashes, and pin what damaged tag data in a FLAC file resolves to, driven by
+the fixture corpus.
 
 ## Log
 
@@ -64,3 +87,59 @@ pin what damaged tag data in a FLAC file resolves to.
   a `VORBIS_COMMENT` block declaring fewer bytes than it holds, an encoder bug mutagen reads
   through and the prototype treats as a broken structure. Decide whether to read through it, as a
   quirk.
+- 2026-10-09 -- Picked up the line. Following mp3-support's method, wrote
+  [flac-layout](../design/flac-layout.md), with a rendered version at
+  [FLAC File Layout](https://claude.ai/artifact/AexqBEnddAEwPJm4cMLvSf): the specifications (RFC
+  9639, the Vorbis I comment header, and the stray tags no specification allows), the positions
+  `A` to `H` with `K` for where the metadata says it ends, four variations and eighteen mishaps
+  `L1` to `L18`, each measured. New in scratchpad: `flac-boundaries [dir]`, which prints the
+  positions for every FLAC file under a directory. What the measurements showed:
+  - every tag edit tried moved `D` (from 4,496 to between 396 and 13,507) and left the frames and
+    STREAMINFO byte-identical; ffmpeg's remux drops SEEKTABLE and APPLICATION blocks;
+  - in a 4-minute file, delimiting frames by CRC-16 alone would end one early 252 times, while a
+    search for headers by sync and CRC-8 found no chance header at all, so frames are delimited by
+    the next header and its number, and only the last frame's end needs CRC-16;
+  - a missing last-block flag is detected exactly, the first frame reading as block type 127; a
+    block length too long makes zeroes read as 207 empty STREAMINFO blocks;
+  - libFLAC refuses the whole file for every metadata damage in the corpus, ffmpeg for some;
+    readers disagree on two comment blocks (first, merged, last);
+  - the real-world files add a PICTURE block declaring length 0 around a whole PNG, a STREAMINFO of
+    18 bytes, empty SEEKTABLE and PADDING blocks, and six truncated snippets.
+
+  The Questions section above now lists what is open, in four groups. Next step: settle them with
+  PJ, starting with groups 1 and 3, which decide what the reader's index of a FLAC file holds; then
+  plan the normative documents, as mp3-support's step 1.
+- 2026-10-09 -- Decided with PJ: a block declared too short is read through when its contents end
+  exactly at a valid next structure, as a quirk audit reports; the last frame's end comes from
+  parsing the frame body; the stray tags' sources are read, since they bear on the concepts, though
+  few files will carry them; a comment without `=` is absent and an audit finding. Added a fifth
+  group at PJ's question of what Goro's hash adds when FLAC checksums every frame: within one file
+  the format's checks are the stronger, needing no stored hash, while Goro's hash adds a reference
+  outside the file that sees any change, one mechanism across formats, and a way to compare copies.
+  So the open question is whether the walk checks each frame's CRC-16, nearly free once the body is
+  parsed, and how a failure is reported; the MD5 needs a decoder and stays out. Next step: the six
+  questions still open, then plan the normative documents.
+- 2026-10-09 -- Decided with PJ: bytes left over after a comment list are a broken structure; the
+  first of two VORBIS_COMMENT blocks is the source; a PICTURE block gets syntax of its own, since
+  `issue-266.flac` holds a different picture in each form and `vorbis::bytes()` must keep meaning
+  comments. For question 3, measured what a wrong block length leaves readable: a block's end has
+  two candidates, its recorded length and, where the block describes itself, its contents' own
+  extent, and in all seven files where they differ exactly one lets the chain walk cleanly to the
+  first frame. Clarified that question 10 is about the audio frames: FLAC checksums no metadata.
+  Next step: questions 3, 5, 8 (the syntax) and 10, then plan the normative documents.
+- 2026-10-09 -- Decided with PJ: a recorded length wrong in either direction, with the contents
+  recovered, is silent for everyday commands and surfaced only by audit and explore, which extends
+  decision 1; PICTURE blocks are `flac::picture()`; the audio frames' CRCs are checked by every
+  command that reads the whole file, never by `goro list`, and the walk reports each failure with
+  its frame, position and check. Rewrote question 5 in flac-layout with its context: two signals
+  from the tail, a frame cut off by the end of the file and a short final block, settle every
+  fixture but `last-frame-damaged.flac`, leaving the size rule or an unusable duration for bytes
+  with no header after the last intact frame. Next step: questions 5, 10 (`goro hash`) and 3 (the
+  search), then plan the normative documents.
+- 2026-10-09 -- Decided with PJ, settling the last questions: `goro hash` says nothing of a frame
+  failing its CRC, since counting it as incomplete would stretch that warning over a second concern;
+  a playing time the tail cannot settle is unusable, junk appended to a file being far likelier than
+  damage on its last frame header; the search for the end of an opaque block is left for `goro
+  explore` to want. Next step: plan the line's steps, as mp3-support's were: the normative documents
+  first (rationale, identifiers.md with `flac::picture()`, quirks.md, hash.md, pathspecs.md,
+  implementation.md, testing.md), then the reader, sources, playing time and hash range in `src/`.

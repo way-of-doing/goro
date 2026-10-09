@@ -12,6 +12,7 @@ namespace Goro.Scratchpad.FileReading;
 ///   taglib-hook           what TagLibSharp's FrameFactory hook is handed
 ///   realworld <dir> <out>  dump what the prototype reads from every audio file under a directory
 ///   boundaries            where the candidate edges of each MP3's audio fall
+///   flac-boundaries [dir] the same for each FLAC file, by the positions of flac-layout.md
 ///   fuzz [rounds]         truncate and overwrite every corpus file; the readers must not throw
 /// </summary>
 public static class Survey
@@ -54,6 +55,9 @@ public static class Survey
                 break;
             case "boundaries":
                 Boundaries.Run(CorpusDir);
+                break;
+            case "flac-boundaries":
+                FlacBoundaries.Run(args.ElementAtOrDefault(1) ?? CorpusDir);
                 break;
             case "fuzz":
                 Fuzz.Run(CorpusDir, int.Parse(args.ElementAtOrDefault(1) ?? "200"));
