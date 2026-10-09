@@ -135,7 +135,9 @@ leaving out the silence an encoder adds at either end wherever the file records 
 Damage inside the audio does not shorten it, while a file cut short ends where its audio does.
 Where a file does not record its playing time in a form Goro can verify, as an MP3 sometimes
 does not, `file::duration` is an unusable occurrence: Goro does not read through the whole of a
-file to work it out.
+file to work it out. A FLAC file states its playing time twice, in its STREAMINFO block and in the
+numbering of its frames, and where its last frames cannot be read and nothing settles which of
+the two is right, its duration is unusable too.
 
 `file::path`, `file::name`, `file::size` and `file::duration` are
 [exactly one](../../concepts/predicates.md#exactly-one): each resolves to exactly one occurrence
@@ -237,3 +239,7 @@ Reads the Vorbis comments of a file that carries them. Since every Vorbis field 
 | `vorbis::bytes(name)`  | blob   | The value of every comment whose field name is `name`, as recorded
 
 A field name is matched without regard to case, so `vorbis::field("mood")` reads a field recorded as `MOOD`. Each comment gives one occurrence. Vorbis comment values are text by definition, so `field()` is unusable only for a comment that is [damaged](#absent-usable-and-unusable-data).
+
+A comment is a name, an `=`, and a value. One without an `=` names nothing, and no name finds it: it is absent for every name asked about.
+
+In a FLAC file the comments are those of its VORBIS_COMMENT metadata block. The format allows one; where a file carries several, as some do, the first is the `vorbis` source, as the first of several Id3v2 tags is the `id3v2` source. The comment list states its own extent, and where the block holds bytes after its last comment, the list was damaged: it counts as [broken off](#absent-usable-and-unusable-data) there, and whatever those bytes held is absent.

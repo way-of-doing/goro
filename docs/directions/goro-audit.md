@@ -37,22 +37,28 @@ typed conditions.
   - an APE tag before the audio;
   - APEv1 text in Latin-1;
   - APE keys differing only in case, of which only the last is seen;
-  - two `VORBIS_COMMENT` blocks;
-  - a Vorbis comment key holding a character the spec forbids;
+  - two `VORBIS_COMMENT` blocks, of which only the first is the `vorbis` source;
+  - Id3v2, APE or Id3v1 tags around a FLAC stream, which no specification allows;
+  - a FLAC metadata block whose recorded length is wrong, read from its own contents, and a block
+    chain with no block flagged last (see [quirks](../design/quirks.md));
+  - a Vorbis comment key holding a character the spec forbids (in Ogg only: RFC 9639 allows `~`
+    in a FLAC name, where Vorbis I does not);
   - a Vorbis comment header without its framing bit;
   - frames stored unsynchronised or compressed, which are legal but worth knowing about.
 - **One datum unreadable:**
   - an unknown text encoding byte;
   - invalid UTF-8;
   - UTF-16 without a byte order mark, or with an odd length;
-  - a comment without `=`;
   - zlib that will not inflate;
   - an encrypted frame;
   - an APE text item that is not UTF-8.
+- **Nothing to read:** a Vorbis comment without `=`, which names nothing and is absent for every
+  name asked about.
 - **Structure broken:** where it broke (offset, and the frame or item it happened in), and what was
   read before it. Examples are a frame size running past the tag, a zero-size frame, an illegal
-  frame identifier, an item count too high, a comment length overrun, and an Ogg comment page
-  failing its CRC.
+  frame identifier, an item count too high, a comment length overrun, bytes left in a FLAC
+  comment block after its last comment, a FLAC block chain lost, and an Ogg comment page failing
+  its CRC.
 - **Tag unusable:** why. Examples are a size past the end of the file, a size that is not
   syncsafe, an unknown major version, an APE size past the start, and a vendor length overrun.
 
@@ -84,8 +90,9 @@ holding bytes outside ASCII, read as ISO-8859-1 and possibly the wrong text.
     trailing tags start, or only the run of three decided it (implementation.md, "Finding where the
     audio ends"). The same causes mostly surface as other findings here, such as junk after the
     audio or a header that disagrees. This is listed so that the walk itself is not forgotten.
-- **FLAC:** STREAMINFO against the last intact frame. Covers a total of 0, a total that disagrees,
-  truncation, and a damaged tail.
+- **FLAC:** STREAMINFO's total against the last frame, and what settled the playing time: the two
+  agreeing, a short final block (a total of 0, or one that disagrees), a frame cut off by the end
+  of the audio (truncation), or nothing, leaving it unusable.
 - **Ogg:**
   - truncation (no end-of-stream page);
   - chained links;
@@ -98,7 +105,8 @@ find a duration:
 
 - MP3: places where frame sync is lost, and how many bytes were skipped; Info frames in the
   middle of a file, a sign of files joined end to end;
-- FLAC: frames failing their CRC-16;
+- FLAC: frames failing their CRC-8 or CRC-16, with each frame's number and position, as the walk
+  every command reading the whole file makes records them;
 - Ogg: pages failing their CRC.
 
 ## Asides worth considering
@@ -109,7 +117,9 @@ find a duration:
   MD5 of the decoded audio, but checking it means decoding FLAC, which Goro does not do. MP3 frames
   rarely carry a CRC, but LAME's tag is described as holding a CRC of the whole audio ("music
   CRC"), which a whole-file read could check. Unlike the tag's own CRC, this one has not yet been
-  verified by running code.
+  verified by running code. For FLAC this is decided (flac-support, 2026-10-09): every command that
+  reads the whole file checks the frames' CRCs, and `goro hash` stays silent about failures, which
+  are audit's and explore's to report.
 - **Prevalence questions only a collection can answer.** How many MP3s get an unusable
   `file::duration` because they have no valid summary header? How common is each quirk? The survey
   had no real damaged collection to look at. The maintainer's own collection is almost entirely
@@ -174,3 +184,7 @@ the fixture corpus.
   is the first case of a condition each command interprets in its own way. Chained and
   multiplexed Ogg are declined, and a file concatenated with itself, which only a walk detects, is
   audit's to find. The `incomplete` warning advertises audit even before it exists.
+- 2026-10-10 -- flac-support updated the FLAC findings above: the quirks it decided (wrong block
+  lengths read from the blocks' contents, no block flagged last, stray tags, the first of two
+  comment blocks), a comment without `=` as absent rather than unreadable, the playing-time
+  evidence, and frames failing their CRCs. See [flac-layout](../design/flac-layout.md).

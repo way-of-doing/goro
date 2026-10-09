@@ -22,7 +22,10 @@ The hash covers a file's encoded audio stream and nothing the container around i
 no edit to a file's tags changes it. For an MP3 that is its audio frames, from the first to the
 end of the last whole frame. Left out are the tags at either end, the frame some encoders write
 ahead of the audio to describe it (Xing, Info or VBRI), and anything else before the first frame
-or after the last. A file in which no audio frame can be found cannot be read, and has no hash.
+or after the last. For a FLAC file it is likewise its audio frames, from the first to the end of
+the last whole frame. Left out are its metadata blocks, STREAMINFO among them, any tag before the
+`fLaC` marker or after the audio, and anything else after the last frame. A file in which no audio
+frame can be found cannot be read, and has no hash.
 
 # Pathspecs
 

@@ -175,6 +175,48 @@ The hash range, for MP3:
 | Junk before the first frame and after the last, and an APE tag behind a Lyrics3v2 block | None of it hashed |
 | A bit flipped inside an audio frame | The hash changes |
 
+FLAC, whose tags are its Vorbis comments and whatever stray tags surround it. Each row also asserts
+whether the file is counted in the `incomplete` warning.
+
+| Scenario | What it is there to catch |
+|---|---|
+| The standard comments: a name in lower case, a name repeated, an empty value, a value with spaces at its ends | Every comment one occurrence, matched by name without regard to case, `field()` untouched |
+| A comment block after the PADDING, and one as the last block | Found wherever it sits in the chain |
+| Two VORBIS_COMMENT blocks | Only the first is the `vorbis` source |
+| An Id3v2 tag before `fLaC`, and APEv2 and Id3v1 tags after the audio | Each read as its own source, the comments unaffected; a concept prefers the comments |
+| A value that is not valid UTF-8 | One unusable occurrence through `field()`, its bytes intact through `bytes()`; not counted |
+| A comment without `=` | Absent for every name; not counted |
+| A name holding `~` | Read: RFC 9639 allows it |
+| A comment whose length runs past its block | The comments before it intact, nothing after it found; counted |
+| A block of zeroes inside the comment block, leaving bytes after the last comment | The comments before the damage intact, the empty ones absent; counted |
+| A comment block declaring 48 bytes and holding more, and a picture block declaring none | Read as though the length were right, every block after it found; not counted |
+| A comment block declaring 200 bytes more than it holds | The same |
+| No block flagged last | The first frame found where the walk meets it, every block read; not counted, nothing being lost |
+| A block length running into blocks that do not state their extent | The blocks before it read, the audio found by search; counted |
+| A STREAMINFO of 18 bytes | The chain read on, the audio found; the total read from the fields that are there |
+| A file ending inside its metadata, or with no frame after it | Unreadable, there being no audio |
+
+Playing time, for FLAC. Every row asserts the whole seconds `file::duration` gives, and whether the
+file is counted in the `incomplete` warning.
+
+| Scenario | What it is there to catch |
+|---|---|
+| STREAMINFO's total, matched by the last frame | 3.300 s: the exact length, not the frames' whole blocks |
+| STREAMINFO's total 0, and doubled, the stream ending in a short final block | 3.300 s from the last frame, not 0 or 6.6 |
+| A file cut inside a frame, the frame's header intact | 1.765 s: the end of the last whole frame, not STREAMINFO's total |
+| The last frame's header damaged, so that bytes holding no frame follow the last that can be read | Unusable, not 3.300 s or 3.251 s |
+| Junk appended after the last frame | 3.300 s: the last frame found by parsing its body, the junk ignored |
+| A block of zeroes in the middle of the frames | 3.300 s: damage does not shorten the timeline |
+
+The hash range, for FLAC:
+
+| Scenario | What it is there to catch |
+|---|---|
+| The same audio under every tag layout in the corpus, and under every edit to the metadata: comments, padding added or removed, blocks reordered, the frames moved | One hash for all of them |
+| STREAMINFO's total changed | The hash unchanged: STREAMINFO is metadata |
+| Junk after the last frame, and stray tags at either end | None of it hashed; the last frame's end found exactly |
+| A bit flipped inside a frame, and a block of zeroes in the frames | The hash changes; the walk records the frames that fail their checksums, and goes on past them |
+
 ### Concepts written without a source
 
 A concept written without a source is resolved across up to four tag formats in order of
@@ -566,7 +608,7 @@ single-condition test exercises.
 | A glob with two `*`s, and one with a wildcard in a directory component, such as `music/*/a.mp3` | Each an error before anything is processed, code `2`, and no output at all |
 | A subdirectory that cannot be listed, inside a directory pathspec | Must warn and continue, and every sibling entry must still be processed |
 | A pathspec naming a file that does not exist, given after a directory holding MP3 files | The same: every pathspec is resolved before any file is processed, so nothing from the directory may be output first |
-| A directory holding `a.mp3`, `b.MP3` and `cover.jpg` | Only the two MP3 files, whatever the case of the extension, and no warning for the image |
+| A directory holding `a.mp3`, `b.MP3`, `c.flac` and `cover.jpg` | Only the MP3 and FLAC files, whatever the case of the extension, and no warning for the image |
 | A file with another extension named directly, and nothing else | Not an error and no warning: no file is considered, and with `--strict-exit-code` the run returns `21` |
 | A glob such as `dir/*.mp3`, over MP3 files directly in `dir` and in its subdirectories | Only those directly in `dir`: a glob matches the entries of one directory |
 | A glob matching a subdirectory and a file with another extension | The subdirectory is walked in full, and the file is passed over |

@@ -424,9 +424,12 @@ the block's contents say so again.
    payload in base64, and decodes to exactly the bytes above. Of the real-world files, 9 of 37 FLAC
    files carry PICTURE blocks and 1 also the comment; 8 Ogg files carry the comment.
 
-   **Decided on 2026-10-09:** the PICTURE block gets syntax of its own, `flac::picture()`, apart
-   from the `vorbis` source, and a concept spanning every format's cover art follows once each form
-   is reachable.
+   **Decided on 2026-10-09:** the PICTURE block gets syntax of its own, apart from the `vorbis`
+   source, and a concept spanning every format's cover art follows once each form is reachable.
+   **Revised on 2026-10-10:** flac-support does not reach PICTURE blocks at all. The syntax, the
+   type a picture is and the concept move to a line of their own,
+   [pictures](../directions/pictures.md), and until it lands a FLAC file's PICTURE blocks cannot be
+   queried.
 
 9. A comment without `=` names nothing (L12, L13). Is it an unusable occurrence for every name asked
    about, as an Id3v2 frame whose description cannot be read is, or absent?

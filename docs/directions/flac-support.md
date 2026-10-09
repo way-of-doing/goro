@@ -1,7 +1,7 @@
 ---
 status: active
 size: focused
-touches: commands/hash.md, concepts/pathspecs.md, features/builtins/identifiers.md, design/rationale.md, design/flac-layout.md, implementation.md, testing.md, src/Goro/Reading, src/Goro/Hashing, src/Goro/Discovery, src/Goro/Predicates/Identifiers
+touches: commands/hash.md, concepts/pathspecs.md, features/builtins/identifiers.md, design/rationale.md, design/quirks.md, design/flac-layout.md, architecture.md, implementation.md, testing.md, src/Goro/Reading, src/Goro/Hashing, src/Goro/Discovery, src/Goro/Predicates/Identifiers
 after: file-discovery-scope
 branch: line/flac-support
 ---
@@ -48,9 +48,9 @@ questions and gives the evidence for each. Decided on 2026-10-09:
   unusable and the file incomplete.
 - **6. The `id3v2`, `ape` and `id3v1` sources** are read in a FLAC file.
 - **7. Of two VORBIS_COMMENT blocks,** the first is the `vorbis` source.
-- **8. A FLAC PICTURE block** is reached by `flac::picture()`, apart from the `vorbis` source, since
-  a file can hold a different picture in a `METADATA_BLOCK_PICTURE` comment; a concept spanning
-  every format's cover art follows.
+- **8. A FLAC PICTURE block** is not reached by this line. A file can hold a different picture in a
+  `METADATA_BLOCK_PICTURE` comment, so the block needs syntax apart from the `vorbis` source, and
+  a picture has parts the language has no type for; both move to [pictures](pictures.md).
 - **9. A comment without `=`** is absent, and `goro audit` reports it as a finding.
 - **10. The audio frames' CRCs** are checked by every command that reads the whole file (`goro
   hash`, `goro audit`, `goro explore`), not by `goro list`. The walk of the whole file reports each
@@ -143,3 +143,40 @@ the fixture corpus.
   explore` to want. Next step: plan the line's steps, as mp3-support's were: the normative documents
   first (rationale, identifiers.md with `flac::picture()`, quirks.md, hash.md, pathspecs.md,
   implementation.md, testing.md), then the reader, sources, playing time and hash range in `src/`.
+- 2026-10-10 -- Decided with PJ: `flac::picture()` is dropped from this line, accepting that a FLAC
+  file's PICTURE blocks cannot be queried for now. The syntax, the type a picture is and a concept
+  across formats go to a new brief, [pictures](pictures.md), which may want an earlier exploration
+  of notation for mapping over values and projecting parts of compound ones. The pathspec
+  documentation may admit `.flac` before the code does. The line's steps:
+  1. the normative documents, and the findings in the goro-audit and goro-explore briefs;
+  2. the reader: five new corpus fixtures (a damaged Id3v2 size before `fLaC`, junk before the
+     marker, both picture forms in one file, a PICTURE block declaring length 0, an 18-byte
+     STREAMINFO), and the FLAC edge analysis with its comment index;
+  3. the `vorbis`, `id3v2`, `ape` and `id3v1` sources bound for FLAC files;
+  4. `file::duration` for FLAC, its logic in one type;
+  5. the hash: the walk of the whole file with its CRC report, FLAC hashing, and `.flac` admitted
+     to discovery.
+
+  Next step: step 1.
+- 2026-10-10 -- Step 1 written, awaiting review:
+  - identifiers.md: in a FLAC file the `vorbis` source is the first comment block; a comment
+    without `=` is absent; bytes after the last comment break the list off; `file::duration` is
+    unusable where a FLAC file's tail cannot settle its playing time;
+  - quirks.md: a block whose recorded length is wrong, read from its contents when the chain then
+    reads cleanly to the first frame; a chain with no block flagged last;
+  - hash.md: what a FLAC file's hash covers; pathspecs.md admits `.flac`, ahead of the code;
+  - rationale.md: the FLAC playing-time rule, added to the timeline entry; why a recovered block
+    length is silent; why a comment without `=` is absent where an undecodable Id3v2 description is
+    unusable; why stray tags are read; why `goro hash` says nothing of failing frame CRCs;
+  - implementation.md: reading a FLAC file from its edges, finding where its audio ends and
+    checking its frames, and its playing time among the choices the specifications leave open;
+  - architecture.md: the walk checks the frames' checksums;
+  - testing.md: FLAC tables for tags and damage, playing time and the hash range, and `c.flac`
+    among the pathspec scenarios;
+  - the goro-audit and goro-explore briefs: the FLAC findings, and the search left to explore.
+
+  Two calls of mine, by the rule that a fault losing nothing is silent: a chain with no block flagged
+  last is not counted as incomplete, being read in full and its end found exactly; and an 18-byte
+  STREAMINFO is read for the fields it holds, its total among them. PJ agreed both. The new
+  briefs, [pictures](pictures.md) and [value-mapping](value-mapping.md), the notation for
+  projections that pictures needs, land with this line. Next step: step 2, the reader, in plan mode.
