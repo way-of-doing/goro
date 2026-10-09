@@ -182,9 +182,12 @@ layout and finds `E` as it reads the frames.
 - **How `goro hash` finds `E` without a trusted summary header.** Answered on 2026-10-09: the walk
   resynchronises over damage, and a frame counts only when it ends at the limit or belongs to a run
   of three; two passes, headers then bytes. See implementation.md, "Finding where the audio ends".
-- **Committing real test files.** None are committed, their licences unweighed. music-metadata's
-  samples are MIT-licensed, which permits it with the notice kept, and Goro is now MIT-licensed
-  too.
+- **Committing real test files.** Answered on 2026-10-09: none are committed. music-metadata's
+  repository is MIT-licensed, but its samples are mostly commercial recordings (Beth Hart, Queen,
+  Windows' "Sleep Away") and files from users' bug reports, whose rights its licence cannot grant;
+  the other three projects' licences are copyleft. The corpus's `rw-` fixtures rebuild every shape
+  they showed with Goro's own audio, and `fetch-realworld.sh` pins the originals for anyone who
+  wants them.
 
 ## Done when
 
@@ -409,3 +412,9 @@ layout and finds `E` as it reads the frames.
 
   Every item of Done when is now met. What remains before the line can land: review of this step,
   and the open question on committing real test files, which the MIT licence now bears on.
+- 2026-10-09 -- Step 4 committed (`93ba301`). PJ asked for the MIT-licensed test files, music-metadata's,
+  to be committed with their notice. Looking closer, they are mostly commercial recordings and
+  bug-report files, which the repository's MIT licence cannot cover, and 53 MB in all, so on PJ's
+  decision none are committed. The open question is closed, and file-reading.md and the fetch
+  script now say why; the brief had wrongly called the samples MIT-licensed. The line's code and
+  docs are complete. Next step: review the line as a whole and land it on main with a merge commit.

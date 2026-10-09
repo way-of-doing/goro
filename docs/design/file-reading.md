@@ -299,7 +299,9 @@ users' bug reports: mutagen (`ada28b2`), TagLib (`961dd69`), TagLib# (`da41dc3`)
 (`9b71259`). That is 240 audio files: 163 MP3, 39 Ogg and 38 FLAC.
 `scratchpad/Goro.Scratchpad/FileReading/fetch-realworld.sh` fetches them at those commits and
 `realworld <dir> <out>` dumps what the prototype reads. Their licences (GPL-2.0, LGPL-2.1 or
-MPL-1.1, LGPL-2.1, MIT) have not been weighed, so none of it is in the repository.
+MPL-1.1, LGPL-2.1, MIT) do not settle it: music-metadata's MIT licence covers its code, not the
+commercial recordings and users' bug-report files most of its samples are. So none of it is in the
+repository (decided on 2026-10-09).
 
 **What held.** No reader threw. Of 944 Id3v2 text frames that mutagen also reads, 877 matched
 exactly, and of 702 Vorbis comments, 687 did; most of the rest are mutagen merging Id3v1 into its
