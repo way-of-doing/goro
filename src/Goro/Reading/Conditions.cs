@@ -96,3 +96,15 @@ public enum TagQuirk
 
 /// <summary>A tag read as its writer meant rather than as its specification says.</summary>
 public sealed record QuirkApplied(TagKind Tag, TagQuirk Quirk, long At) : Condition;
+
+/// <summary>
+/// Bytes after the audio a trusted summary header describes, and before the trailing tags: junk,
+/// never part of the audio (docs/implementation.md).
+/// </summary>
+public sealed record BytesAfterAudio(Region Region) : Condition;
+
+/// <summary>The file's playing time cannot be had: its <c>file::duration</c> is unusable, and the file is reported.</summary>
+public sealed record DurationUnusable(DurationProblem Problem) : Condition
+{
+    public override bool MakesIncomplete => true;
+}

@@ -19,9 +19,24 @@ public readonly record struct MpegFrameHeader(
         [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],         // V2 L2, L3
     ];
 
+    /// <summary>The longest frame there is: MPEG-1 Layer II at 384 kbps and 32 kHz, padded.</summary>
+    public const int MaxFrameLength = 2881;
+
     public bool IsFreeFormat => BitrateKbps == 0;
 
     public int SamplesPerFrame => Layer switch { 1 => 384, 2 => 1152, _ => Version == 1 ? 1152 : 576 };
+
+    public bool IsMono => ChannelMode == 3;
+
+    /// <summary>
+    /// Where a Xing or Info header starts in the frame, after the header, the CRC if there is one,
+    /// and the side information.
+    /// </summary>
+    public int SummaryOffset => Length + (Crc ? 2 : 0) + (Version == 1 ? (IsMono ? 17 : 32) : (IsMono ? 9 : 17));
+
+    /// <summary>The mean frame length at this bitrate: what the padding bit keeps a constant-bitrate stream to.</summary>
+    public double AverageFrameLength =>
+        (Layer == 1 ? 48.0 : Layer == 3 && Version != 1 ? 72.0 : 144.0) * BitrateKbps * 1000 / SampleRate;
 
     /// <summary>Parses the first four bytes of <paramref name="bytes"/>.</summary>
     public static bool TryParse(ReadOnlySpan<byte> bytes, out MpegFrameHeader header)

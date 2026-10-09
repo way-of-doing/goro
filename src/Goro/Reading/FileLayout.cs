@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Goro.Reading.Bytes;
+using Goro.Reading.Mp3;
 using Goro.Reading.Tags;
 
 namespace Goro.Reading;
@@ -35,13 +36,16 @@ public abstract record AudioLocation
 
 /// <summary>
 /// What the analysis of a file's edges found: its tags, with an index of their fields, where its
-/// audio is, and every condition met on the way. It describes a file however damaged rather than
-/// failing on it; what the description means is for each command to decide.
+/// audio is, its playing time, and every condition met on the way. It describes a file however
+/// damaged rather than failing on it; what the description means is for each command to decide.
 /// </summary>
+/// <param name="Summary">The summary frame ahead of the audio, if there is one.</param>
 public sealed record FileLayout(
     AudioFormat Format,
     ImmutableArray<TagIndex> Tags,
     AudioLocation Audio,
+    DurationOutcome Duration,
+    SummaryFrame? Summary,
     ImmutableArray<Condition> Conditions,
     ReadLog Reads)
 {

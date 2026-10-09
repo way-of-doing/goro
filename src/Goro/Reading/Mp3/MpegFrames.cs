@@ -23,17 +23,24 @@ public static class MpegFrames
     /// further than the search budget allows. <paramref name="gaveUp"/> says whether the search
     /// stopped for want of budget before reaching <paramref name="end"/>.
     /// </summary>
-    public static long? FindFirst(BoundedReader reader, long from, long end, out bool gaveUp)
+    public static long? FindFirst(BoundedReader reader, long from, long end, out bool gaveUp) =>
+        Find(reader, from, end, end, accept: null, out gaveUp)?.At;
+
+    /// <summary>
+    /// The first confirmed frame of the stream <paramref name="stream"/> belongs to, starting in
+    /// [<paramref name="from"/>, <paramref name="to"/>), with its header: a probe of a stream already
+    /// found. Null where there is none, or the search budget does not allow looking.
+    /// </summary>
+    public static (long At, MpegFrameHeader Header)? FindOfStream(BoundedReader reader, long from, long to, long end, MpegFrameHeader stream) =>
+        Find(reader, from, to, end, stream.Matches, out _);
+
+    private static (long At, MpegFrameHeader Header)? Find(
+        BoundedReader reader, long from, long to, long end, Func<MpegFrameHeader, bool>? accept, out bool gaveUp)
     {
         gaveUp = false;
-        if (from >= end)
+        for (var at = from; at < to; at += SearchStep)
         {
-            return null;
-        }
-
-        for (var at = from; at < end; at += SearchStep)
-        {
-            if (!reader.TryRead(ReadPurpose.Search, at, Math.Min(SearchStep, end - at), out var block))
+            if (!reader.TryRead(ReadPurpose.Search, at, Math.Min(SearchStep, to - at), out var block))
             {
                 gaveUp = true;
                 return null;
@@ -42,15 +49,45 @@ public static class MpegFrames
             var span = block.Span;
             for (var i = 0; i < span.Length; i++)
             {
-                if (span[i] == 0xFF && IsConfirmed(reader, at + i, end, out _))
+                if (span[i] == 0xFF && IsConfirmed(reader, at + i, end, out var header) && (accept is null || accept(header)))
                 {
-                    return at + i;
+                    return (at + i, header);
                 }
             }
         }
 
         return null;
     }
+
+    /// <summary>
+    /// Whether a frame of <paramref name="stream"/>, and of its bitrate if <paramref name="sameBitrate"/>,
+    /// ends exactly at <paramref name="at"/>: looked for no further back than the longest frame there is,
+    /// and no further back than <paramref name="from"/>.
+    /// </summary>
+    public static bool FrameEndsAt(BoundedReader reader, long at, long from, MpegFrameHeader stream, bool sameBitrate)
+    {
+        var start = Math.Max(from, at - MpegFrameHeader.MaxFrameLength);
+        if (at - start < MpegFrameHeader.Length || !reader.TryRead(ReadPurpose.Search, start, at - start, out var block))
+        {
+            return false;
+        }
+
+        var span = block.Span;
+        for (var i = span.Length - MpegFrameHeader.Length; i >= 0; i--)
+        {
+            if (MpegFrameHeader.TryParse(span[i..], out var last) && last.Matches(stream) && !last.IsFreeFormat
+                && start + i + last.FrameLength == at && (!sameBitrate || last.BitrateKbps == stream.BitrateKbps))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Whether a header of <paramref name="stream"/> starts at <paramref name="at"/>.</summary>
+    public static bool FrameStartsAt(BoundedReader reader, long at, long end, MpegFrameHeader stream) =>
+        TryHeaderAt(reader, at, end, out var header) && header.Matches(stream);
 
     /// <summary>Whether a frame header at <paramref name="at"/> is confirmed by the frame that follows it.</summary>
     public static bool IsConfirmed(BoundedReader reader, long at, long end, out MpegFrameHeader header)

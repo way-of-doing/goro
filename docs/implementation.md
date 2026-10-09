@@ -75,6 +75,13 @@ windows begin at 64 KiB each, and the budgets at 4 KiB for sniffing, 256 KiB for
 the first frame nearly always follows the tags directly, so a healthy file costs its two windows
 and nothing more.
 
+A file's playing time is decided in every analysis, whatever was asked, since a file whose playing
+time cannot be had counts as incomplete once it is opened. For an MP3 with a summary header that
+costs nothing beyond the head window. For one without, the seven probes that confirm a constant
+bitrate are reads in the middle of the file, at most 16 KiB each, charged to the search budget,
+under any predicate that opens the file. Deciding it only when asked is recorded in
+[deferred](design/deferred.md).
+
 A refusal is never silent. A tag whose structure the budget cuts off is broken off there, as if it
 were damaged, and a file whose analysis was refused anything is reported as incomplete. The
 structure budget is large because of one case: an Id3v2 tag before v2.4 that is unsynchronised as

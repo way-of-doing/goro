@@ -150,4 +150,18 @@ public class TagReadingTests
         Assert.That(Lines(byGenre.StdOut), Is.EqualTo(new[] { v24 }), "(17)Post-Rock refines Rock");
         Assert.That(Lines(rock.StdOut), Is.EquivalentTo(new[] { v24, v23, v22 }), "(17), (17)Post-Rock and Rock/Metal");
     }
+
+    [Test]
+    public async Task ADurationPredicate_ReadsTheTrimmedPlayingTime_AndTheFaqsGuardPassesOverTheRest()
+    {
+        var cbr = Fixture("seeds/mp3-cbr.mp3");
+        var headerless = Fixture("seeds/mp3-cbr-notag.mp3");
+        Fixture("mp3/vbr-notag-id3v24.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", "--filter=file::duration IS USABLE AND file::duration == 3s", _collection.Root);
+
+        Assert.That(Lines(stdOut), Is.EquivalentTo(new[] { cbr, headerless }));
+        Assert.That(exitCode, Is.EqualTo(12), "the file with no playing time is still counted as incomplete");
+        Assert.That(Lines(stdErr), Is.EqualTo(new[] { new IncompleteWarning(1, 3).ToString() }));
+    }
 }

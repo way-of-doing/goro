@@ -35,10 +35,15 @@ public class EdgeReadingTests
 
         Assert.That(layout.Audio, Is.InstanceOf<AudioLocation.Found>());
         Assert.That(layout.Tags.Select(t => t.Kind.Format), Is.EquivalentTo(new[] { TagFormat.Id3v2, TagFormat.Ape, TagFormat.Id3v1 }));
-        // The first frame follows the leading tag, inside the head window, so the two windows are all
-        // that is read, cover art included.
-        Assert.That(reader.Log.BytesFromSource, Is.EqualTo(ReadPolicy.Default.HeadWindow + ReadPolicy.Default.TailWindow));
-        Assert.That(reader.Log.Records.Count(r => r.Outcome == ReadOutcome.FromSource), Is.EqualTo(2));
+        // The first frame follows the leading tag, inside the head window. The frames carry no summary
+        // header, so the stream is counted from its edges: besides the two windows, seven probes of the
+        // middle and the headers that confirm what they find, and nothing else, cover art included.
+        Assert.That(layout.Duration, Is.InstanceOf<DurationOutcome.Known>()
+            .With.Property(nameof(DurationOutcome.Known.Basis)).EqualTo(DurationBasis.ConstantBitrateFromEdges));
+        var windows = ReadPolicy.Default.HeadWindow + ReadPolicy.Default.TailWindow;
+        Assert.That(reader.Log.BytesFromSource, Is.InRange(windows, windows + 7 * (16 * 1024 + 64)));
+        Assert.That(reader.Log.Records.Where(r => r.Outcome == ReadOutcome.FromSource && r.Purpose != ReadPurpose.Sniff),
+            Has.All.Property(nameof(ReadRecord.Purpose)).EqualTo(ReadPurpose.Search), "only the windows and the probes");
     }
 
     [Test]
@@ -54,6 +59,33 @@ public class EdgeReadingTests
         Assert.That(layout.Audio, Is.EqualTo(new AudioLocation.NotFound(AudioNotFoundReason.SearchGaveUp)));
         var searched = reader.Log.Records.Where(r => r.Purpose == ReadPurpose.Search && r.Outcome == ReadOutcome.FromSource).Sum(r => r.Length);
         Assert.That(searched, Is.LessThanOrEqualTo(ReadPolicy.Default.SearchBudget));
+    }
+
+    // A stream whose bitrate changes is not counted, and not walked either: the first probe that finds
+    // another bitrate ends the attempt.
+    [Test]
+    public void ALongFileWithoutAHeader_ThatIsNotConstantBitrate_HasNoDuration_AndIsNotWalked()
+    {
+        byte[] tile = [.. SyntheticMp3Builder.BuildAudioFrames(3), .. OtherBitrateFrame()];
+        var source = new TiledSource(SyntheticMp3Builder.BuildId3V2(100), tile, Audio, []);
+        var reader = new BoundedReader(source, ReadPolicy.Default);
+
+        var layout = Mp3Analysis.Analyse(reader);
+
+        Assert.That(layout.Duration, Is.EqualTo(new DurationOutcome.Unusable(DurationProblem.NotConstantBitrate)));
+        Assert.That(layout.IsIncomplete, Is.True);
+        Assert.That(reader.Log.BytesFromSource, Is.LessThan(ReadPolicy.Default.AnalysisCeiling));
+    }
+
+    /// <summary>One MPEG-1 Layer III frame at 160 kbps, 44.1 kHz, mono: 522 bytes.</summary>
+    private static byte[] OtherBitrateFrame()
+    {
+        var frame = new byte[522];
+        frame[0] = 0xFF;
+        frame[1] = 0xFB;
+        frame[2] = 0xA0;
+        frame[3] = 0xC0;
+        return frame;
     }
 
     /// <summary>A file of <paramref name="head"/>, then <paramref name="tile"/> repeated for about <paramref name="middle"/> bytes, then <paramref name="tail"/>, made on demand.</summary>

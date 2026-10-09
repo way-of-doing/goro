@@ -180,9 +180,8 @@ public class FileSourceTests
     [Test]
     public void Duration_OfAnMp3WithADamagedId3v2Tag_StillResolves()
     {
-        // A TIT2 frame claiming a size far beyond the tag. warnings.md: a file is unreadable for
-        // file::duration when its audio properties cannot be parsed, not when its tags cannot.
-        // TagLibSharp parses the tags on the way to the audio, so this guards its tolerance.
+        // A TIT2 frame claiming a size far beyond the tag. Damage to a tag never makes a file
+        // unreadable (docs/concepts/warnings.md), and the playing time is read from the audio.
         var tag = SyntheticMp3Builder.BuildId3V2(64);
         "TIT2"u8.CopyTo(tag.AsSpan(10));
         tag[14] = 0x7F;

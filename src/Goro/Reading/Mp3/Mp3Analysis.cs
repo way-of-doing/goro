@@ -27,6 +27,14 @@ public static class Mp3Analysis
         var audio = Collate(reader, head, trailingTagsStart, conditions);
         var ordered = MarkSources(tags, conditions);
 
+        var (duration, summary) = audio is AudioLocation.Found found
+            ? Mp3Duration.Decide(reader, found.FirstFrame, found.TrailingTagsStart, conditions)
+            : (new DurationOutcome.Unusable(DurationProblem.NoAudio), null);
+        if (audio is AudioLocation.Found && duration is DurationOutcome.Unusable(var problem))
+        {
+            conditions.Add(new DurationUnusable(problem));
+        }
+
         // Whatever a budget kept the analysis from reading, the file is reported for it.
         foreach (var purpose in (ReadPurpose[])[ReadPurpose.Sniff, ReadPurpose.DeclaredStructure, ReadPurpose.Search])
         {
@@ -36,7 +44,7 @@ public static class Mp3Analysis
             }
         }
 
-        return new FileLayout(AudioFormat.Mp3, ordered, audio, [.. conditions], reader.Log);
+        return new FileLayout(AudioFormat.Mp3, ordered, audio, duration, summary, [.. conditions], reader.Log);
     }
 
     /// <param name="End"><c>B</c>: where the leading tags say they end.</param>

@@ -84,4 +84,32 @@ public class PredicateStageReadingTests
         Assert.That(outcome.Warnings.OfType<DataWarning>().Single().SubExpression, Is.EqualTo("""id3v2::field("TPE1")"""));
         Assert.That(outcome.Reading, Is.EqualTo(FileReading.Read), "a value that does not decode is not damage to the tag's structure");
     }
+
+    // A file counts once it is opened: its playing time cannot be had, and the predicate never asked.
+    [Test]
+    public async Task ATagPredicate_OnAFileWhosePlayingTimeCannotBeHad_ReadsItInPart()
+    {
+        var outcome = await Run("""id3v2::field("TIT2") IS ABSENT OR TRUE""", "mp3/vbr-notag-id3v24.mp3");
+
+        Assert.That(outcome.Reading, Is.EqualTo(FileReading.ReadInPart));
+    }
+
+    [Test]
+    public async Task AnUnusableDuration_WarnsWhenCompared_AndLeavesThePredicateUnanswered()
+    {
+        var outcome = await Run("file::duration >= 1", "mp3/vbr-notag-id3v24.mp3");
+
+        Assert.That(outcome.IsUnanswered, Is.True);
+        Assert.That(outcome.Warnings.OfType<DataWarning>().Single().SubExpression, Is.EqualTo("file::duration"));
+    }
+
+    [Test]
+    public async Task GuardingTheDuration_PassesOverTheFileSilently()
+    {
+        var outcome = await Run("file::duration IS USABLE AND file::duration >= 1", "mp3/vbr-notag-id3v24.mp3");
+
+        Assert.That(outcome.Disposition, Is.EqualTo(FileDisposition.Unmatched));
+        Assert.That(outcome.IsUnanswered, Is.False);
+        Assert.That(outcome.Warnings, Is.Empty);
+    }
 }

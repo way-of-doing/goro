@@ -28,33 +28,6 @@ internal sealed class FileSystemFacet : FileFacet<FileMetadata>
     }
 }
 
-/// <summary>The properties of a file's audio, as opposed to its tags.</summary>
-internal sealed record AudioProperties(TimeSpan Duration);
-
-/// <summary>
-/// A file's audio properties, read by TagLibSharp until Goro's reader gives the playing time (step 3
-/// of docs/directions/mp3-support.md). Only the properties are kept; the file is closed before this
-/// returns. The file's layout is analysed first, as for the tags, so that a file with no audio is
-/// unreadable here too, and counts as opened.
-/// </summary>
-internal sealed class AudioPropertiesFacet : FileFacet<AudioProperties>
-{
-    public static AudioPropertiesFacet Instance { get; } = new();
-
-    private AudioPropertiesFacet()
-    {
-    }
-
-    public override AudioProperties Load(FileData file)
-    {
-        TagsFacet.ReadableLayout(file);
-        using var taglib = TagLib.File.Create(file.Path, TagLib.ReadStyle.Average);
-        return taglib.Properties is { } properties
-            ? new AudioProperties(properties.Duration)
-            : throw new InvalidDataException("The audio properties could not be read.");
-    }
-}
-
 /// <summary>A file's tags, as its layout indexes them, and the values that can be read from them.</summary>
 internal sealed record FileTags(FileLayout Layout, TagValues Values)
 {

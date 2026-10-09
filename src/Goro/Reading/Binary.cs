@@ -22,6 +22,22 @@ internal static class Binary
     public static uint Syncsafe(ReadOnlySpan<byte> bytes) =>
         (uint)((bytes[0] & 0x7F) << 21 | (bytes[1] & 0x7F) << 14 | (bytes[2] & 0x7F) << 7 | (bytes[3] & 0x7F));
 
+    /// <summary>CRC-16/ARC: reflected polynomial 0x8005, initial value 0. The LAME tag's checksum.</summary>
+    public static ushort Crc16Arc(ReadOnlySpan<byte> data)
+    {
+        ushort crc = 0;
+        foreach (var b in data)
+        {
+            crc ^= b;
+            for (var i = 0; i < 8; i++)
+            {
+                crc = (crc & 1) != 0 ? (ushort)((crc >> 1) ^ 0xA001) : (ushort)(crc >> 1);
+            }
+        }
+
+        return crc;
+    }
+
     /// <summary>Undoes unsynchronisation: every <c>FF 00</c> becomes <c>FF</c>.</summary>
     public static byte[] Resynchronise(ReadOnlySpan<byte> data)
     {

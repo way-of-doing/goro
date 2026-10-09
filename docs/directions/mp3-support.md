@@ -369,3 +369,24 @@ layout and finds `E` as it reads the frames.
     overflow whatever it is asked to read.
 
   Next step: review of 2c; then step 3, `file::duration` from the reader.
+- 2026-10-09 -- Step 2c committed (`73f4e27`). Step 3 written, awaiting review: `file::duration`
+  from Goro's reader.
+  - `Reading/Mp3/Mp3Duration` holds all of an MP3's duration logic: the Xing, Info or VBRI header
+    with the LAME tag and its CRC-16/ARC; the trust checks, within one frame of the audio or up to
+    an exact frame end with nothing starting there; the seven-probe constant-bitrate count from the
+    edges.
+  - `FileLayout` gained `Duration` (`Known` with its basis, or `Unusable` with the problem) and the
+    `SummaryFrame`. An unusable duration is a `DurationUnusable` condition, which makes the file
+    incomplete.
+  - `file::duration` reads the layout, and is one unusable occurrence where the playing time
+    cannot be had. TagLibSharp's facet is gone: TagLibSharp is now only `goro hash`'s, until step 4.
+
+  Over the corpus every LAME-encoded fixture gives 3.300 s, header-less CBR files 3.344 s, the
+  MPEG-2.5 seed 3.456 s. Seven files have no usable duration: the doubled Xing count, the
+  half-truncated and joined files, header-less VBR, and the truncated header-less CBR file. That
+  agrees with the survey once the constant-bitrate decision is applied.
+
+  Decided with PJ: deciding the playing time stays eager, so the probes run for any predicate that
+  opens a header-less file. Deciding it only when asked is recorded in deferred.md as a thing to
+  explore. Next step: review of step 3, then step 4, the hash range from the reader and
+  TagLibSharp removed.
