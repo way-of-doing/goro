@@ -1,7 +1,7 @@
 # Reading audio files
 
 This is a survey made ahead of [mp3-support](../directions/archive/mp3-support.md),
-[ogg-support](../directions/ogg-support.md) and [flac-support](../directions/flac-support.md). It
+[ogg-support](../directions/ogg-support.md) and [flac-support](../directions/archive/flac-support.md). It
 is exploration rather than specification: it asks how Goro should read tag data and playing time,
 what it can promise when a file is damaged, and whether any existing code reads files the way Goro
 needs. Whatever the lines decide moves into the rationale and the normative documents in their own

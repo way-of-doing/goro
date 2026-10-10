@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 size: focused
 touches: commands/hash.md, concepts/pathspecs.md, features/builtins/identifiers.md, design/rationale.md, design/quirks.md, design/flac-layout.md, architecture.md, implementation.md, testing.md, src/Goro/Reading, src/Goro/Hashing, src/Goro/Discovery, src/Goro/Predicates/Identifiers
 after: file-discovery-scope
@@ -16,14 +16,14 @@ what admits `.flac` to discovery.
 
 ## Settled
 
-The questions this brief first asked, each answered by the [file-reading](../design/file-reading.md)
-survey or by [flac-layout](../design/flac-layout.md), which measures each claim:
+The questions this brief first asked, each answered by the [file-reading](../../design/file-reading.md)
+survey or by [flac-layout](../../design/flac-layout.md), which measures each claim:
 
 - **Where the audio begins:** at the end of the metadata block flagged last, `K`, confirmed by a
   frame header there; Goro walks the block chain itself, trusting no length. Every tagger edit
   tried, metaflac's and ffmpeg's, moved the frames without changing a byte of them.
 - **STREAMINFO is not hashed:** the hash covers `[D, E)`, the frames from the first to the end of
-  the last whole one ([What the hash covers](../design/file-reading.md#what-the-hash-covers)). No
+  the last whole one ([What the hash covers](../../design/file-reading.md#what-the-hash-covers)). No
   edit tried rewrote STREAMINFO, and metaflac has no option to.
 - **Stray Id3v2, APE and Id3v1 tags** lie outside `[D, E)`: in front of `fLaC`, and behind the last
   frame. Seen in a real file, a 190 KB Id3v2 tag in front and Id3v1 behind.
@@ -33,7 +33,7 @@ survey or by [flac-layout](../design/flac-layout.md), which measures each claim:
 
 ## Questions
 
-From [flac-layout](../design/flac-layout.md#questions-for-flac-support), which numbers ten
+From [flac-layout](../../design/flac-layout.md#questions-for-flac-support), which numbers ten
 questions and gives the evidence for each. Decided on 2026-10-09:
 
 - **1 and 3. A block's recorded length wrong,** too long or too short: wherever the contents are
@@ -50,7 +50,7 @@ questions and gives the evidence for each. Decided on 2026-10-09:
 - **7. Of two VORBIS_COMMENT blocks,** the first is the `vorbis` source.
 - **8. A FLAC PICTURE block** is not reached by this line. A file can hold a different picture in a
   `METADATA_BLOCK_PICTURE` comment, so the block needs syntax apart from the `vorbis` source, and
-  a picture has parts the language has no type for; both move to [pictures](pictures.md).
+  a picture has parts the language has no type for; both move to [pictures](../pictures.md).
 - **9. A comment without `=`** is absent, and `goro audit` reports it as a finding.
 - **10. The audio frames' CRCs** are checked by every command that reads the whole file (`goro
   hash`, `goro audit`, `goro explore`), not by `goro list`. The walk of the whole file reports each
@@ -69,7 +69,7 @@ the fixture corpus.
 
 ## Log
 
-- 2026-10-08 -- The [file-reading](../design/file-reading.md) survey answered several of the
+- 2026-10-08 -- The [file-reading](../../design/file-reading.md) survey answered several of the
   questions above, and its decisions hold here too. Goro reads FLAC itself, walking the metadata
   blocks without trusting their lengths, so it finds the audio's start without TagLib. Measured
   with ffmpeg: STREAMINFO's sample rate changes the stream's rate when frame headers defer to it,
@@ -81,14 +81,14 @@ the fixture corpus.
   on two fixtures, and the canonical form of the hashed parameters.
 - 2026-10-08 -- Decided in file-reading: the hash covers the frames, from the first to the end of the
   last whole frame, and STREAMINFO is left out; see
-  [What the hash covers](../design/file-reading.md#what-the-hash-covers). This replaces the
+  [What the hash covers](../../design/file-reading.md#what-the-hash-covers). This replaces the
   leaning towards the frames plus the stream parameters above.
-- 2026-10-08 -- Real files ([file-reading](../design/file-reading.md#real-world-test-data)) include
+- 2026-10-08 -- Real files ([file-reading](../../design/file-reading.md#real-world-test-data)) include
   a `VORBIS_COMMENT` block declaring fewer bytes than it holds, an encoder bug mutagen reads
   through and the prototype treats as a broken structure. Decide whether to read through it, as a
   quirk.
 - 2026-10-09 -- Picked up the line. Following mp3-support's method, wrote
-  [flac-layout](../design/flac-layout.md), with a rendered version at
+  [flac-layout](../../design/flac-layout.md), with a rendered version at
   [FLAC File Layout](https://claude.ai/artifact/AexqBEnddAEwPJm4cMLvSf): the specifications (RFC
   9639, the Vorbis I comment header, and the stray tags no specification allows), the positions
   `A` to `H` with `K` for where the metadata says it ends, four variations and eighteen mishaps
@@ -145,7 +145,7 @@ the fixture corpus.
   implementation.md, testing.md), then the reader, sources, playing time and hash range in `src/`.
 - 2026-10-10 -- Decided with PJ: `flac::picture()` is dropped from this line, accepting that a FLAC
   file's PICTURE blocks cannot be queried for now. The syntax, the type a picture is and a concept
-  across formats go to a new brief, [pictures](pictures.md), which may want an earlier exploration
+  across formats go to a new brief, [pictures](../pictures.md), which may want an earlier exploration
   of notation for mapping over values and projecting parts of compound ones. The pathspec
   documentation may admit `.flac` before the code does. The line's steps:
   1. the normative documents, and the findings in the goro-audit and goro-explore briefs;
@@ -178,7 +178,7 @@ the fixture corpus.
   Two calls of mine, by the rule that a fault losing nothing is silent: a chain with no block flagged
   last is not counted as incomplete, being read in full and its end found exactly; and an 18-byte
   STREAMINFO is read for the fields it holds, its total among them. PJ agreed both. The new
-  briefs, [pictures](pictures.md) and [value-mapping](value-mapping.md), the notation for
+  briefs, [pictures](../pictures.md) and [value-mapping](../value-mapping.md), the notation for
   projections that pictures needs, land with this line. Next step: step 2, the reader, in plan mode.
 - 2026-10-10 -- The steps revised: `FileLayout` carries the playing time, decided in every analysis,
   so the reader is not whole without it, and the old step 4 joins step 2. Four steps remain: 2 the
@@ -263,3 +263,10 @@ the fixture corpus.
   hash for each of the three with damaged audio; the 4-minute file hashes in under a second. Every
   item of Done when is now met. Next step: review of step 4, then land the line on main with a merge
   commit, as mp3-support did.
+- 2026-10-10 -- Step 4 committed (`7bae009`). Landed on main with a merge commit, and moved to the
+  archive. Goro reads FLAC files itself: the metadata chain, recovering a block whose recorded
+  length is wrong, the Vorbis comments and the stray Id3v2, APE and Id3v1 tags, the playing time
+  from the end of the audio, and a hash of the frames that survives every metadata edit, checking
+  every frame's checksums on the way. Set aside for others: a FLAC file's PICTURE blocks, to
+  [pictures](../pictures.md), after [value-mapping](../value-mapping.md); reporting the walk's
+  faults and the findings listed in [goro-audit](../goro-audit.md) and [goro-explore](../goro-explore.md).

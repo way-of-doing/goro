@@ -1,6 +1,6 @@
 # The layout of a FLAC file
 
-This is working material for [flac-support](../directions/flac-support.md), made as
+This is working material for [flac-support](../directions/archive/flac-support.md), made as
 [mp3-layout](mp3-layout.md) was for MP3: how a FLAC file is laid out, where each kind of tag sits,
 and what goes wrong at each edge. Every mishap is tied to a lettered position in the diagrams, and
 most to a file in the fixture corpus (`tests/Goro.Tests/Fixtures/Audio/flac`) or in the real-world

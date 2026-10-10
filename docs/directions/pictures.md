@@ -15,7 +15,7 @@ picture data that no source function reaches today, and what type a picture is, 
 (a picture type, a media type, a description, dimensions, the image) and the language has no
 values with parts.
 
-The line was split from [flac-support](flac-support.md), which found that a FLAC file's own
+The line was split from [flac-support](archive/flac-support.md), which found that a FLAC file's own
 PICTURE blocks are out of reach and set reaching them aside rather than settle syntax in passing.
 Until this line lands, a FLAC file's PICTURE blocks cannot be queried.
 

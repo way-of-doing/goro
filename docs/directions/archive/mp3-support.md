@@ -19,7 +19,7 @@ The promise to keep comes from [sources-and-fields](sources-and-fields.md): `fie
 `bytes()` give the data as recorded. [file-reading](../../design/file-reading.md) showed that no
 .NET library keeps it, and recorded what was decided as a result. This line writes those
 decisions into the normative documents and builds them for MP3.
-[flac-support](../flac-support.md) and [ogg-support](../ogg-support.md) then do the same for their
+[flac-support](flac-support.md) and [ogg-support](../ogg-support.md) then do the same for their
 formats.
 
 ## Settled by the survey
