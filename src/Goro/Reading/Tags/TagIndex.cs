@@ -8,11 +8,12 @@ public enum TagFormat
     Ape,
     Id3v1,
     Lyrics3,
+    Vorbis,
 }
 
 /// <summary>
 /// A tag's format and revision: 2, 3 or 4 for Id3v2; 1 or 2 for APE; 0 or 1 for Id3v1; 2 for
-/// Lyrics3. A tag whose revision could not be read, an Id3v2 tag claiming v2.5 say, keeps the number
+/// Lyrics3; 1 for Vorbis comments, which have had one revision. A tag whose revision could not be read, an Id3v2 tag claiming v2.5 say, keeps the number
 /// it claimed.
 /// </summary>
 public readonly record struct TagKind(TagFormat Format, int Revision)
@@ -23,6 +24,7 @@ public readonly record struct TagKind(TagFormat Format, int Revision)
         TagFormat.Ape => $"ape{Revision}",
         TagFormat.Id3v1 => $"id3v1.{Revision}",
         TagFormat.Lyrics3 => $"lyrics3v{Revision}",
+        TagFormat.Vorbis => "vorbis",
         _ => $"{Format}{Revision}",
     };
 }

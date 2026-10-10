@@ -161,6 +161,7 @@ the first link of `ogg-chained-vorbis-opus.ogg`, whose links are 3.300 s and 1.7
 | `id3v2-prefix.flac` | An Id3v2.4 tag before fLaC, as some rippers write. |
 | `id3v1-suffix.flac` | Id3v1.1 after the last frame. |
 | `ape-suffix.flac` | APEv2 and Id3v1 after the last frame. |
+| `id3v2-junk-before-marker.flac` | An Id3v2.4 tag, then 1000 zero bytes its size does not cover, then fLaC. |
 
 ### audio-damage
 
@@ -182,6 +183,8 @@ the first link of `ogg-chained-vorbis-opus.ogg`, whose links are 3.300 s and 1.7
 | `dmg-block-length-overrun.flac` | FLAC: the VORBIS_COMMENT block header claims 200 bytes more than the block holds, so the next block header is misread. |
 | `dmg-no-last-block-flag.flac` | FLAC whose metadata blocks never set the last-block flag, so a reader walks into the first frame. |
 | `dmg-zeroed-comment.flac` | FLAC with 64 bytes in the middle of the VORBIS_COMMENT block zeroed. |
+| `dmg-id3v2-size-short.flac` | An Id3v2.4 tag before fLaC whose size field is 300 bytes too short, so that the rest of the tag lies where fLaC should be. |
+| `dmg-application-length-overrun.flac` | FLAC whose APPLICATION block declares 200 bytes more than it holds: a block that does not state its own extent, so the chain is lost there. |
 
 ## Shapes from other projects' test data
 
@@ -204,6 +207,9 @@ reader and mutagen make of each pair; the last column is for checking it by hand
 | `mp3/rw-apple-text-frames.mp3` | Id3v2.4 with Apple's text frames `GRP1`, `MVNM` and `MVIN`, beside `TIT1`. | `music-metadata@9b71259 test/samples/mp3/herbal-tea-GRP1.mp3`<br>`music-metadata@9b71259 test/samples/mp3/pr-544-id3v24.mp3` | |
 | `mp3/rw-three-id3v2-tags.mp3` | Three Id3v2 tags in a row, v2.3 then v2.4 twice, disagreeing about title, artist and track. Only the first is the `id3v2` source. | `music-metadata@9b71259 test/samples/id3-multi-01.mp3`<br>`music-metadata@9b71259 test/samples/id3-multi-02.mp3`<br>`taglib@961dd69 tests/data/duplicate_id3v2.mp3` | |
 | `flac/rw-comment-block-too-short.flac` | FLAC whose `VORBIS_COMMENT` block, the last, declares 48 bytes but holds all its comments; the frames start where the comments end. | `mutagen@ada28b2 tests/data/52-too-short-block-size.flac` | |
+| `flac/rw-picture-block-and-comment.flac` | FLAC holding a picture twice over and differently: a front cover in a `METADATA_BLOCK_PICTURE` comment, and a picture of type Other in a PICTURE block. | `music-metadata@9b71259 test/samples/issue-266.flac` | |
+| `flac/rw-picture-block-length-zero.flac` | FLAC whose PICTURE block declares 0 bytes and holds a whole picture; PADDING, the last block, follows the picture. | `mutagen@ada28b2 tests/data/106-short-picture-block-size.flac` | |
+| `flac/rw-streaminfo-short.flac` | FLAC whose STREAMINFO block is 18 bytes, every field but the MD5, and declares so; the chain is otherwise sound. | `mutagen@ada28b2 tests/data/106-invalid-streaminfo.flac` | |
 | `ogg/rw-vorbis-skeleton.ogg` | Ogg Vorbis multiplexed with an Ogg Skeleton v4 stream, an index rather than audio: fishead, the Vorbis identification header, fisbone, the other Vorbis headers, an empty Skeleton end page, then the audio. | `music-metadata@9b71259 test/samples/ogg/ogg-vorbis-skeleton-v4.ogg`<br>`music-metadata@9b71259 test/samples/ogg/ogg-vorbis-skeleton-v3.ogg` | |
 | `ogg/rw-flac-in-ogg.ogg` | Ogg FLAC under the `.ogg` extension: a codec Goro does not read, in a file it would discover. | `music-metadata@9b71259 test/samples/ogg/audio.flac.ogg`<br>`taglib@961dd69 tests/data/empty_flac.oga` | |
 | `ogg/rw-speex-in-ogg.ogg` | Ogg Speex under the `.ogg` extension, as speexenc writes it. | `music-metadata@9b71259 test/samples/ogg/audio.speex.ogg` | |

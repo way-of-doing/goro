@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Goro.Reading;
 using Goro.Reading.Bytes;
+using Goro.Reading.Flac;
 using Goro.Reading.Mp3;
 using Goro.Reading.Tags;
 
@@ -25,12 +26,41 @@ internal static class AudioCorpus
             .Select(path => Path.GetRelativePath(Root, path).Replace('\\', '/'))
             .Order(StringComparer.Ordinal);
 
+    /// <summary>Every FLAC file in the corpus, seeds included, by its path relative to the corpus.</summary>
+    public static IEnumerable<string> FlacFiles =>
+        Directory.EnumerateFiles(Root, "*.flac", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(Root, path).Replace('\\', '/'))
+            .Order(StringComparer.Ordinal);
+
+    /// <summary>A reader over a corpus file, for the parsing pieces that work below a whole analysis.</summary>
+    public static BoundedReader Reader(string relative, ReadPolicy? policy = null) =>
+        new(new MemoryByteSource(Bytes(relative)), policy ?? ReadPolicy.Default);
+
+    /// <summary>
+    /// The metadata of a corpus FLAC file, its chain walked from just after the first <c>fLaC</c> in it;
+    /// finding the marker behind a damaged tag is the analysis's business, not this helper's.
+    /// </summary>
+    public static (FlacMetadata Metadata, BoundedReader Reader) FlacMetadataOf(string relative)
+    {
+        var bytes = Bytes(relative);
+        var reader = new BoundedReader(new MemoryByteSource(bytes), ReadPolicy.Default);
+        return (FlacMetadata.Read(reader, bytes.AsSpan().IndexOf("fLaC"u8) + 4), reader);
+    }
+
     private static readonly Lazy<IReadOnlyList<ManifestEntry>> LazyManifest = new(() =>
         JsonSerializer.Deserialize<List<ManifestEntry>>(File.ReadAllText(PathOf("manifest.json")), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!);
 
     public static IReadOnlyList<ManifestEntry> Manifest => LazyManifest.Value;
 
-    public static Analysed Analyse(string relative, ReadPolicy? policy = null) => Analyse(Bytes(relative), policy);
+    /// <summary>The analysis of a corpus file, by the format its extension names, as Goro judges a file.</summary>
+    public static Analysed Analyse(string relative, ReadPolicy? policy = null) =>
+        relative.EndsWith(".flac", StringComparison.OrdinalIgnoreCase) ? AnalyseFlac(Bytes(relative), policy) : Analyse(Bytes(relative), policy);
+
+    public static Analysed AnalyseFlac(byte[] bytes, ReadPolicy? policy = null)
+    {
+        var reader = new BoundedReader(new MemoryByteSource(bytes), policy ?? ReadPolicy.Default);
+        return new Analysed(FlacAnalysis.Analyse(reader), new TagValues(reader));
+    }
 
     public static Analysed Analyse(byte[] bytes, ReadPolicy? policy = null)
     {

@@ -74,6 +74,13 @@ Fields stepped over as quirks appear with their offset and size.
 **Every condition** the analysis and the walk record, with its offset, so that what the
 `incomplete` warning counts can be seen for this file.
 
+**For a FLAC file,** the map shows each metadata block as a region, with a block whose recorded
+length was wrong at its true extent and the recorded one beside it, and the audio lists every frame
+that failed its CRC. A block that does not state its own extent (PADDING, APPLICATION, SEEKTABLE)
+and whose length is wrong loses the rest of the chain; explore may want a search, for a place from
+which the chain reads cleanly to the first frame, to show the blocks after it. flac-support left
+that search out, no file seen needing it.
+
 ## How it renders
 
 The business code and the rendering are kept apart. What explore finds -- the map, the tag table,
@@ -186,3 +193,5 @@ or audit, and changes stored hashes if it is answered yes.
   modules are welcome experiments, provided an experiment never costs the foundation: modules read
   the model and nothing else, and any one can be added or dropped alone. Defaults and user options
   are settled later.
+- 2026-10-10 -- flac-support added what explore shows of a FLAC file, and left to explore the search
+  for blocks behind one whose wrong length cannot be recovered.

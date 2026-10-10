@@ -82,6 +82,15 @@ bitrate are reads in the middle of the file, at most 16 KiB each, charged to the
 under any predicate that opens the file. Deciding it only when asked is recorded in
 [deferred](design/deferred.md).
 
+A FLAC file is read the same way, and its metadata is what can outgrow the head window: a picture
+block alone may hold megabytes. The block chain is walked by its 4-byte headers, each read beyond
+the window charged to the structure budget, and a block's payload is stepped over unread unless
+the analysis needs it. The comment block is read whole, to index its comments; picture blocks are
+not read at all. At the tail, the last frames are found by searching back from where the trailing
+tags start for frame headers that pass their CRC, and the last one's body is parsed to find where
+it ends. For every file seen that lies within the tail window; a search reaching further is
+charged to the search budget, as for an MP3.
+
 A refusal is never silent. A tag whose structure the budget cuts off is broken off there, as if it
 were damaged, and a file whose analysis was refused anything is reported as incomplete. The
 structure budget is large because of one case: an Id3v2 tag before v2.4 that is unsynchronised as
@@ -116,6 +125,28 @@ the bytes of `[D, E)`. One pass would have to hold back everything after the las
 count, which has no bound across a long damaged stretch. The second pass usually comes from the
 operating system's cache. Neither pass is held to the analysis budgets, since hashing reads the
 audio by definition.
+
+### Finding where a FLAC file's audio ends
+
+A FLAC frame does not record its length, so a frame ends where the next one starts. The walk from
+the first frame looks for each next header by its sync code, its CRC, and its number: the frame
+number one higher or, in a stream of variable block size, the sample number one block later. A
+running CRC is no substitute: in a four-minute file, the frame checksum would have matched early,
+by chance, 252 times, where a search for headers found no chance header at all. Over damage the walk
+resynchronises on the next header whose number is later than expected, so that damaged frames stay
+inside the hash. The last frame has no header after it, so its body is parsed, subframe by subframe
+and down to the Rice-coded residual, to find the bit where it ends; nothing is decoded into
+samples. Its checksum then confirms it. That gives `E` exactly when bytes follow the audio, where
+scanning for a matching checksum would cut the last frame short about once in fifty files.
+
+The walk checks every frame's checksums as it goes, at almost no cost once each frame's end is
+known, and records each frame that fails: where it is, its number, and whether its header's CRC-8
+or the frame's CRC-16 failed. A header whose CRC-8 fails is not taken for a header, so it shows only
+where the walk already knows something is wrong: inside a frame that fails its CRC-16 or after
+which numbers are skipped, or after the last frame. There it is looked for as a header whose fields
+are well formed and whose CRC-8 does not match them; anywhere else such a run occurs by chance in
+healthy audio, and would be reported as damage that is not there. Every command that walks the audio, `goro hash` among them, gets
+the record; which of them report it is theirs to decide.
 
 ### The reader never throws over what a file holds
 
@@ -217,3 +248,16 @@ the frames did not really end there: the structure counts as broken at that poin
 reported as incomplete. Id3v2 says padding is zeroes, so a tagger that left other bytes in it is
 reported the same way, which is the cost.
 
+### A FLAC file's playing time is settled by the end of its audio
+
+STREAMINFO declares a FLAC stream's total samples, and the last frame's header shows where the
+stream really ends: its frame number times the block size plus its own block size, or, in a stream
+of variable block size, its sample number plus its block size. RFC 9639 leaves a decoder to cope
+when the two disagree. Goro takes STREAMINFO's total when the last frame's end matches it. When the
+frames end short of it, Goro takes the last intact frame's end where the tail proves which kind of
+end it is: a frame whose header is intact and whose body runs past the end of the audio is a
+truncation, and a final block shorter than the stream's block size, which only the last block may
+be, is a natural end, whatever STREAMINFO says, a total of 0 included. Otherwise, with bytes that
+hold no frame after the last that can be read, the playing time is unusable. The cost is a file
+whose last frame header was damaged, which would have had STREAMINFO's total, and has none. All of
+it lives in one type, as an MP3's duration does.

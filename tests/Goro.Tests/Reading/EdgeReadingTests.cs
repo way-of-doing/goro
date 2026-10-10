@@ -1,5 +1,6 @@
 using Goro.Reading;
 using Goro.Reading.Bytes;
+using Goro.Reading.Flac;
 using Goro.Reading.Mp3;
 using Goro.Reading.Tags;
 using Goro.Tests.TestSupport;
@@ -44,6 +45,46 @@ public class EdgeReadingTests
         Assert.That(reader.Log.BytesFromSource, Is.InRange(windows, windows + 7 * (16 * 1024 + 64)));
         Assert.That(reader.Log.Records.Where(r => r.Outcome == ReadOutcome.FromSource && r.Purpose != ReadPurpose.Sniff),
             Has.All.Property(nameof(ReadRecord.Purpose)).EqualTo(ReadPurpose.Search), "only the windows and the probes");
+    }
+
+    [Test]
+    public void ALongFlacFile_IsReadOnlyAtItsEdges_TagValuesIncluded()
+    {
+        // The metadata and stray tags of a corpus file, around 200 MB of its first frame repeated,
+        // then its last frame, a short final block, and its trailing tags.
+        var corpus = AudioCorpus.Bytes("flac/ape-suffix.flac");
+        const int firstFrame = 4496, secondFrame = 5467, lastFrame = 45_961;
+        var source = new TiledSource(corpus[..firstFrame], corpus[firstFrame..secondFrame], Audio, corpus[lastFrame..]);
+        var reader = new BoundedReader(source, ReadPolicy.Default);
+
+        var layout = FlacAnalysis.Analyse(reader);
+        var values = new TagValues(reader);
+        foreach (var field in layout.Tags.SelectMany(tag => tag.Fields))
+        {
+            values.Bytes(field);
+            values.Text(field);
+        }
+
+        Assert.That(layout.Tags.Select(t => t.Kind.Format), Is.EquivalentTo(new[] { TagFormat.Vorbis, TagFormat.Ape, TagFormat.Id3v1 }));
+        Assert.That(layout.Duration, Is.InstanceOf<DurationOutcome.Known>()
+            .With.Property(nameof(DurationOutcome.Known.Basis)).EqualTo(DurationBasis.StreamInfoConfirmed));
+
+        // The metadata lies in the head window and the last frame in the tail window: nothing else is read.
+        Assert.That(reader.Log.BytesFromSource, Is.EqualTo(ReadPolicy.Default.HeadWindow + ReadPolicy.Default.TailWindow));
+    }
+
+    [Test]
+    public void AFlacMarkerFarBehindItsTag_IsSearchedForInSteps_NoFurtherThanTheSearchBudget()
+    {
+        var tag = SyntheticMp3Builder.BuildId3V2(100);
+        var source = new TiledSource([.. tag, .. new byte[300 * 1024]], AudioCorpus.Bytes("seeds/flac.flac"), Audio, []);
+        var reader = new BoundedReader(source, ReadPolicy.Default);
+
+        var layout = FlacAnalysis.Analyse(reader);
+
+        Assert.That(layout.Audio, Is.EqualTo(new AudioLocation.NotFound(AudioNotFoundReason.SearchGaveUp)));
+        var searched = reader.Log.Records.Where(r => r.Purpose == ReadPurpose.Search && r.Outcome == ReadOutcome.FromSource).Sum(r => r.Length);
+        Assert.That(searched, Is.LessThanOrEqualTo(ReadPolicy.Default.SearchBudget));
     }
 
     [Test]

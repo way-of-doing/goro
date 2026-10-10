@@ -38,6 +38,9 @@ public enum FieldForm
 
     /// <summary>A single-byte Id3v1 field: the track and the genre.</summary>
     Id3v1Byte,
+
+    /// <summary>The value of a Vorbis comment, after its name and <c>=</c>: UTF-8, one value however it reads.</summary>
+    VorbisComment,
 }
 
 /// <summary>Where a field's stored bytes are.</summary>
@@ -80,10 +83,16 @@ public readonly record struct FieldTransform(int PrefixLength, bool Unsynchronis
 /// </summary>
 /// <param name="Key">
 /// The name Goro reads the field under: an Id3v2 frame's v2.4 identifier where it has one (see
-/// <see cref="Id3v2FrameNames"/>), an APE key as recorded, an Id3v1 field's name.
+/// <see cref="Id3v2FrameNames"/>), an APE key or a Vorbis comment's name as recorded, an Id3v1
+/// field's name.
 /// </param>
 /// <param name="RunsPastTag">
 /// The field's recorded size runs past the end of its tag. It is clearly recorded and cannot be
 /// read, so it is an unusable occurrence, and the tag's structure breaks there.
 /// </param>
-public sealed record FieldEntry(string Key, FieldForm Form, StoredBytes Stored, FieldTransform Transform = default, bool RunsPastTag = false);
+/// <param name="NameUnreadable">
+/// The field's name could not be read, as a Vorbis comment's name that is not UTF-8. It might be any
+/// name, so it is an unusable occurrence for every name asked about, as an Id3v2 frame whose
+/// description cannot be read is for every description; <paramref name="Key"/> is then empty.
+/// </param>
+public sealed record FieldEntry(string Key, FieldForm Form, StoredBytes Stored, FieldTransform Transform = default, bool RunsPastTag = false, bool NameUnreadable = false);

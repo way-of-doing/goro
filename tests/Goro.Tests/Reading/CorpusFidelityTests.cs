@@ -66,6 +66,60 @@ public class CorpusFidelityTests
         });
     }
 
+    private static IEnumerable<TestCaseData> FlacCommentEntries() =>
+        AudioCorpus.Manifest
+            .Where(entry => entry.File.StartsWith("flac/", StringComparison.Ordinal) && entry.Recorded is { } recorded && recorded.Any(r => r.Tag == "vorbis"))
+            .Select(entry => new TestCaseData(entry.File).SetName($"fidelity: {entry.File}, vorbis"));
+
+    /// <summary>
+    /// Every comment the manifest records for a FLAC file is found, in the comment blocks in file
+    /// order, under its name as recorded, with its value as recorded; a comment without <c>=</c> is
+    /// found under no name at all.
+    /// </summary>
+    [TestCaseSource(nameof(FlacCommentEntries))]
+    public void EveryRecordedComment_IsReadAsRecorded(string file)
+    {
+        var entry = AudioCorpus.Manifest.Single(e => e.File == file);
+        var (metadata, reader) = AudioCorpus.FlacMetadataOf(file);
+        var values = new TagValues(reader);
+        var fields = metadata.Blocks
+            .Where(block => block.Type == Goro.Reading.Flac.FlacBlockType.VorbisComment)
+            .SelectMany(block => VorbisCommentIndex.Index(block.Comments!, block.Payload).Tag.Fields)
+            .ToList();
+        var claimed = new HashSet<FieldEntry>(ReferenceEqualityComparer.Instance);
+
+        Assert.Multiple(() =>
+        {
+            foreach (var recorded in entry.Recorded!.Where(r => r.Tag == "vorbis"))
+            {
+                var field = fields.FirstOrDefault(f => f.Key == recorded.Key && !claimed.Contains(f));
+                if (recorded.Note?.Contains("no '='", StringComparison.Ordinal) == true)
+                {
+                    Assert.That(fields.Any(f => f.Key.Contains(recorded.Key, StringComparison.Ordinal)), Is.False, $"{recorded.Key}: names nothing");
+                    continue;
+                }
+
+                Assert.That(field, Is.Not.Null, recorded.Key);
+                if (field is null)
+                {
+                    continue;
+                }
+
+                claimed.Add(field);
+                Assert.That(HexOf(values.Bytes(field)), Is.EqualTo(recorded.BytesHex), $"{recorded.Key}: bytes()");
+                if (recorded.Values is null)
+                {
+                    Assert.That(values.Text(field), Is.InstanceOf<FieldText.Unreadable>(), $"{recorded.Key}: {recorded.Note}");
+                }
+                else
+                {
+                    IReadOnlyList<string>? text = values.Text(field) is FieldText.Readable(var readable, _) ? readable : null;
+                    Assert.That(text, Is.EqualTo(recorded.Values), $"{recorded.Key}: field()");
+                }
+            }
+        });
+    }
+
     [Test]
     public void OfSeveralId3v2Tags_OnlyTheFirstIsTheSource()
     {

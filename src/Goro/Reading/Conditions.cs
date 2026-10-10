@@ -32,6 +32,9 @@ public enum TagUnusableReason
 
     /// <summary>An Id3v2.2 tag flagged as compressed, which that revision never defined.</summary>
     UndefinedCompression,
+
+    /// <summary>A Vorbis comment list whose vendor string runs past the end of its block.</summary>
+    VendorRunsPastTag,
 }
 
 /// <summary>A tag of which nothing could be read: its source is absent everywhere.</summary>
@@ -62,6 +65,9 @@ public enum StructureBreak
 
     /// <summary>The structure went on past what the budget for reading it allows.</summary>
     ReadLimitReached,
+
+    /// <summary>Bytes in a FLAC comment block after its last comment: the list was damaged (docs/features/builtins/identifiers.md).</summary>
+    BytesAfterLastComment,
 }
 
 /// <summary>A tag whose structure broke off at <paramref name="At"/>: nothing after it was found.</summary>
@@ -108,3 +114,48 @@ public sealed record DurationUnusable(DurationProblem Problem) : Condition
 {
     public override bool MakesIncomplete => true;
 }
+
+/// <summary>A Vorbis comment with no <c>=</c>, which names nothing and is absent for every name asked about.</summary>
+public sealed record CommentWithoutName(long At) : Condition;
+
+public enum FlacQuirk
+{
+    /// <summary>
+    /// A metadata block whose recorded length is wrong, read to the end its own contents give, the
+    /// rest of the chain reading cleanly from there (docs/design/quirks.md).
+    /// </summary>
+    BlockLengthRecovered,
+
+    /// <summary>No metadata block flagged last: the chain read on to the first frame (docs/design/quirks.md).</summary>
+    NoLastBlockFlag,
+}
+
+/// <summary>A FLAC file's metadata read as its writer meant rather than as RFC 9639 says; nothing is lost.</summary>
+public sealed record FlacQuirkApplied(FlacQuirk Quirk, long At) : Condition;
+
+public enum MetadataChainBreak
+{
+    /// <summary>Where a block header should be, something that is not one.</summary>
+    InvalidBlockHeader,
+
+    /// <summary>A block whose recorded length runs past the end of the file.</summary>
+    BlockRunsPastFile,
+
+    /// <summary>A second STREAMINFO block, which only a chain read from the wrong place meets.</summary>
+    SecondStreamInfo,
+
+    /// <summary>The chain ended, flagged last, where no audio frame starts.</summary>
+    NoFrameAfterLastBlock,
+}
+
+/// <summary>
+/// A FLAC file's metadata block chain lost at <paramref name="At"/>: the blocks before it are read,
+/// and nothing after it is found.
+/// </summary>
+public sealed record MetadataChainLost(long At, MetadataChainBreak Reason) : Condition
+{
+    public override bool MakesIncomplete => true;
+}
+
+/// <summary>A STREAMINFO block shorter than its 34 bytes, read for the fields it holds.</summary>
+public sealed record StreamInfoShort(int Length) : Condition;

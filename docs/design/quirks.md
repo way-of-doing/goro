@@ -108,3 +108,35 @@ recognised as a repeat (see the identifier documentation's genre rules).
 **What it costs:** a predicate written with an original spelling, `genre == "alternrock"`, no
 longer matches a file that records the genre as number 40, though it still matches one that
 records the text.
+
+## A FLAC metadata block whose recorded length is wrong
+
+**The specification:** RFC 9639 gives each metadata block a 24-bit length, and the next block, or
+the first audio frame after the last block, starts where that length says.
+
+**What Goro does:** for a block whose contents state their own extent -- STREAMINFO is always 34
+bytes, a VORBIS_COMMENT gives a length for its vendor string and for every comment, a PICTURE for
+each of its parts -- it compares the two ends, the recorded one and the one the contents give. When
+they differ, the right one is the end from which the rest of the chain reads cleanly: every later
+block well formed, and the block flagged last ending exactly where an audio frame starts whose
+header passes its CRC and is numbered 0. Where that is the contents' end, the file is read as
+though the length had been right, and nothing is reported but by `goro audit` and `goro explore`.
+Real files need it: an encoder bug left mutagen's test data a comment block declaring 48 bytes and
+holding 147, and a picture block declaring none around a whole PNG. In every file measured where
+the two ends differ, exactly one of them reads on cleanly.
+
+**What it costs:** nothing that has been seen. A block that does not state its own extent --
+PADDING, APPLICATION, SEEKTABLE -- has only its recorded length, and when that is wrong the chain is
+lost from there.
+
+## A FLAC metadata chain with no block flagged last
+
+**The specification:** the last metadata block sets a flag in its header, and the audio frames
+start where that block ends.
+
+**What Goro does:** reads on when no block carries the flag, as long as each block is well formed,
+and takes the audio to start where the walk meets a frame. That place is found exactly: a frame
+starts with its sync code, which read as a block header is a block of type 127, a type RFC 9639
+forbids for that reason. Every block is read, and only `goro audit` and `goro explore` report it.
+
+**What it costs:** nothing that has been seen.

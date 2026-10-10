@@ -1,3 +1,5 @@
+using Goro.Reading;
+
 namespace Goro.Discovery;
 
 /// <summary>
@@ -7,10 +9,6 @@ namespace Goro.Discovery;
 /// </summary>
 public static class CandidateFiles
 {
-    // A format joins this set only once its audio hash survives tag edits; FLAC and Ogg each have
-    // a line of development in docs/directions/ that ends by adding them here.
-    private static readonly HashSet<string> CandidateExtensions = new(StringComparer.OrdinalIgnoreCase) { "mp3" };
-
     /// <summary>
     /// The extension of a file name as <c>file::extension</c> defines it: the part after the last
     /// dot, or null when there is no dot, when the only dot is the first character, or when
@@ -23,6 +21,13 @@ public static class CandidateFiles
         return lastDot > 0 && lastDot < fileName.Length - 1 ? fileName[(lastDot + 1)..] : null;
     }
 
-    public static bool IsCandidate(string filePath) =>
-        Extension(Path.GetFileName(filePath)) is { } extension && CandidateExtensions.Contains(extension);
+    /// <summary>
+    /// The format a file is taken to hold, by its extension; null for a file Goro does not consider.
+    /// A format is admitted here, through <see cref="AudioFormats"/>, only once its audio hash
+    /// survives tag edits: Ogg has a line of development in docs/directions/ that ends by adding it.
+    /// </summary>
+    public static AudioFormat? FormatOf(string filePath) =>
+        Extension(Path.GetFileName(filePath)) is { } extension ? AudioFormats.FromExtension(extension) : null;
+
+    public static bool IsCandidate(string filePath) => FormatOf(filePath) is not null;
 }

@@ -17,11 +17,22 @@ public class CandidateFilesTests
 
     [TestCase("/music/a.mp3", true)]
     [TestCase("/music/a.MP3", true)]
-    [TestCase("/music/a.flac", false)]
+    [TestCase("/music/a.flac", true)]
+    [TestCase("/music/A.FLAC", true)]
+    [TestCase("/music/a.ogg", false)]
+    [TestCase("/music/cover.jpg", false)]
     [TestCase("/music/.mp3", false)]
     [TestCase("/music.mp3/cover", false)]
     public void IsCandidate_JudgesTheFileNameByItsExtension(string path, bool expected)
     {
         Assert.That(CandidateFiles.IsCandidate(path), Is.EqualTo(expected));
+    }
+
+    [TestCase("/music/a.mp3", Goro.Reading.AudioFormat.Mp3)]
+    [TestCase("/music/a.Flac", Goro.Reading.AudioFormat.Flac)]
+    [TestCase("/music/a.opus", null)]
+    public void FormatOf_IsTheFormatTheExtensionNames(string path, Goro.Reading.AudioFormat? expected)
+    {
+        Assert.That(CandidateFiles.FormatOf(path), Is.EqualTo(expected));
     }
 }

@@ -53,5 +53,5 @@ internal sealed class TagsFacet : FileFacet<FileTags>
     /// <summary>The file's layout, or the file is unreadable because no audio can be found in it.</summary>
     /// <exception cref="UnreadableFileException">No audio was found.</exception>
     public static FileLayout ReadableLayout(FileData file) =>
-        file.Loader.Layout is { Audio: AudioLocation.NotFound } ? throw new UnreadableFileException(file.Path, "no MPEG audio found") : file.Loader.Layout;
+        file.Loader.Layout is { Audio: AudioLocation.NotFound } layout ? throw new UnreadableFileException(file.Path, AudioFormats.NoAudioFound(layout.Format)) : file.Loader.Layout;
 }

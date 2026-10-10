@@ -1,5 +1,6 @@
 using Goro.Reading;
 using Goro.Reading.Bytes;
+using Goro.Reading.Flac;
 using Goro.Reading.Mp3;
 using Goro.Reading.Tags;
 using Goro.Tests.TestSupport;
@@ -69,6 +70,89 @@ public class ReaderFuzzTests
             values.Bytes(field);
             values.Text(field);
             values.Description(field);
+        }
+    }
+
+    private static IEnumerable<TestCaseData> FlacFiles() =>
+        AudioCorpus.FlacFiles.Select((file, index) => new TestCaseData(file, index).SetName($"fuzz: {file}"));
+
+    /// <summary>
+    /// The FLAC analysis and its pieces never throw: the analysis and every value it indexes, the walk
+    /// that finds the hash range, the metadata chain and comment index on their own, and the first and
+    /// last frames walked by header and body. Half the damage lands in the metadata, where
+    /// nearly all the structure is.
+    /// </summary>
+    [TestCaseSource(nameof(FlacFiles))]
+    public void FlacDamagedAtRandom_TheReaderNeverThrows(string file, int seed)
+    {
+        var original = AudioCorpus.Bytes(file);
+        var random = new Random(seed);
+        for (var run = 0; run < RunsPerFile * 2; run++)
+        {
+            var damaged = run % 2 == 0 ? Damage(original, random) : Damage(original[..Math.Min(original.Length, 6000)], random).Concat(original.Skip(6000)).ToArray();
+            var policy = run % 4 < 2 ? ReadPolicy.Default : Tiny;
+            Assert.DoesNotThrow(() => ReadFlacPieces(damaged, policy), $"run {run}");
+        }
+    }
+
+    /// <summary>However a FLAC file is damaged, its analysis takes no more from it than the policy's ceiling.</summary>
+    [TestCaseSource(nameof(FlacFiles))]
+    public void FlacDamagedAtRandom_TheAnalysisStaysWithinItsBudgets(string file, int seed)
+    {
+        var original = AudioCorpus.Bytes(file);
+        var random = new Random(seed);
+        for (var run = 0; run < RunsPerFile; run++)
+        {
+            var damaged = Damage(original, random);
+            var policy = run % 2 == 0 ? ReadPolicy.Default : Tiny;
+            var reader = new BoundedReader(new MemoryByteSource(damaged), policy);
+            FlacAnalysis.Analyse(reader);
+            Assert.That(reader.Log.BytesFromSource, Is.LessThanOrEqualTo(policy.AnalysisCeiling), $"run {run}");
+        }
+    }
+
+    private static void ReadFlacPieces(byte[] bytes, ReadPolicy policy)
+    {
+        var source = new MemoryByteSource(bytes);
+        var analysis = new BoundedReader(source, policy);
+        var layout = FlacAnalysis.Analyse(analysis);
+        if (layout.Audio is AudioLocation.Found)
+        {
+            var range = FlacAudioRange.Find(source, layout).Range;
+            Assert.That(range.Start, Is.GreaterThanOrEqualTo(0).And.LessThanOrEqualTo(range.End));
+            Assert.That(range.End, Is.LessThanOrEqualTo(bytes.Length));
+        }
+
+        var analysed = new TagValues(analysis);
+        foreach (var field in layout.Tags.SelectMany(tag => tag.Fields))
+        {
+            analysed.Bytes(field);
+            analysed.Text(field);
+            analysed.Description(field);
+        }
+
+        var reader = new BoundedReader(new MemoryByteSource(bytes), policy);
+        var marker = bytes.AsSpan().IndexOf("fLaC"u8);
+        var metadata = FlacMetadata.Read(reader, marker < 0 ? 0 : marker + 4);
+        var values = new TagValues(reader);
+        foreach (var block in metadata.Blocks.Where(b => b.Comments is not null))
+        {
+            foreach (var field in VorbisCommentIndex.Index(block.Comments!, block.Payload).Tag.Fields)
+            {
+                values.Bytes(field);
+                values.Text(field);
+            }
+        }
+
+        foreach (var at in (long[])[metadata.End ?? 0, Math.Max(0, bytes.Length - 2000)])
+        {
+            for (var i = at; i < Math.Min(bytes.Length, at + 2000); i++)
+            {
+                if (FlacFrameHeader.TryParse(bytes.AsSpan((int)i), out var header))
+                {
+                    FlacFrameBody.FindEnd(bytes.AsSpan((int)i), header, metadata.StreamInfo?.BitDepth ?? 0);
+                }
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 using Goro.Predicates.Identifiers;
 using Goro.Predicates.Values;
+using Goro.Reading.Bytes;
 using Goro.Tests.TestSupport;
 using static Goro.Tests.TestSupport.Id3v2Bytes;
 using static Goro.Tests.TestSupport.TagBytes;
@@ -247,5 +248,36 @@ public class TagConceptTests
     public void VorbisConcepts_AreAbsentFromAnMp3()
     {
         Assert.That(Resolve<string>("vorbis::artist", Id3v2(4, ("TPE1", Latin1Text("x")))).IsAbsent, Is.True);
+    }
+
+    private static Value<T> InFile<T>(string identifier, string file) where T : notnull
+    {
+        using var loader = new FileDataLoader(AudioCorpus.PathOf(file), ReadPolicy.Default);
+        return Resolve<T>(identifier, loader);
+    }
+
+    [Test]
+    public void VorbisConcepts_ReadTheirComments_Interpreted()
+    {
+        Assert.That(Data(InFile<string>("vorbis::artist", "flac/comments.flac")), Is.EquivalentTo(new[] { "AC/DC", "Motörhead" }));
+        Assert.That(Data(InFile<string>("vorbis::title", "flac/comments.flac")), Is.EqualTo(new[] { "Title ✓" }));
+        Assert.That(Data(InFile<string>("vorbis::genre", "flac/comments.flac")), Is.EqualTo(new[] { "Rock" }));
+        Assert.That(Data(InFile<decimal>("vorbis::year", "flac/comments.flac")), Is.EqualTo(new object[] { 1991m }), "from DATE, 1991-01-02");
+        Assert.That(Data(InFile<decimal>("vorbis::track", "flac/comments.flac")), Is.EqualTo(new object[] { 3m }));
+    }
+
+    [Test]
+    public void AConceptWithoutASource_PrefersTheComments_InAFlacFileWithTagsAroundIt()
+    {
+        Assert.That(Data(InFile<string>("title", "flac/id3v2-prefix.flac")), Is.EqualTo(new[] { "Title ✓" }));
+        Assert.That(InFile<string>("id3v2::title", "flac/id3v2-prefix.flac").IsAbsent, Is.False, "the stray tag is read as its own source");
+        Assert.That(InFile<string>("ape::artist", "flac/ape-suffix.flac").IsAbsent, Is.False);
+        Assert.That(InFile<string>("id3v1::artist", "flac/ape-suffix.flac").IsAbsent, Is.False);
+    }
+
+    [Test]
+    public void AVorbisValueThatDoesNotDecode_IsAnUnusableConcept()
+    {
+        Assert.That(Data(InFile<string>("vorbis::artist", "flac/dmg-comment-values.flac")), Is.EqualTo(new[] { "unusable" }));
     }
 }

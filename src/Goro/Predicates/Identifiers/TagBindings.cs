@@ -24,7 +24,7 @@ internal static class TagBindings
             SourceNames.Id3v2 => new Id3v2Cell<T>(field, interpretation.Id3v2 ?? interpretation.Text),
             SourceNames.Ape => new ApeCell<T>(field, interpretation.Text),
             SourceNames.Id3v1 => new Id3v1Cell<T>(field, interpretation),
-            SourceNames.Vorbis => new NoVorbisComments<T>(),
+            SourceNames.Vorbis => new VorbisCell<T>(field, interpretation.Text),
             _ => throw new ArgumentException($"The {source} source has no concepts."),
         };
 
@@ -33,7 +33,7 @@ internal static class TagBindings
     {
         SourceNames.Id3v2 => call => new Id3v2Field(call.Arguments[0], call.Arguments.Length > 1 ? call.Arguments[1] : null),
         SourceNames.Ape => call => new ApeField(call.Arguments[0]),
-        SourceNames.Vorbis => _ => new NoVorbisComments<string>(),
+        SourceNames.Vorbis => call => new VorbisField(call.Arguments[0]),
         _ => throw new ArgumentException($"The {source} source has no field()."),
     };
 
@@ -42,7 +42,7 @@ internal static class TagBindings
     {
         SourceNames.Id3v2 => call => new Id3v2Bytes(call.Arguments[0]),
         SourceNames.Ape => call => new ApeBytes(call.Arguments[0]),
-        SourceNames.Vorbis => _ => new NoVorbisComments<Blob>(),
+        SourceNames.Vorbis => call => new VorbisBytes(call.Arguments[0]),
         _ => throw new ArgumentException($"The {source} source has no bytes()."),
     };
 
@@ -133,15 +133,36 @@ internal static class TagBindings
     }
 
     /// <summary>
-    /// The Vorbis comments of an MP3, which has none. The file's tags are still read, so that a file
-    /// in which no audio can be found is unreadable here as everywhere else.
+    /// The comments of the <c>vorbis</c> source named <paramref name="name"/>, matched without regard
+    /// to case, and every comment whose name could not be read, which might be any name.
     /// </summary>
-    private sealed class NoVorbisComments<T> : IdentifierBinding<T> where T : notnull
+    private static IEnumerable<FieldEntry> VorbisComments(FileTags tags, string name) =>
+        tags.Source(TagFormat.Vorbis)?.Fields.Where(f => f.NameUnreadable || string.Equals(f.Key, name, StringComparison.OrdinalIgnoreCase)) ?? [];
+
+    /// <summary>
+    /// The text of every comment named <paramref name="name"/>, one occurrence each: a comment is one
+    /// value however it reads. One whose name could not be read is unusable, whatever name was asked.
+    /// </summary>
+    private sealed class VorbisField(string name) : IdentifierBinding<string>
     {
-        public override Value<T> Resolve(FileData file, Origin origin)
+        public override Value<string> Resolve(FileData file, Origin origin)
         {
-            file.Get(TagsFacet.Instance);
-            return Value<T>.Absent;
+            var tags = file.Get(TagsFacet.Instance);
+            return Value<string>.Of(VorbisComments(tags, name).SelectMany(comment => comment.NameUnreadable
+                ? [new Unusable<string>(origin)]
+                : Text(tags, comment, origin).Occurrences));
+        }
+    }
+
+    /// <summary>The value of every comment named <paramref name="name"/>, as recorded, one occurrence each.</summary>
+    private sealed class VorbisBytes(string name) : IdentifierBinding<Blob>
+    {
+        public override Value<Blob> Resolve(FileData file, Origin origin)
+        {
+            var tags = file.Get(TagsFacet.Instance);
+            return Value<Blob>.Of(VorbisComments(tags, name).Select(comment => comment.NameUnreadable
+                ? new Unusable<Blob>(origin)
+                : Content(tags, comment, origin)));
         }
     }
 
@@ -176,6 +197,19 @@ internal static class TagBindings
         {
             var tags = file.Get(TagsFacet.Instance);
             return ApeItem(tags, key) is { } item ? Value<T>.Of(Interpret(tags, item, origin, interpret)) : Value<T>.Absent;
+        }
+    }
+
+    /// <summary>A Vorbis concept: the comments <c>vorbis::field()</c> would read under its name, interpreted.</summary>
+    private sealed class VorbisCell<T>(string name, Func<string, Origin, IEnumerable<Occurrence<T>>> interpret) : IdentifierBinding<T>
+        where T : notnull
+    {
+        public override Value<T> Resolve(FileData file, Origin origin)
+        {
+            var tags = file.Get(TagsFacet.Instance);
+            return Value<T>.Of(VorbisComments(tags, name).SelectMany(comment => comment.NameUnreadable
+                ? [new Unusable<T>(origin)]
+                : Interpret(tags, comment, origin, interpret)));
         }
     }
 
