@@ -245,3 +245,21 @@ the fixture corpus.
   Through the real pipeline, `artist == "AC/DC" AND file::duration == 3s` matches
   `flac/comments.flac`. Nothing a user runs changes yet: discovery admits `.flac` in step 4. Next
   step: review of step 3, then step 4, the hash and discovery.
+- 2026-10-10 -- Step 3 committed (`ee22ebe`). Step 4 written, awaiting review: the hash, and `.flac`
+  admitted.
+  - `Reading/Flac/FlacAudioRange`: the walk over the audio, each frame ended by the next header of
+    the stream with the next number, resynchronising on a later one over damage, the last frame
+    ended by its body. It records every fault: a CRC-16 failing, numbers skipped, the last frame cut
+    off or malformed, and a header whose CRC-8 fails, looked for only where the walk already knows
+    something is wrong, since such a run can occur by chance in healthy audio (implementation.md).
+  - `Hashing/AudioHasher`, renamed from `Mp3AudioHasher`, hashes either format by its extension;
+    the walk's faults are not reported by `goro hash`.
+  - Discovery admits what `AudioFormats` names, through `CandidateFiles.FormatOf`, which the loader
+    and the hasher use too: one list of formats, admitted and read alike.
+  - `Mp3AudioRange`'s sequential window moved to `Reading/Bytes` for both walks.
+
+  Over the corpus and the metaflac and ffmpeg edits, `goro hash` gives one hash for the 33 files
+  holding the seeds' frames, the MD5 an independent script computed over them, and a different
+  hash for each of the three with damaged audio; the 4-minute file hashes in under a second. Every
+  item of Done when is now met. Next step: review of step 4, then land the line on main with a merge
+  commit, as mp3-support did.

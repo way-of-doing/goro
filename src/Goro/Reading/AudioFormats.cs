@@ -19,6 +19,14 @@ public static class AudioFormats
             _ => null,
         };
 
+    /// <summary>Why a file of <paramref name="format"/> in which no audio can be found cannot be read, spelt whole for each format.</summary>
+    public static string NoAudioFound(AudioFormat format) => format switch
+    {
+        AudioFormat.Mp3 => "no MPEG audio found",
+        AudioFormat.Flac => "no FLAC audio found",
+        _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
+    };
+
     /// <summary>The analysis of a file's edges, by the format it is taken to hold.</summary>
     public static FileLayout Analyse(AudioFormat format, BoundedReader reader) => format switch
     {

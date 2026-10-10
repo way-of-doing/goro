@@ -35,9 +35,17 @@ public readonly record struct FlacFrameHeader(
     public ulong EndSample(int nominalBlockSize) => FirstSample(nominalBlockSize) + (ulong)BlockSize;
 
     /// <summary>Parses a header at the start of <paramref name="bytes"/>, which may hold more after it.</summary>
-    public static bool TryParse(ReadOnlySpan<byte> bytes, out FlacFrameHeader header)
+    public static bool TryParse(ReadOnlySpan<byte> bytes, out FlacFrameHeader header) =>
+        TryParseIgnoringCrc(bytes, out header, out var crcPasses) && crcPasses;
+
+    /// <summary>
+    /// Parses a header whether or not its CRC-8 passes, saying which: what a damaged header looks
+    /// like, every field well formed and the checksum not matching them.
+    /// </summary>
+    public static bool TryParseIgnoringCrc(ReadOnlySpan<byte> bytes, out FlacFrameHeader header, out bool crcPasses)
     {
         header = default;
+        crcPasses = false;
         if (bytes.Length < 6 || bytes[0] != 0xFF || (bytes[1] & 0xFE) != 0xF8)
         {
             return false;
@@ -111,10 +119,12 @@ public readonly record struct FlacFrameHeader(
             at += 2;
         }
 
-        if (at + 1 > bytes.Length || Checksums.Crc8(bytes[..at]) != bytes[at])
+        if (at + 1 > bytes.Length)
         {
             return false;
         }
+
+        crcPasses = Checksums.Crc8(bytes[..at]) == bytes[at];
 
         var (channels, assignment) = channelCode switch
         {

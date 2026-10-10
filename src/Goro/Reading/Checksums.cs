@@ -36,9 +36,11 @@ public static class Checksums
     }
 
     /// <summary>CRC-16 with polynomial 0x8005, not reflected, and initial value 0: a FLAC frame's checksum.</summary>
-    public static ushort Crc16(ReadOnlySpan<byte> data)
+    public static ushort Crc16(ReadOnlySpan<byte> data) => Crc16(data, 0);
+
+    /// <summary>The CRC-16 of <paramref name="data"/> following data whose CRC-16 was <paramref name="crc"/>: a checksum taken in pieces.</summary>
+    public static ushort Crc16(ReadOnlySpan<byte> data, ushort crc)
     {
-        ushort crc = 0;
         foreach (var b in data)
         {
             crc = (ushort)((crc << 8) ^ Crc16Table[(crc >> 8) ^ b]);

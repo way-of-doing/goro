@@ -141,7 +141,11 @@ scanning for a matching checksum would cut the last frame short about once in fi
 
 The walk checks every frame's checksums as it goes, at almost no cost once each frame's end is
 known, and records each frame that fails: where it is, its number, and whether its header's CRC-8
-or the frame's CRC-16 failed. Every command that walks the audio, `goro hash` among them, gets
+or the frame's CRC-16 failed. A header whose CRC-8 fails is not taken for a header, so it shows only
+where the walk already knows something is wrong: inside a frame that fails its CRC-16 or after
+which numbers are skipped, or after the last frame. There it is looked for as a header whose fields
+are well formed and whose CRC-8 does not match them; anywhere else such a run occurs by chance in
+healthy audio, and would be reported as damage that is not there. Every command that walks the audio, `goro hash` among them, gets
 the record; which of them report it is theirs to decide.
 
 ### The reader never throws over what a file holds

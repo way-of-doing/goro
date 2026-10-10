@@ -46,6 +46,21 @@ public class TagReadingTests
     }
 
     [Test]
+    public async Task FlacFiles_AreFound_AndReadThroughTheirComments()
+    {
+        var comments = Fixture("flac/comments.flac");
+        var prefixed = Fixture("flac/id3v2-prefix.flac");
+        Fixture("flac/truncated.flac");
+        Fixture("mp3/id3v24.mp3");
+
+        var (exitCode, stdOut, stdErr) = await RunAsync("list", "--strict-exit-code", """--filter=vorbis::artist == "AC/DC" AND file::duration == 3s""", _collection.Root);
+
+        Assert.That(exitCode, Is.EqualTo(0), stdErr);
+        Assert.That(Lines(stdOut), Is.EquivalentTo(new[] { comments, prefixed }));
+        Assert.That(stdErr, Is.Empty);
+    }
+
+    [Test]
     public async Task ADescribedFrame_IsSelectedByItsDescription()
     {
         var both = Fixture("mp3/id3v24.mp3");

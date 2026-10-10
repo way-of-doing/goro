@@ -77,9 +77,9 @@ public class ReaderFuzzTests
         AudioCorpus.FlacFiles.Select((file, index) => new TestCaseData(file, index).SetName($"fuzz: {file}"));
 
     /// <summary>
-    /// The FLAC analysis and its pieces never throw: the analysis and every value it indexes, the
-    /// metadata chain and comment index on their own, and the first and last frames walked by header
-    /// and body. Half the damage lands in the metadata, where
+    /// The FLAC analysis and its pieces never throw: the analysis and every value it indexes, the walk
+    /// that finds the hash range, the metadata chain and comment index on their own, and the first and
+    /// last frames walked by header and body. Half the damage lands in the metadata, where
     /// nearly all the structure is.
     /// </summary>
     [TestCaseSource(nameof(FlacFiles))]
@@ -113,8 +113,16 @@ public class ReaderFuzzTests
 
     private static void ReadFlacPieces(byte[] bytes, ReadPolicy policy)
     {
-        var analysis = new BoundedReader(new MemoryByteSource(bytes), policy);
+        var source = new MemoryByteSource(bytes);
+        var analysis = new BoundedReader(source, policy);
         var layout = FlacAnalysis.Analyse(analysis);
+        if (layout.Audio is AudioLocation.Found)
+        {
+            var range = FlacAudioRange.Find(source, layout).Range;
+            Assert.That(range.Start, Is.GreaterThanOrEqualTo(0).And.LessThanOrEqualTo(range.End));
+            Assert.That(range.End, Is.LessThanOrEqualTo(bytes.Length));
+        }
+
         var analysed = new TagValues(analysis);
         foreach (var field in layout.Tags.SelectMany(tag => tag.Fields))
         {

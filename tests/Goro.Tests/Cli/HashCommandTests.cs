@@ -32,6 +32,25 @@ public class HashCommandTests
     }
 
     [Test]
+    public async Task Hash_OfADirectory_HashesItsMp3AndFlacFiles_AndTheSameFramesAlike()
+    {
+        var flac = Path.Combine(_tempDir.FullName, "a.flac");
+        var retagged = Path.Combine(_tempDir.FullName, "b.FLAC");
+        File.Copy(AudioCorpus.PathOf("flac/comments.flac"), flac);
+        File.Copy(AudioCorpus.PathOf("flac/ape-suffix.flac"), retagged);
+        File.WriteAllText(Path.Combine(_tempDir.FullName, "notes.txt"), "not audio");
+
+        var (exitCode, stdOut, stdErr) = await GoroAppFactory.Create().RunCapturedAsync("hash", _tempDir.FullName);
+
+        Assert.That(exitCode, Is.EqualTo(0), stdErr);
+        var hashes = stdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(line => line.Split(' '))
+            .ToDictionary(parts => Path.GetFileName(parts[0]), parts => parts[^1]);
+        Assert.That(hashes.Keys, Is.EquivalentTo(new[] { "track.mp3", "a.flac", "b.FLAC" }));
+        Assert.That(hashes["a.flac"], Is.EqualTo(hashes["b.FLAC"]), "the same frames under different tags");
+    }
+
+    [Test]
     public async Task Hash_AlgorithmAndOutputOptionsAreCaseInsensitive_AndProduceSha1Json()
     {
         var app = GoroAppFactory.Create();

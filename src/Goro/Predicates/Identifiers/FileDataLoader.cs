@@ -28,10 +28,7 @@ public sealed class FileDataLoader(string path, ReadPolicy policy) : IFileDataLo
 
     public void Dispose() => source?.Dispose();
 
-    private AudioFormat Format() =>
-        CandidateFiles.Extension(Path.GetFileName(path)) is { } extension && AudioFormats.FromExtension(extension) is { } format
-            ? format
-            : throw new InvalidDataException("not a format Goro reads");
+    private AudioFormat Format() => CandidateFiles.FormatOf(path) ?? throw new InvalidDataException("not a format Goro reads");
 
     private BoundedReader Reader()
     {
