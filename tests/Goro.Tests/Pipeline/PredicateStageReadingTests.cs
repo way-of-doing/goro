@@ -33,6 +33,18 @@ public class PredicateStageReadingTests
         Assert.That(outcome.Reading, Is.EqualTo(FileReading.Read));
     }
 
+    [TestCase("""artist == "AC/DC" AND file::duration == 3s""", "flac/comments.flac", FileDisposition.Matched, FileReading.Read)]
+    [TestCase("""vorbis::field("TITLE") == "Title ✓" """, "flac/id3v2-prefix.flac", FileDisposition.Matched, FileReading.Read)]
+    [TestCase("""artist == "AC/DC" """, "flac/dmg-comment-length-overrun.flac", FileDisposition.Matched, FileReading.ReadInPart)]
+    [TestCase("""title == "x" """, "flac/dmg-no-last-block-flag.flac", FileDisposition.Unmatched, FileReading.Read)]
+    public async Task APredicate_OnAFlacFile_ReadsItsCommentsAndPlayingTime(string predicate, string file, FileDisposition disposition, FileReading reading)
+    {
+        var outcome = await Run(predicate, file);
+
+        Assert.That(outcome.Disposition, Is.EqualTo(disposition));
+        Assert.That(outcome.Reading, Is.EqualTo(reading));
+    }
+
     [TestCase("mp3/dmg-id3v24-frame-overrun.mp3")]
     [TestCase("mp3/dmg-id3v2-version-5.mp3")]
     [TestCase("mp3/dmg-ape-item-count-high.mp3")]

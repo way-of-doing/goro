@@ -191,6 +191,31 @@ public class FileSourceTests
         Assert.That(SingleDatum(Resolve<Duration>("duration", path)), Is.EqualTo(new Duration(4)));
     }
 
+    [TestCase("flac/comments.flac", 3)]
+    [TestCase("flac/streaminfo-total-doubled.flac", 3)]
+    [TestCase("flac/truncated.flac", 1)]
+    public void Duration_OfAFlacFile_IsItsTimeline_InWholeSeconds(string file, long seconds)
+    {
+        Assert.That(SingleDatum(Resolve<Duration>("duration", AudioCorpus.PathOf(file))), Is.EqualTo(new Duration(seconds)));
+    }
+
+    [Test]
+    public void Duration_OfAFlacFileWhoseLastFramesCannotBeAccountedFor_IsUnusable()
+    {
+        var duration = Resolve<Duration>("duration", AudioCorpus.PathOf("flac/last-frame-damaged.flac"));
+        Assert.That(duration.Occurrences.Single(), Is.InstanceOf<Unusable<Duration>>());
+    }
+
+    [Test]
+    public void Duration_OfAFileNamedFlacThatIsNotAudio_MakesTheFileUnreadable()
+    {
+        var path = WriteFile("this is a shopping list, not a song"u8.ToArray(), "list.flac");
+
+        var exception = Assert.Throws<UnreadableFileException>(() => Resolve<Duration>("duration", path));
+
+        Assert.That(exception.Reason, Is.EqualTo("no FLAC audio found"));
+    }
+
     [Test]
     public void Duration_OfAFileThatIsNotAudio_MakesTheFileUnreadable()
     {

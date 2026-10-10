@@ -64,6 +64,31 @@ internal static class SyntheticFlacBuilder
         return [.. bytes];
     }
 
+    /// <summary>
+    /// A stream of two frames whose metadata is a STREAMINFO and a VORBIS_COMMENT block holding
+    /// <paramref name="comments"/>, each written as given, so that a comment can hold any bytes.
+    /// </summary>
+    public static byte[] WithComments(int blockSize, byte[][] comments)
+    {
+        var list = new List<byte>();
+        list.AddRange(BitConverter.GetBytes(4u));
+        list.AddRange("test"u8.ToArray());
+        list.AddRange(BitConverter.GetBytes((uint)comments.Length));
+        foreach (var comment in comments)
+        {
+            list.AddRange(BitConverter.GetBytes((uint)comment.Length));
+            list.AddRange(comment);
+        }
+
+        var bytes = new List<byte>("fLaC"u8.ToArray()) { 0x00, 0x00, 0x00, 0x22 };
+        bytes.AddRange(StreamInfo(blockSize, blockSize, 44100, 2UL * (ulong)blockSize));
+        bytes.AddRange([0x84, (byte)(list.Count >> 16), (byte)(list.Count >> 8), (byte)list.Count]);
+        bytes.AddRange(list);
+        bytes.AddRange(Frame(0, blockSize, 0, 4, false, Constant()));
+        bytes.AddRange(Frame(1, blockSize, 0, 4, false, Constant()));
+        return [.. bytes];
+    }
+
     /// <summary>A STREAMINFO payload: mono, 16 bits, frame sizes unknown, no MD5.</summary>
     public static byte[] StreamInfo(int minBlock, int maxBlock, int rate, ulong totalSamples)
     {

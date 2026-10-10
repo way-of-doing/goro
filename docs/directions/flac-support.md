@@ -228,3 +228,20 @@ the fixture corpus.
   comment block's wrong length, which Goro reads through. A snippet cut inside its first frame,
   `flac_application.flac`, has a playing time of 0 s: audio found, none of it whole. Next step:
   review of 2b, then step 3, the sources and the loader.
+- 2026-10-10 -- Step 2b committed (`e0dd44f`). Step 3 written, awaiting review: the sources and the
+  loader.
+  - `Reading/AudioFormats`: the format an extension names, and the analysis for each format, in
+    one place, for discovery to use in step 4.
+  - `FileDataLoader` analyses a file as its extension names, deciding when the file is first
+    analysed: the runtime makes a loader for every file, opened or not, so refusing an unknown
+    extension when the loader is made failed predicates that open nothing. An extension Goro does not
+    read is refused before the file is opened, which discovery never lets happen.
+  - A file with no audio is unreadable with a reason spelt whole for its format: "no MPEG audio
+    found", "no FLAC audio found".
+  - `TagBindings`: `vorbis::field()`, `vorbis::bytes()` and the Vorbis cells read the source's
+    comments by name without regard to case; a comment whose name does not decode is unusable for
+    every name. `NoVorbisComments` is gone: an MP3 has no `vorbis` tag, so the bindings are absent.
+
+  Through the real pipeline, `artist == "AC/DC" AND file::duration == 3s` matches
+  `flac/comments.flac`. Nothing a user runs changes yet: discovery admits `.flac` in step 4. Next
+  step: review of step 3, then step 4, the hash and discovery.

@@ -15,13 +15,15 @@ public class TagSourceFunctionTests
 {
     private static readonly Origin Origin = new(new SourceId(0), "call", 0);
 
-    private static Value<T> Call<T>(string file, string source, string function, params string[] arguments) where T : notnull
+    private static Value<T> Call<T>(string file, string source, string function, params string[] arguments) where T : notnull =>
+        CallAt<T>(AudioCorpus.PathOf(file), source, function, arguments);
+
+    private static Value<T> CallAt<T>(string path, string source, string function, params string[] arguments) where T : notnull
     {
         var found = (SourceFunctionLookup.Found)BuiltInCatalog.Instance.LookupFunction(source, function);
         var resolution = found.Function.Resolve([.. arguments]);
         Assert.That(resolution, Is.InstanceOf<SourceFunctionResolution.Found>(), $"{source}::{function}({string.Join(", ", arguments)})");
         var declaration = (IdentifierDeclaration<T>)((SourceFunctionResolution.Found)resolution).Declaration;
-        var path = AudioCorpus.PathOf(file);
         using var loader = new FileDataLoader(path, ReadPolicy.Default);
         return declaration.Binding.Resolve(new FileData(path, loader), Origin);
     }
@@ -156,6 +158,76 @@ public class TagSourceFunctionTests
         Assert.That(Bytes("mp3/id3v24.mp3", "vorbis", "TITLE").IsAbsent, Is.True);
     }
 
+    [Test]
+    public void VorbisField_GivesEveryCommentOfTheName_MatchedWhateverItsCase()
+    {
+        Assert.That(Texts(Field("flac/comments.flac", "vorbis", "ARTIST")), Is.EquivalentTo(new[] { "AC/DC", "Motörhead" }));
+        Assert.That(Texts(Field("flac/comments.flac", "vorbis", "artist")), Is.EquivalentTo(new[] { "AC/DC", "Motörhead" }));
+        Assert.That(Texts(Field("flac/comments.flac", "vorbis", "MOOD")), Is.EqualTo(new[] { "calm" }), "recorded as mood");
+    }
+
+    [Test]
+    public void VorbisField_TrimsNothing_AndAnEmptyValueIsAValue()
+    {
+        Assert.That(Texts(Field("flac/comments.flac", "vorbis", "COMMENT")), Is.EqualTo(new[] { "  padded  " }));
+        Assert.That(Texts(Field("flac/comments.flac", "vorbis", "EMPTY")), Is.EqualTo(new[] { "" }));
+        Assert.That(Field("flac/comments.flac", "vorbis", "NOTHING_LIKE_IT").IsAbsent, Is.True);
+    }
+
+    [Test]
+    public void VorbisBytes_GivesEachCommentsValueAsRecorded()
+    {
+        var bytes = Bytes("flac/comments.flac", "vorbis", "ARTIST").Occurrences
+            .Select(o => o is Usable<Blob>(var blob) ? System.Text.Encoding.UTF8.GetString(blob.Bytes.AsSpan()) : null);
+        Assert.That(bytes, Is.EquivalentTo(new[] { "AC/DC", "Motörhead" }));
+    }
+
+    [Test]
+    public void AVorbisValueThatDoesNotDecode_IsUnusableThroughField_AndIntactThroughBytes()
+    {
+        Assert.That(Field("flac/dmg-comment-values.flac", "vorbis", "ARTIST").Occurrences, Is.EqualTo(new[] { UnusableText }));
+        Assert.That(Bytes("flac/dmg-comment-values.flac", "vorbis", "ARTIST").Occurrences.Single(), Is.InstanceOf<Usable<Blob>>());
+        Assert.That(Texts(Field("flac/dmg-comment-values.flac", "vorbis", "BAD~KEY")), Is.EqualTo(new[] { "x" }));
+    }
+
+    [Test]
+    public void AVorbisCommentWithoutAnEqualsSign_IsAbsent()
+    {
+        Assert.That(Field("flac/dmg-comment-values.flac", "vorbis", "NOEQUALSSIGN").IsAbsent, Is.True);
+        Assert.That(Bytes("flac/dmg-comment-values.flac", "vorbis", "NOEQUALSSIGN").IsAbsent, Is.True);
+    }
+
+    [Test]
+    public void AVorbisCommentRunningPastItsBlock_IsUnusable_AndNothingAfterItIsFound()
+    {
+        var artists = Field("flac/dmg-comment-length-overrun.flac", "vorbis", "ARTIST").Occurrences;
+        Assert.That(artists, Is.EquivalentTo(new[] { new Usable<string>("AC/DC"), UnusableText }));
+        Assert.That(Bytes("flac/dmg-comment-length-overrun.flac", "vorbis", "ARTIST").Occurrences.OfType<Unusable<Blob>>().Count(), Is.EqualTo(1));
+        Assert.That(Field("flac/dmg-comment-length-overrun.flac", "vorbis", "ALBUM").IsAbsent, Is.True);
+    }
+
+    [Test]
+    public void OfTwoCommentBlocks_OnlyTheFirstIsRead()
+    {
+        Assert.That(Texts(Field("flac/two-comment-blocks.flac", "vorbis", "ARTIST")), Is.EquivalentTo(new[] { "AC/DC", "Motörhead" }));
+    }
+
+    [Test]
+    public void ACommentWhoseNameDoesNotDecode_IsUnusableWhateverNameIsAsked()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"goro-{Guid.NewGuid():N}.flac");
+        File.WriteAllBytes(path, SyntheticFlacBuilder.WithComments(4096, [[0xC3, 0x28, (byte)'=', (byte)'x'], "TITLE=Title"u8.ToArray()]));
+        try
+        {
+            Assert.That(CallAt<string>(path, "vorbis", "field", "ARTIST").Occurrences, Is.EqualTo(new[] { UnusableText }));
+            Assert.That(CallAt<string>(path, "vorbis", "field", "TITLE").Occurrences, Is.EquivalentTo(new[] { new Usable<string>("Title"), UnusableText }));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     // --- a file with no audio ---
 
     [TestCase("id3v2", "field", "TIT2")]
@@ -168,6 +240,22 @@ public class TagSourceFunctionTests
             : () => Bytes("mp3/dmg-id3v24-truncated-in-tag.mp3", source, name);
 
         Assert.That(call, Throws.TypeOf<UnreadableFileException>().With.Property(nameof(UnreadableFileException.Reason)).EqualTo("no MPEG audio found"));
+    }
+
+    [Test]
+    public void AFlacFileWithNoAudio_IsUnreadable()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"goro-{Guid.NewGuid():N}.flac");
+        File.WriteAllBytes(path, AudioCorpus.Bytes("flac/comments.flac")[..4000]);
+        try
+        {
+            Assert.That(() => CallAt<string>(path, "vorbis", "field", "TITLE"),
+                Throws.TypeOf<UnreadableFileException>().With.Property(nameof(UnreadableFileException.Reason)).EqualTo("no FLAC audio found"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Test]
