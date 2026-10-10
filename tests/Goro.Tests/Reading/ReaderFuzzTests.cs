@@ -77,12 +77,13 @@ public class ReaderFuzzTests
         AudioCorpus.FlacFiles.Select((file, index) => new TestCaseData(file, index).SetName($"fuzz: {file}"));
 
     /// <summary>
-    /// The FLAC parsing pieces never throw: the metadata chain, the comment index and values, and the
-    /// first and last frames walked by header and body. Half the damage lands in the metadata, where
+    /// The FLAC analysis and its pieces never throw: the analysis and every value it indexes, the
+    /// metadata chain and comment index on their own, and the first and last frames walked by header
+    /// and body. Half the damage lands in the metadata, where
     /// nearly all the structure is.
     /// </summary>
     [TestCaseSource(nameof(FlacFiles))]
-    public void FlacDamagedAtRandom_TheParsingPiecesNeverThrow(string file, int seed)
+    public void FlacDamagedAtRandom_TheReaderNeverThrows(string file, int seed)
     {
         var original = AudioCorpus.Bytes(file);
         var random = new Random(seed);
@@ -94,8 +95,34 @@ public class ReaderFuzzTests
         }
     }
 
+    /// <summary>However a FLAC file is damaged, its analysis takes no more from it than the policy's ceiling.</summary>
+    [TestCaseSource(nameof(FlacFiles))]
+    public void FlacDamagedAtRandom_TheAnalysisStaysWithinItsBudgets(string file, int seed)
+    {
+        var original = AudioCorpus.Bytes(file);
+        var random = new Random(seed);
+        for (var run = 0; run < RunsPerFile; run++)
+        {
+            var damaged = Damage(original, random);
+            var policy = run % 2 == 0 ? ReadPolicy.Default : Tiny;
+            var reader = new BoundedReader(new MemoryByteSource(damaged), policy);
+            FlacAnalysis.Analyse(reader);
+            Assert.That(reader.Log.BytesFromSource, Is.LessThanOrEqualTo(policy.AnalysisCeiling), $"run {run}");
+        }
+    }
+
     private static void ReadFlacPieces(byte[] bytes, ReadPolicy policy)
     {
+        var analysis = new BoundedReader(new MemoryByteSource(bytes), policy);
+        var layout = FlacAnalysis.Analyse(analysis);
+        var analysed = new TagValues(analysis);
+        foreach (var field in layout.Tags.SelectMany(tag => tag.Fields))
+        {
+            analysed.Bytes(field);
+            analysed.Text(field);
+            analysed.Description(field);
+        }
+
         var reader = new BoundedReader(new MemoryByteSource(bytes), policy);
         var marker = bytes.AsSpan().IndexOf("fLaC"u8);
         var metadata = FlacMetadata.Read(reader, marker < 0 ? 0 : marker + 4);

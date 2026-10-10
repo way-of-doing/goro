@@ -52,7 +52,15 @@ internal static class AudioCorpus
 
     public static IReadOnlyList<ManifestEntry> Manifest => LazyManifest.Value;
 
-    public static Analysed Analyse(string relative, ReadPolicy? policy = null) => Analyse(Bytes(relative), policy);
+    /// <summary>The analysis of a corpus file, by the format its extension names, as Goro judges a file.</summary>
+    public static Analysed Analyse(string relative, ReadPolicy? policy = null) =>
+        relative.EndsWith(".flac", StringComparison.OrdinalIgnoreCase) ? AnalyseFlac(Bytes(relative), policy) : Analyse(Bytes(relative), policy);
+
+    public static Analysed AnalyseFlac(byte[] bytes, ReadPolicy? policy = null)
+    {
+        var reader = new BoundedReader(new MemoryByteSource(bytes), policy ?? ReadPolicy.Default);
+        return new Analysed(FlacAnalysis.Analyse(reader), new TagValues(reader));
+    }
 
     public static Analysed Analyse(byte[] bytes, ReadPolicy? policy = null)
     {

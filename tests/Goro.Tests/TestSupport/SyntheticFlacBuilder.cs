@@ -17,9 +17,13 @@ internal static class SyntheticFlacBuilder
     /// </summary>
     /// <param name="channelCode">The channels bits: 0–7 for 1–8 independent channels, 8–10 for left/side, side/right, mid/side.</param>
     /// <param name="depthCode">The bit depth bits: 4 for 16 bits, 0 to defer to STREAMINFO.</param>
-    public static byte[] Frame(ulong number, int blockSize, int channelCode, int depthCode, bool variable, params Subframe[] subframes)
+    public static byte[] Frame(ulong number, int blockSize, int channelCode, int depthCode, bool variable, params Subframe[] subframes) =>
+        Frame(number, blockSize, channelCode, depthCode, variable, rateCode: 9, subframes);
+
+    /// <param name="rateCode">The sample rate bits: 9 for 44.1 kHz, 0 to defer to STREAMINFO.</param>
+    public static byte[] Frame(ulong number, int blockSize, int channelCode, int depthCode, bool variable, int rateCode, Subframe[] subframes)
     {
-        var header = new List<byte> { 0xFF, (byte)(variable ? 0xF9 : 0xF8), (byte)((7 << 4) | 9), (byte)((channelCode << 4) | (depthCode << 1)) };
+        var header = new List<byte> { 0xFF, (byte)(variable ? 0xF9 : 0xF8), (byte)((7 << 4) | rateCode), (byte)((channelCode << 4) | (depthCode << 1)) };
         header.AddRange(CodedNumber(number));
         header.Add((byte)((blockSize - 1) >> 8));
         header.Add((byte)(blockSize - 1));
@@ -36,6 +40,45 @@ internal static class SyntheticFlacBuilder
         var body = header.Concat(bits.ToBytes()).ToArray();
         var crc = Crc16(body);
         return [.. body, (byte)(crc >> 8), (byte)crc];
+    }
+
+    /// <summary>
+    /// A whole stream: <c>fLaC</c>, a STREAMINFO block flagged last, then <paramref name="frames"/>.
+    /// The frames are mono, 16 bits, 44.1 kHz, each a constant subframe, so a stream of any length is
+    /// cheap; a frame number past <paramref name="blockSizes"/>' end is never made.
+    /// </summary>
+    /// <param name="blockSizes">Each frame's block size, in order.</param>
+    /// <param name="variable">Whether frames are numbered by sample rather than by frame.</param>
+    public static byte[] Stream(ulong totalSamples, int[] blockSizes, bool variable = false, int streamRate = 44100, int frameRateCode = 9)
+    {
+        var maxBlock = blockSizes.Max();
+        var bytes = new List<byte>("fLaC"u8.ToArray()) { 0x80, 0x00, 0x00, 0x22 };
+        bytes.AddRange(StreamInfo(variable ? blockSizes.Min() : maxBlock, maxBlock, streamRate, totalSamples));
+        ulong sample = 0;
+        for (var n = 0; n < blockSizes.Length; n++)
+        {
+            bytes.AddRange(Frame(variable ? sample : (ulong)n, blockSizes[n], 0, 4, variable, frameRateCode, [Constant()]));
+            sample += (ulong)blockSizes[n];
+        }
+
+        return [.. bytes];
+    }
+
+    /// <summary>A STREAMINFO payload: mono, 16 bits, frame sizes unknown, no MD5.</summary>
+    public static byte[] StreamInfo(int minBlock, int maxBlock, int rate, ulong totalSamples)
+    {
+        var info = new byte[34];
+        info[0] = (byte)(minBlock >> 8);
+        info[1] = (byte)minBlock;
+        info[2] = (byte)(maxBlock >> 8);
+        info[3] = (byte)maxBlock;
+        var packed = ((ulong)rate << 44) | (0UL << 41) | (15UL << 36) | totalSamples;
+        for (var i = 0; i < 8; i++)
+        {
+            info[10 + i] = (byte)(packed >> (56 - 8 * i));
+        }
+
+        return info;
     }
 
     public static Subframe Constant(long value = 0) => (bits, _, depth) =>

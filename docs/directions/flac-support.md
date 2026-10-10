@@ -207,3 +207,24 @@ the fixture corpus.
   at run time, and the checksums have tests of their own. They moved from `Binary`, which is
   internal, to a public `Checksums`, the LAME tag's CRC-16/ARC with them, since the tests reach
   only public types. 2a committed; next step: 2b, the analysis.
+- 2026-10-10 -- Step 2b written, awaiting review: the analysis of a FLAC file's edges.
+  - `Flac/FlacAnalysis`: the stray tags at either end, then `fLaC` at `B` or searched for (the
+    letters and a STREAMINFO header), the chain and its comment blocks, the first comment block the
+    `vorbis` source and a second reported, `D` at `K` or, where the chain is lost, the first frame
+    numbered 0 whose body checks out.
+  - `Flac/FlacDuration`, all of the playing time: the last frame found by searching back from `F`,
+    the tail window first; a frame cut off is a truncation, a last header matching STREAMINFO's
+    total confirms it, a short final block or a frame ending at `F` ends the stream, and anything
+    else is unusable. Junk after the last frame is `BytesAfterAudio`.
+  - `Tags/TagEdges`: the leading and trailing tags and the marking of sources, moved out of
+    `Mp3Analysis` unchanged, so both formats share them.
+  - `FileLayout` carries `FormatDetails`, MP3's summary frame or FLAC's marker and metadata, with a
+    `Summary` shortcut; four duration bases and two problems are new.
+
+  The edge-reading test found the search for the last frame reading 64 KiB from before the tail
+  window; it now searches the window first. Over the real-world files, every position matches the
+  flac-boundaries probe, and every playing time matches ffmpeg but one: mutagen's
+  `52-too-short-block-size.flac`, 0.418 s against 0.313 s, ffmpeg losing the first frame to the
+  comment block's wrong length, which Goro reads through. A snippet cut inside its first frame,
+  `flac_application.flac`, has a playing time of 0 s: audio found, none of it whole. Next step:
+  review of 2b, then step 3, the sources and the loader.
